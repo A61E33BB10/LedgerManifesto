@@ -1,6 +1,8 @@
 % =====================================================================
-%  THE LEDGER FRAMEWORK — Manifesto, Version 1.0
+%  THE LEDGER FRAMEWORK — Manifesto, Version 1.1
 %  R. Delloye — July 2026
+%  v1.1: Amendments 1–3 (collateral ruling), ratified by the owner
+%  2026-07-11 per the Phase 1 Design Ruling memo.
 %  Build: pdflatex (twice). Requires a standard TeX Live; lmodern and
 %  microtype are used when available and skipped otherwise.
 % =====================================================================
@@ -24,7 +26,7 @@
   {\LARGE\bfseries THE LEDGER FRAMEWORK}\\[0.9em]
   {\large\bfseries Manifesto and Architectural Constitution}\\[0.6em]
   {\normalsize A Unified, Closed-System, Event-Driven Post-Trade Architecture}\\[1.4em]
-  R.~Delloye \quad---\quad July 2026 \quad---\quad Version 1.0
+  R.~Delloye \quad---\quad July 2026 \quad---\quad Version 1.1
 \end{center}
 
 \vspace{0.6em}
@@ -354,11 +356,18 @@ inside it, so the system is closed. Conservation holds by construction,
 not by check.
 
 When a balance must carry more information than a single number, it
-generalises to a vector of coordinates: owned, lent out, borrowed,
-posted as collateral, received as collateral. A quantity earns a
+generalises to a signed vector of coordinates --- owned, lent, posted ---
+whose named rays are: lent out and borrowed, the two signs of lent;
+posted as collateral and received as collateral, the two signs of
+posted. A quantity earns a
 coordinate only when a distinct real-world action can change that
 coordinate independently of ownership. Only the owned coordinate carries
-economic value and drives profit and loss. Anything computable from the
+economic value and drives profit and loss. The remaining coordinates
+carry mass, never value: they record possession and encumbrance under a
+named agreement, no quantity reaches them without reference to the
+agreement unit that governs it, and a lifecycle event extinguishes
+value, never mass --- a unit leaves the ledger only from the zero
+vector. Anything computable from the
 coordinates is a projection, computed when needed and never stored.
 
 \hypertarget{the-machines}{%
@@ -591,11 +600,18 @@ cost'' is ever maintained alongside the position record.
 
 For the variation in NAV to be exactly profit, deposits and
 contributions must not create profit. Every inflow of value is one of
-three things: an exchange paired with an equal-valued outflow; a
-contribution or financing received against an equal obligation created
-in the same transaction; or value held in custody without being owned
-(including cash received as collateral, recorded on the
-collateral-received coordinate). A deposit therefore cannot move profit
+three things: an exchange paired with an equal-valued outflow ---
+settled-to-market margin is this case, a settlement extinguishing the
+day's exposure with no return obligation; a contribution or financing
+received against an equal obligation created in the same transaction ---
+collateral received under title transfer, cash included, is this case,
+owned by the receiver against an equivalent-return obligation that is
+itself a unit; or value held in custody without being owned, recorded on
+the collateral-received coordinate --- collateral received under a
+security interest without right of use, segregated cash included, is
+this case. Where an inflow moves under a margin or collateral agreement,
+which case governs it is declared once, on that agreement unit. A
+deposit therefore cannot move profit
 and loss --- not because a formula subtracts it, but because it cannot
 change net owned value.
 
@@ -886,6 +902,21 @@ Event Monitor, the Events Executor, the Transaction Executor, smart
 contract, the market data operator, the three homes, virtual wallet,
 virtual ledger --- is fixed: one name per component, and no
 specification shall introduce a synonym for any of them.
+
+\subsection*{Amendment record}
+
+\textbf{Version 1.1 (11 July 2026).} Three amendments, proposed by the
+v15 Phase~1 Design Ruling on the collateral generalisation and ratified
+by the owner: Section~4's coordinate sentence restated as a signed
+vector --- owned, lent, posted --- with the five original names as its
+rays; Section~4 extended by one sentence fixing that non-owned
+coordinates carry mass never value, always under a named agreement, and
+that a lifecycle event extinguishes value never mass; Section~8's
+three-case inflow sentence sharpened to key the case on the declared
+legal regime of the governing agreement --- settled-to-market margin as
+settlement, title-transfer collateral (cash included) as financing
+against an obligation unit, and security-interest collateral without
+right of use as custody.
 
 --- End of Manifesto ---
 
