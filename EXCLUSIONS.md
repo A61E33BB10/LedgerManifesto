@@ -265,4 +265,15 @@ Keyed to the constitution's sections; v13.1/v14 origin in parentheses.
 4. **Cum/ex state-aware pricing, sec26.** "Ex but amount unknown is unrepresentable" and the pricer-total-over-(u,q,d) fibre condition are correctness content only partially implied by §14.2's "estimates and entitlements are kept apart." If dropped with the appendix, the dividend-forecast tour stop loses its formal footing. *Recommendation: fold into the market-data-operator chapter.*
 5. **Locate machinery (P26, admission-position-indexed weld; EU SSR / Reg SHO), sec17.** Neither the constitution nor the ruling mentions locates; the ruling's coverage invariant subsumes the *drawdown* guard (P14) but not the pre-trade locate object, its TTL-unit model, or the venue-keyed regulatory taxonomy. If the SBL chapter drops it under the cap, short-selling admissibility has no home. *Recommendation: carry condensed in the SBL chapter.*
 
+## Post-ratification additions (Phase 2 gate, owner dispositions of 2026-07-11)
+
+| # | Topic (source) | Disp. | Reason |
+|---|---|---|---|
+| E71 | Dividend-forecast worked example (v14 stop; two-component datum) | COMP | *Worked-Examples Volume* per owner disposition G1; the mechanisms it substantiates (datum-kind registry, invariance witness) are normative in Ch. 8. |
+| E72 | Special-dividend override worked example (v14 stop; three-layer schedule) | COMP | *Worked-Examples Volume* per owner disposition G1; the adjustment-schedule totality mechanism is normative in Ch. 8. |
+| E73 | Full SBL operational lifecycle (locates incl. P26 weld and EU SSR/Reg SHO taxonomy, buy-ins, SFTR/CSDR discipline, cascade recalls) | COMP | Named companion: *SBL Operations Companion*, per owner disposition G6; v15 carries the half-page lent-plane episode and the ruling's SBL corollary in Ch. 9. Supersedes flag 5's recommendation. |
+| E74 | Track B of "Term Sheets as Graphs" (generic interpreter prototype, CDM round-trip, term-sheet rendering) | COMP | Standalone post-v15 companion memo per owner note §5; Track A (product graph, watch identity, typed states, consistency invariant) is ratified INTO v15 Ch. 3. |
+
+**Gate dispositions on the five flagged cuts:** flag 1 (dual valuation) — carried, Ch. 7 (+1 pp); flag 2 (W1–W4) — carried normatively, Ch. 8 (+0.5 pp); flag 3 (open-problems index) — carried, Ch. 17 (+1 pp); flag 4 (cum/ex pricing) — carried, Ch. 8 (+0.5 pp); flag 5 (locates) — resolved by E73 (companion), with the coverage invariant carrying the drawdown guard in v15. Register ratified by the owner 2026-07-11 with these amendments.
+
 — End of register —
