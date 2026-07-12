@@ -196,3 +196,15 @@ reintroduction of a store to reconcile; it is a cached read of the log, provably
 the log it came from. What is materialised is a fact a contract must read; what is never
 materialised is a view a projection can recompute. Between them the homes carry everything
 the contracts need and nothing they do not.
+
+The accrued statistic is order-dependent: each firing reads the previous accrual and
+extends it, so its projection is defined by an order, and that order is fixed. The
+immutable log's total order for a unit's fixings is the recorded observation index~$k$ ---
+the fixing sequence --- not the order in which prints arrive; replay folds the accrual in
+that order and is deterministic. A late or out-of-order print is inserted at its
+observation position~$k$, and the accumulator tail $A_{k},A_{k+1},\dots$ is recomputed from
+$k$ forward --- identical to timely arrival because the fold is over the ordered sequence,
+while the downstream daily CCP-cash figures at positions after~$k$ --- the future's
+variation margin on the same recorded closes, not anything the once-settled variance swap
+pays --- are corrected by compensating transactions, not left as posted. Rebuilding a home is therefore a re-fold in
+observation-index order, never a replay in arrival order.

@@ -107,7 +107,8 @@ state is obtained from the ledger, from UnitStatus and PositionState
 layer computes; the ledger is the sole authority for the state it computes in.
 
 \paragraph{Episode --- the one-touch.}
-OT-1 is a one-touch on stock OMEGA, barrier $80.00$ touch-at-or-below, payout
+OT-1 is a one-touch on stock OMEGA, barrier $80.00$ observed at the official
+close (a discretely-monitored closing-price one-touch), payout
 \USD{1,000,000}, held by W-ALPHA. While live, the pricing layer marks it at
 \USD{400,000}. When OMEGA's official close prints $79.00$, the Event Monitor
 emits the touch and the option's contract records the lifecycle transition:
@@ -152,9 +153,13 @@ Case~2 is the one that could leak profit, and does not, for a stated reason.
 
 \begin{proposition}[Deposit-neutrality of title-transfer financing]
 The return obligation minted in case~2 is a valued unit, priced at the inflow
-amount --- par plus accrued at the declared rate. At receipt the owned cash and
-the obligation are equal and opposite in the owned sum, so net owned value is
-unchanged, and NAV does not move.
+amount --- par plus accrued at the declared rate. This is a theorem, and not an
+approximation, exactly when the declared financing rate equals the fair rate for
+the term, so that par-plus-accrued is the obligation's fair value; a declared rate
+away from the fair rate prices the obligation off the inflow amount, and the
+day-one difference is a financing basis, not a deposit. Under that assumption, at
+receipt the owned cash and the obligation are equal and opposite in the owned sum,
+so net owned value is unchanged, and NAV does not move.
 \end{proposition}
 
 Because the obligation is priced at par-plus-accrued, its value tracks the cash

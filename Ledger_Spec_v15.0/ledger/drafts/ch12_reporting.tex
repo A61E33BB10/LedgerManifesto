@@ -38,7 +38,11 @@ One input class stands outside the record: reference data --- identifiers,
 classifications, counterparty attributes --- owned by external authorities, per
 the constitution's scope. It is supplied at the boundary by the authority that
 owns it and joined to the projection as the report is built. The join attaches
-labels and groupings; it can never alter a quantity. A figure carrying a wrong
+labels and groupings; it can never alter a quantity. Gating admission and altering a
+quantity are different acts, and neither contradicts the other: an eligibility predicate
+may read declared or reference data to refuse a transaction at the door (Chapter~9), but a
+refusal admits or rejects, it never rewrites a booked number --- and the report-time join
+does not even gate, it only labels. A figure carrying a wrong
 identifier is a labelling defect at the boundary, repaired by re-joining fresh
 reference data to the unchanged projection --- never a ledger defect. The same
 division of labour governs format: the ledger computes what the figures are; a
@@ -118,7 +122,10 @@ per \S 2. It has exactly three components:
 \begin{enumerate}[nosep]
 \item the \emph{pool predicate} --- a declared wallet and move predicate
   defining the pool over which received value is attributed (for instance, the
-  wallets and moves constituting the reinvestment book);
+  wallets and moves constituting the reinvestment book); it is total over recorded
+  log state, ranging only over wallets and moves already on the log, so an input not
+  on the record is not admissible and there is no hidden manual-tagging step outside
+  the projection;
 \item the \emph{period basis} --- the timestamp or period on which the pro-rata
   ratio is struck;
 \item the \emph{rounding rule} --- with remainders booked explicitly, per
@@ -155,7 +162,9 @@ determinism --- not agreement with a second party, because no second party
 exists.
 
 One figure on this surface is genuinely two-sided: the collateralisation of net
-exposure under a governing agreement. The counterparty computes the same figure
+exposure under a governing agreement. It is the specification's single reconciled
+surface, present by design and named beside the projections, not a concession
+extracted from them after the fact. The counterparty computes the same figure
 from the same agreement, and the two are compared at the boundary. It is
 therefore sourced from the governing agreement unit's declared terms ---
 valuation percentages, thresholds, netting --- consistently with the

@@ -180,9 +180,12 @@ what the contract reads, never in how it runs.}
 \subsection{The one-touch: one firing, one transaction, and idempotence}
 
 OT-1 is a one-touch on the stock OMEGA that pays \USD{1{,}000{,}000} the first
-time OMEGA trades at or below its barrier of 80.00. It is written by W-BANK and
-held by W-ALPHA; its terms declare one watch, on OMEGA's recorded official
-close against the barrier.
+time OMEGA's official close is at or below 80.00 --- a discretely-monitored
+(closing-price) one-touch. It is written by W-BANK and held by W-ALPHA; its
+terms declare one watch, on OMEGA's recorded official close against the barrier
+--- and because the barrier is observed at that close, the watch is exactly the
+barrier edge's declared guard, so the term is transcribed faithfully
+(Chapter~3's product-graph consistency).
 
 \emph{The trigger and the contract.} OMEGA closes at 79.00; the close is
 recorded, the condition is met, and the Monitor emits the touch. The contract
@@ -215,6 +218,17 @@ Firing~$k$ reads both, forms the return, adds its square, and writes the updated
 accrued statistic back for firing~$k+1$. A firing 200 days into the swap's life
 reconstructs its entire history from the record and holds nothing of its own
 between firings.
+
+\emph{Ordering.} The fold obeys the log's order, not the wire's: the immutable
+log's total order for a unit's fixings is the recorded observation index --- the
+fixing sequence~$k$ --- not the order the prints happen to arrive, so replay is
+deterministic. A duplicate print is inert, absorbed once under its cause-derived
+identifier; a late or out-of-order print is not a no-op --- it is re-sequenced to
+its observation position~$k$, and the accrued-statistic tail
+$A_k, A_{k+1}, \ldots$ is recomputed from~$k$ forward. The recomputed result is
+identical to timely arrival because the fold is over the ordered sequence, and
+any figure already posted against a superseded tail is corrected by a
+compensating transaction, never left standing (Chapter~15).
 
 \emph{Firing~$k$ finds fixings $1 \ldots k-1$ on the record; a contract never
 remembers.}

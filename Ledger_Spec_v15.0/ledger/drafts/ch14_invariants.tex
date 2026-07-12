@@ -263,6 +263,25 @@ post $5{,}000$ is refused at the door. Coverage is never lawfully false, because
 transaction is atomic and possession is instantaneous within it: that is what
 makes it an invariant.
 
+Coverage binds \emph{instructed} ownership, and the qualifier is load-bearing. Owned is
+booked at instruction --- trade-date (Chapter~\ref{ch:collateral}) --- so a wallet may
+post or deliver a security it has bought but not yet settled: that state is reachable,
+admitted at the door because instructed ownership covers it. The invariant forbids only
+\emph{recording} a state whose posted mass exceeds instructed ownership. A later
+involuntary reduction of owned --- a failed or cancelled purchase that would drop owned
+below the mass already posted --- is therefore not a silent breach but a transaction
+\emph{refused at the door}: it cannot be recorded while it would violate coverage. The
+unmet return is carried instead as a recorded, deadline-bearing obligation
+(Chapter~\ref{ch:collateral}), and on default it escalates to the supervised write-off
+path there. The fails cascade thus lives inside the model --- order-forced at the door,
+then obligation, then supervised write-off --- and the invariant is never false in any
+committed state.
+
+On fungible cash coverage is a per-move check: a cash posting is admitted against owned
+cash at the instant it is recorded, and because the same owned USD backs every
+obligation drawn on it, aggregate cash adequacy across all obligations is not coverage
+at all but the sufficiency obligation --- a deadline, not an invariant.
+
 \begin{center}
 \begin{tabular}{@{}p{0.20\textwidth}p{0.30\textwidth}p{0.16\textwidth}p{0.24\textwidth}@{}}
 \toprule
@@ -337,5 +356,10 @@ Chapter~\ref{ch:objects}, they are the surface Chapter~15 tests over one
 generator universe. Their joint effect is the constitution's claim in \S 11: the
 classes of inconsistent state that internal reconciliation exists to detect ---
 unbalanced books, a fact written twice into disagreement, a quantity valued in the
-wrong frame, collateral delivered that was never possessed --- are not caught
-here; they are unreachable. What cannot be represented cannot break.
+wrong frame, collateral posted in excess of the poster's instructed ownership --- are
+not caught here; they are unreachable. What cannot be represented cannot break. The
+residual economic exposures that remain --- a bought-not-yet-settled posting whose
+purchase later fails, an intraday shortfall of value against exposure --- are reachable
+and real, but the model carries them as recorded, deadline-bearing obligations
+(Chapters~\ref{ch:collateral} and~\ref{ch:settlement}), never as silent breaches of an
+invariant.

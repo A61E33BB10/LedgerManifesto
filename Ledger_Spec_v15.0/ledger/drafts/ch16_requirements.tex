@@ -108,7 +108,9 @@ pricing layer must meet.
 The boundary is the one place the closed system is not closed
 (Chapter~\ref{ch:marketdata}). Chapter~8 held it watertight with two devices --- the
 recorded observation and the market data operator --- and listed six checks a candidate
-implementation must pass. They are the boundary minima.
+implementation must pass. A seventh extends the same discipline to the declared terms of a
+governing agreement, whose provenance is the executed agreement rather than a market feed
+(Chapter~\ref{ch:collateral}). They are the boundary minima.
 
 \begin{enumerate}[label=\textbf{B\arabic*.}, ref=B\arabic*, leftmargin=*, itemsep=3pt]
 \item \textbf{Every datum carries provenance.} Every datum on the record must carry its
@@ -146,13 +148,22 @@ implementation must pass. They are the boundary minima.
   datum that materially affects valuation is insufficient: such a datum must be drawn from
   more than one attested source, aggregated by a declared rule, with divergence beyond a
   declared threshold producing a flagged output rather than a silent pick (W3).
+\item \textbf{Declared agreement terms are reconciled at the boundary.} Every declared
+  term of a governing agreement --- eligibility, valuation percentage, thresholds, the
+  trapping predicate, and the legal-regime bit --- is boundary data whose provenance is the
+  executed agreement; it must be reconciled against the counterparty's own record, and a
+  transcription error repaired by terms amendment plus a compensating rebooking, never a
+  silent edit (Chapter~\ref{ch:collateral}; Chapter~\ref{ch:marketdata}). The regime bit is
+  the worked instance; the duty is general over every declared term.
 \end{enumerate}
 
-The boundary rests on one named trust assumption and no other: TA-KIND, that a kind
+The boundary rests on two named trust assumptions and no other: TA-KIND, that a kind
 declaration faithfully renders its publisher's quotation convention, owned by data
 governance and detected by the invariance witness, source divergence, and recomputation
-(Chapter~\ref{ch:marketdata}). Everything else that crosses is recorded, framed, and
-replayable.
+(Chapter~\ref{ch:marketdata}); and TA-TERMS, that a declared agreement term faithfully
+transcribes the executed agreement (B7), owned by the same governance and detected by
+boundary reconciliation against the counterparty's own record. Everything else that
+crosses is recorded, framed, and replayable.
 
 \subsection{Verification}
 
@@ -166,10 +177,13 @@ identical transaction, and that neither machine writes the ledger. The valuation
 (V1--V6) are checkable over generated positions and prices: recompute every NAV from the
 record and compare to the minor unit, confirm the price function reads state only from the
 ledger, and confirm that mark-to-market and mark-to-mid fold one composition. The boundary
-minima (B1--B6) are checkable over generated data and corporate actions: confirm that no
+minima (B1--B7) are checkable over generated data, corporate actions, and agreements:
+confirm that no
 datum lacks provenance, that no unregistered kind and no undeclared pairing crosses, that
 every original survives its adjustment, that the invariance witness holds across every
-generated event, and that each of W1--W4 replays bit-identically
+generated event, that each of W1--W4 replays bit-identically, and that a perturbed
+agreement term is caught by boundary reconciliation and repaired by amendment plus
+rebooking rather than silent edit
 (Chapters~\ref{ch:testability} and~\ref{ch:invariants}).
 
 Because every requirement here restates a derivation already proved in the body,

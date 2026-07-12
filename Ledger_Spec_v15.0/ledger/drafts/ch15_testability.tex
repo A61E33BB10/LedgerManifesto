@@ -54,12 +54,18 @@ and a structurally valid transaction can still be economically wrong.
 
 \subsection{The generator universe and the adversarial scheduler}
 
-The enumerations this specification builds on are closed: the lifecycle states and edges of
-a product graph, fixed at registration (Chapter~\ref{ch:objects}); the collateral regimes
-and marker planes (Chapter~\ref{ch:collateral}); the component dimensions of the datum-kind
-registry and the boundary failure regimes W1--W4 (Chapter~\ref{ch:marketdata}); the trigger
-classes of a contract (Chapter~\ref{ch:contracts}). Because they are closed and declared,
-one generator universe ranges over the whole domain, and its coverage of each enumeration is
+The enumerations this specification builds on are genuinely closed. On the ledger's side:
+the product-graph node and edge sets --- the lifecycle states and guarded transitions ---
+fixed at registration (Chapter~\ref{ch:objects}); the collateral regimes
+\{title-transfer, pledge, STM/CTM\} and the coordinate planes \{owned, lent, posted\}
+(Chapter~\ref{ch:collateral}); the component dimensions of the datum-kind registry and the
+boundary failure regimes W1--W4 (Chapter~\ref{ch:marketdata}); and the trigger and event
+kinds of a contract (Chapter~\ref{ch:contracts}). On the CDM side the genuinely closed
+enumerations are the day-count fraction, the option type (call or put), and the
+primitive-instruction set (Chapter~\ref{ch:cdm}). These are closed choices, and they seed
+the generator universe; a co-populated, cardinality-many composite is not a closed choice
+and is not one of them. Because the closed enumerations are closed and declared, one
+generator universe ranges over the whole domain, and its coverage of each enumeration is
 itself a checkable fact --- every inhabitant is reachable by the generators, so a property
 that never exercises a case is a visible gap, not a silent one.
 
@@ -141,24 +147,34 @@ prop_movesOnly tx = balances (apply tx l0) === balances (apply (onlyMoves tx) l0
 \paragraph{(ii) Determinism and replay.}
 The clock is the single input not on the record, and the Event Monitor is the single place it
 is consulted (Chapter~\ref{ch:machines}); every arrow downstream is a function of the record
-alone. Two gates follow. \emph{Idempotence:} a duplicated or late proposal, carrying the same
-cause-derived identifier, commits once and produces the identical transaction. \emph{Replay
-determinism:} re-running the map on the recorded observations reproduces every recorded
-statistic bit-for-bit, because barrier and fixing observation are deterministic --- each
-datum crosses the boundary once, as a recorded observation, and is never re-read live
-(Chapter~\ref{ch:marketdata}).
+alone. Two gates follow. \emph{Idempotence:} a duplicated proposal, carrying the same
+cause-derived identifier, commits once and produces the identical transaction --- a
+duplicate is inert. A late or out-of-order proposal is not a no-op on the tail: the
+immutable log's total order for a unit's fixings is the recorded observation index~$k$, so
+the proposal is inserted at its observation position~$k$ and the order-dependent accumulator
+tail $A_{k},A_{k+1},\dots$ is re-sequenced and recomputed from $k$ forward. \emph{Replay
+determinism:} re-running the map on the recorded observations \emph{in observation-index
+order} reproduces every recorded statistic bit-for-bit, because barrier and fixing
+observation are deterministic --- each datum crosses the boundary once, as a recorded
+observation, and is never re-read live (Chapter~\ref{ch:marketdata}); a late insertion
+recomputes the tail, and the recomputation is bit-exact.
 
 \medskip\noindent\textbf{Episode --- the future (T1): a duplicate is inert; a late firing is
 identical.}
 FUT-IDX settles at recorded IDX closes $1{,}000$, $990$, $1{,}005$ (multiplier $10$);
 cumulative variation margin is $+50-100+150 = 100$ (Chapters~\ref{ch:contracts}
 and~\ref{ch:valuation}). \emph{The gate.} The day-2 settlement event is delivered twice, and
-delivered late, in a scheduler that reorders it against unrelated firings. The contract is a
-function of the record, so the late firing emits the identical \USD{100} move; the duplicate
-carries the same cause-derived identifier and commits once at the door. \emph{Design point.}
+delivered late, in a scheduler that reorders it against \emph{unrelated} firings. Reordering
+against unrelated firings leaves FUT-IDX's own fixing sequence --- its observation-index
+order --- untouched, so the contract, a function of the record, emits the identical
+\USD{100} move; the duplicate carries the same cause-derived identifier and commits once at
+the door. Were day~2 instead reordered \emph{within} FUT-IDX's own sequence --- arriving
+after day~3 --- it would be inserted at its observation position and the variation-margin
+tail recomputed from there, not applied as a late no-op. \emph{Design point.}
 \emph{Timeliness depends on the untrusted machines; integrity does not --- a duplicate is
-inert and a late firing identical, and both are properties the scheduler tries and fails to
-break.}
+inert, a firing reordered against unrelated events is identical, and one reordered within
+its unit's own sequence is re-sequenced and its tail recomputed; all are properties the
+scheduler tries and fails to break.}
 
 \medskip\noindent\textbf{Episode --- the variance swap (T5): regenerate firing~127.}
 VS-1 accrues a sum-of-squared-returns statistic in UnitStatus, an integer at scale $10^{-8}$,
@@ -173,13 +189,26 @@ prop_replay127 :: Property
 prop_replay127 = accrue close127 1005 1805000 === recorded A_127
 -- the recorded closes are deterministic; A_126 is a recorded integer; so any party
 -- re-running the same map on the same recorded fixings obtains the identical A_127.
+
+-- replay folds the fixings in recorded OBSERVATION-INDEX order (the sequence k), never
+-- arrival order; a late or out-of-order print is inserted at position k and the tail
+-- A_k, A_{k+1}, ... is recomputed from k forward:
+prop_lateInsertRecomputesTail :: Fixing -> [Fixing] -> Property
+prop_lateInsertRecomputesTail late fs =
+  foldAccrue (insertAtObsIndex late fs) === foldAccrue (sortByObsIndex (late : fs))
+-- the fold is over an ordered integer sequence, so the recomputed tail is bit-exact.
 \end{lstlisting}
 
-Firing~127 is not trusted to have been right because it ran; it is verified by
-recomputation, and the recomputation is exact because its every input --- the accrued
-integer, the recorded closes --- is on the record. \emph{Economic verification is re-running
-the map on recorded inputs and comparing; determinism is what makes the comparison
-bit-exact.}
+Replay is a fold in observation-index order, not arrival order: the immutable log's total
+order for VS-1's fixings is the recorded fixing sequence, so an out-of-order or late print
+is inserted at its position~$k$ and the accrual tail $A_{k},A_{k+1},\dots$ recomputed from
+$k$ forward, bit-for-bit, while the downstream daily CCP-cash figures at positions after~$k$
+--- the future's variation margin on the same recorded closes --- are corrected by
+compensating transactions, not left as posted. Firing~127 is not trusted to have been right
+because it ran; it is verified by recomputation, and the recomputation is exact because its
+every input --- the accrued integer, the recorded closes --- is on the record.
+\emph{Economic verification is re-running the map on recorded inputs and comparing;
+determinism is what makes the comparison bit-exact.}
 
 \paragraph{(iii) The temporal residual: a safety and liveness model.}
 The move algebra owns what is true \emph{within} a transaction --- conservation, coverage,
@@ -238,8 +267,10 @@ invariants and no adversarial history reaches a forbidden state; the economic or
 reproduces every recorded transaction from its recorded event, and a seeded divergence is
 repaired only by a compensating transaction; the four product-graph properties confirm that
 watches, state schema, and actions never disagree; moves are shown to be the sole balance
-mutator; a duplicate firing is inert and a late firing identical; firing~127 recomputes
-bit-for-bit; and the knock--revalue--call--discharge model holds its two safety invariants
+mutator; a duplicate firing is inert and a late firing folds in at its observation index ---
+identical when reordered against unrelated events, its tail recomputed when reordered within
+its unit's own sequence; firing~127 recomputes bit-for-bit; and the
+knock--revalue--call--discharge model holds its two safety invariants
 always and its liveness obligation eventually, with sufficiency asserted only as the latter.
 Each is mechanical, each is replayable from a seed, and each fails closed. A property that
 cannot be checked this way is redesigned until it can be: property-based testing is a

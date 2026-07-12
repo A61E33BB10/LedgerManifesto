@@ -20,6 +20,10 @@ settles; the external infrastructure decides \emph{how}, and how is out of scope
 connectivity are external authorities the ledger reconciles against, never
 functions it performs). An instruction is the boundary object: it names the
 transfer to be performed and carries none of the machinery that performs it.
+Settlement in size may confirm in part: the ledger records the settled quantity each
+confirmation carries, as a new external fact, while how a delivery is partialled,
+tranched, or auto-split under settlement discipline belongs to the settlement layer ---
+the \emph{how}, out of scope.
 
 What the interface never does is write. It is not the Transaction Executor and
 holds none of its privilege; it proposes nothing to the door and changes no
@@ -58,7 +62,7 @@ not undone. History is never rewritten (\S2): a trade ultimately unwound is unwo
 by a compensating transaction, through the same door, never by deleting the booking
 that instructed it.
 
-\subsection{Three episodes}
+\subsection{Four episodes}
 
 \textbf{Dividend: cash projects to one instruction.} W-ALPHA holds $10{,}000$ ACME;
 the declared dividend is $1.50$ per share, and nothing encumbers the holding. The
@@ -130,6 +134,22 @@ never the stale $100.00$); the interface adds no check and emits nothing.
 re-denominates terms crosses nothing, so it projects to nothing --- by
 construction.}
 
+\medskip\noindent\textbf{Variance swap: the terminal settlement projects to one
+instruction.} VS-1 is a one-year OTC variance swap on IDX, $252$ fixings, strike $400$
+variance points at \USD{1{,}000} per point. Through its life each fixing is an
+observation the ledger records, not a transfer (Chapters~\ref{ch:marketdata}
+and~\ref{ch:valuation}); none crosses the boundary, and each projects to the empty
+list. At expiry the realised variance is $441$ points and the contract proposes one
+settlement move --- owned(USD) $1{,}000\times(441-400) = \USD{41{,}000}$, from the
+strike payer to the realised-variance receiver.
+\emph{The projection} reads that one committed move.
+\emph{The instruction:}
+\begin{enumerate}[label=(\arabic*),nosep]
+\item Cash \USD{41{,}000}, strike payer $\to$ realised-variance receiver.
+\end{enumerate}
+\emph{A whole year of fixings accrues one statistic and settles once; only the terminal
+cash crosses the edge, and the interface instructs exactly it.}
+
 \subsection{Settlement state and the market claim}
 
 One recorded fact upstream of the projection is load-bearing for its correctness:
@@ -145,23 +165,41 @@ interface projects is the promise that the external register will catch up. Betw
 the two lies the instruction-to-settlement gap, and the gap is carried explicitly
 --- never elided, never back-filled at read time.
 
-\medskip\noindent\textbf{A record date inside the gap.} Entitlement determination
-reads the owned plane (Chapter~\ref{ch:collateral}): who owns a unit at the record
-date is who is owed its distribution. But the paying agent credits the \emph{record
-holder} at the external register, and while a sale is unsettled the record holder is
-still the deliverer --- the seller --- not the buyer the owned plane already shows.
-The two disagree by construction, and the disagreement is not a break to be
+\medskip\noindent\textbf{A record date inside the gap.} Economic entitlement to a
+distribution is fixed by the \emph{ex-date}, not by the record date alone. A trade
+executed before the ex-date is \emph{cum} --- the price it paid still includes the
+coming distribution --- and one executed on or after the ex-date is \emph{ex}, its
+price already excluding it; the ex-date operator that separates the two frames is the
+one Chapter~\ref{ch:marketdata} declares, and the cum/ex invariance witness that
+forbids reading a price on the wrong side of it is catalogued in
+Chapter~\ref{ch:invariants}. The routing predicate reads the trade's execution date
+against that recorded ex-date; the record date only fixes the registration snapshot
+the paying agent pays against. Two cases follow, and only one raises a claim.
+
+\emph{The cum case.} A \emph{cum} sale still unsettled at the record date leaves the
+owned plane showing the buyer --- who is cum-entitled --- while the paying agent
+credits the \emph{record holder} at the external register, still the deliverer, the
+seller. The two disagree by construction, and the disagreement is not a break to be
 reconciled at report time: it is a recorded obligation. The \textbf{market claim} is
 that obligation --- a unit (\S6) whose obligee holds it positive and whose obligor
-holds it negative, the buyer's claim-for-equivalent on one side and the deliverer's
-duty to remit on the other, created over the gap by the record-date firing and
-discharged when the deliverer receives the distribution. Here is the seam that keeps
-the projection pure: the market claim is created not by the projection, which writes
-nothing, but by the contract that fires at the record date. That contract reads the
-owned plane and the recorded settlement state and proposes the reconciling leg as
-one component of the determination transaction, which the Transaction Executor
-admits like any other. The projection then reads the resulting committed moves; it
-originates none of them.
+holds it negative, the cum buyer's claim-for-equivalent on one side and the
+deliverer's duty to remit on the other, created over the gap by the record-date firing
+and discharged when the deliverer receives the distribution.
+
+\emph{The ex case.} An \emph{ex} sale unsettled at the record date raises no buyer
+claim at all: the buyer bought ex, is not entitled to this distribution, and the
+registered holder --- the deliverer --- keeps it, matching the ex-buyer's economic
+expectation exactly. The owned plane shows the buyer here too, so owned read alone
+would misroute; entitlement keys on the ex-date, and the record-date contract stays
+silent.
+
+Here is the seam that keeps the projection pure: the market claim is created not by the
+projection, which writes nothing, but by the contract that fires at the record date.
+That contract reads the owned plane, the trade's cum/ex status against the recorded
+ex-date, and the recorded settlement state, and proposes the reconciling leg --- where
+the cum case calls for one --- as one component of the determination transaction, which
+the Transaction Executor admits like any other. The projection then reads the resulting
+committed moves; it originates none of them.
 
 \begin{lstlisting}
 data SettlementState = Instructed | Settled | Failed  -- a recorded fact, read by routing
@@ -176,20 +214,27 @@ data MarketClaim = MarketClaim
 \end{lstlisting}
 
 \begin{proposition}[Entitlement routing]
-The recipient of a distribution is a total function of the recorded owned plane and
-the recorded settlement state at the record date. Determination reads owned; where
-the settlement state of an owned re-booking is unsettled across the record date, the
-paying agent credits the deliverer and a market-claim unit carries the reconciling
-leg from the deliverer to the owner. No distribution reaches any wallet except by a
-recorded move against a determined entitlement or the discharge of a market-claim
+The recipient of a distribution is a total function of the recorded owned plane, the
+trade's cum/ex status against the recorded ex-date, and the recorded settlement state
+at the record date. Determination reads owned; a market claim arises in exactly one
+case --- a \emph{cum} trade, executed before the ex-date, still unsettled across the
+record date --- where the paying agent credits the deliverer and a market-claim unit
+carries the reconciling leg from the deliverer to the cum-buyer. An \emph{ex} trade,
+executed on or after the ex-date, unsettled at the record date raises no buyer claim:
+the registered holder keeps the distribution. No distribution reaches any wallet except
+by a recorded move against a determined entitlement or the discharge of a market-claim
 unit.
 \end{proposition}
 
 \medskip\noindent\textbf{Worked micro-example (dividend).} Stock ACME pays a cash
 dividend of $1.50$ per share; the record date is 2026-05-15. Wallet W-ALPHA holds
 $10{,}000$ ACME and sells them to a buyer, wallet W-BETA: the sale is instructed on
-2026-05-14 for settlement on 2026-05-16, so the record date falls in the gap. (The
-cash consideration settles symmetrically and does not bear on the entitlement.)
+2026-05-14 for settlement on 2026-05-16, so the record date falls in the gap. The
+2026-05-14 execution precedes the ex-date associated with the 2026-05-15 record date,
+so the sale is \emph{cum} --- which is why the distribution routes to the buyer; an
+otherwise identical trade executed on or after the ex-date would be \emph{ex} and raise
+no market claim. (The cash consideration settles symmetrically and does not bear on the
+entitlement.)
 
 \emph{2026-05-14 --- the sale; owned re-books at instruction.} One transaction:
 \begin{enumerate}[label=(\arabic*),nosep]
@@ -199,14 +244,15 @@ instruction; the settlement instruction, due 2026-05-16, is recorded as unsettle
 The owned plane now shows W-BETA holding $10{,}000$ ACME and W-ALPHA holding none.
 
 \emph{2026-05-15, record date --- determination and the market claim.} The
-record-date watch fires; the stock's contract determines the entitlement and,
-reading the recorded settlement state, proposes the reconciling leg. One
-transaction:
+record-date watch fires; the stock's contract determines the entitlement and, reading
+the trade's cum status against the ex-date and the recorded settlement state, proposes
+the reconciling leg. One transaction:
 \begin{enumerate}[label=(\arabic*),nosep]
 \item determination reads the owned plane --- W-BETA owns $10{,}000$ --- and records
 the entitlement, $10{,}000 \times 1.50 = \USD{15{,}000}$, to W-BETA in PositionState;
-\item settlement state reads unsettled across the record date: the paying agent will
-credit the record holder, the deliverer W-ALPHA. Issue the market-claim unit MC-1,
+\item the sale is cum and unsettled across the record date, so a market claim arises:
+the paying agent will credit the record holder, the deliverer W-ALPHA. Issue the
+market-claim unit MC-1,
 valued at par: move owned(MC-1) $1{,}500{,}000$ (minor units, $=\USD{15{,}000}$),
 W-ALPHA $\to$ W-BETA --- W-ALPHA holds $-1{,}500{,}000$ (the duty to remit once
 received), W-BETA holds $+1{,}500{,}000$ (the claim-for-equivalent). MC-1's discharge
@@ -255,8 +301,8 @@ reconciliation break the ledger exists to abolish. Reading settlement state, and
 recording the market claim as a first-class unit, makes the routing both faithful to
 what the venue will do and reproducible by any party from the record alone (\S2,
 \S3). The construction is symmetric: where an owned re-booking runs the other way
-across the record date, the same unit carries the reverse claim with its signs
-reversed --- one mechanism, total over the gap.
+across the record date, the same market-claim unit carries the mirror obligation, its
+signs reversed --- one mechanism, total over the gap.
 
 \emph{The ledger says what settles and, across the gap, who is owed; the interface
 projects that settled activity into instructions, writing nothing and inventing

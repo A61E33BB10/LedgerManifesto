@@ -120,7 +120,11 @@ The commitments are ordered by what arbitrates a conflict: a design that is audi
 and reproducible but untestable is redesigned; a design that is elegant but cannot be
 replayed is rejected. No design decision in this document rests on custom or typical
 practice; each is derived from the commitments and then, where an external standard
-binds, shown to satisfy it.
+binds, shown to satisfy it. One boundary bounds all six: they secure one consistent
+internal record, not its correspondence with the world outside --- internal
+unbreakability is not external correctness, and whether a projection matches the market,
+the custodian, or the counterparty is reconciled at the boundary
+(Chapter~\ref{ch:marketdata}), never assumed.
 
 \subsection{The discipline of the document}
 
@@ -141,8 +145,9 @@ design point it substantiates. All quantities are exact integers in minor units;
 amounts stated in whole currency are exact in cents.
 
 Two conventions govern notation. Category-theoretic language appears only as a
-\emph{second telling}: every concept is first fully explained in plain terms with a
-concrete example, and a marked box may then restate it categorically to remove
-residual ambiguity --- nothing later depends on any such box, and deleting them all
+\emph{second telling}, and no knowledge of category theory is assumed of the reader:
+every concept is first fully explained in plain terms with a concrete example, and a
+marked box may then restate it categorically to remove residual ambiguity for the reader
+who wants it --- nothing later depends on any such box, and deleting them all
 leaves the specification complete. Code appears only as short typed signatures and
 data declarations; the reference implementation lies outside this document entirely.

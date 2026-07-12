@@ -33,9 +33,10 @@ through the whole pipeline; the rest are worked where they bite.
 T1 & FUT-IDX --- cash-settled future on IDX; W-ALPHA / the CCP & multiplier 10, USD,
   settled-to-market; buy 1 at 995.00; settlement prints 1{,}000.00 / 990.00 /
   1{,}005.00; cumulative VM \USD{100} $=$ PnL \\
-T2 & OT-1 --- one-touch on stock OMEGA; W-BANK writes, W-ALPHA holds & barrier 80.00
-  touch-at-or-below, payout \USD{1{,}000{,}000}; spot 95.00 at inception; knock at close
-  79.00 \\
+T2 & OT-1 --- one-touch on stock OMEGA; W-BANK writes, W-ALPHA holds & barrier
+  breached when OMEGA's official close is at or below 80.00 --- a discretely-monitored
+  (closing-price) one-touch; payout \USD{1{,}000{,}000}; spot 95.00 at inception; knock at
+  close 79.00 \\
 T3 & ACME --- cash dividend; issuer / W-ALPHA & 1.50 per share; W-ALPHA holds 10{,}000
   shares; entitlement \USD{15{,}000} \\
 T4 & ACME --- 2-for-1 split; issuer / W-ALPHA & 10{,}000 $\to$ 20{,}000 shares; price
@@ -141,8 +142,8 @@ lives with the events; authority lives with the transactions.
 
 \subsection{One instrument walks the pipeline}
 
-The one-touch OT-1 pays \USD{1{,}000{,}000} if stock OMEGA ever trades at or below the
-barrier 80.00; its spot at inception is 95.00. It is written by \mbox{W-BANK} and held by
+The one-touch OT-1 pays \USD{1{,}000{,}000} when OMEGA's official close is at or below
+80.00 --- a discretely-monitored (closing-price) one-touch; its spot at inception is 95.00. It is written by \mbox{W-BANK} and held by
 \mbox{W-ALPHA}, and at registration its terms declared one watch: OMEGA's recorded
 official closes against the barrier.
 

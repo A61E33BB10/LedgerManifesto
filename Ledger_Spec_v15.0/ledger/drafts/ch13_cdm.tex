@@ -21,19 +21,24 @@ listed, fungible instrument this template is the whole image: the same terms
 serve every holder.
 
 For a bespoke bilateral instrument the faithful image is not the template but
-the CDM \texttt{Trade}. The reason is identity. In CDM the collateral terms live
-on \texttt{Trade.collateral} (a \texttt{CollateralProvisions}), so two executions
+the CDM \texttt{Trade}. The reason is economic individuation. In CDM the
+collateral terms live on \texttt{Trade.collateral}, whose type
+\texttt{Collateral} carries the \texttt{CollateralProvisions}; so two executions
 sharing one \texttt{NonTransferableProduct} but differing in their collateral
 terms are distinct \texttt{Trade}s. The ledger reaches the same conclusion from
 the other direction and for the same reason: collateral eligibility and the
 governing regime are declared terms of a distinct agreement unit
 (Chapter~9), and a unit whose economics are inseparable from those terms is a
-distinct unit. Unit identity therefore corresponds to \texttt{Trade} identity,
-not to \texttt{NonTransferableProduct} identity --- collateral terms are part of
-identity in both models. The one structural difference is placement: CDM
-co-locates \texttt{CollateralProvisions} inside the \texttt{Trade}, whereas the
-ledger factors the same terms into a separate agreement unit and relates the two
-by projection. That is a finding about the mapping, carried by the
+distinct unit. Unit identity therefore corresponds to the CDM \texttt{Trade}
+layer, not to the \texttt{NonTransferableProduct} template --- collateral terms
+individuate a trade economically in both models. The individuation is not the
+identifier: a CDM trade's identity is carried by its \texttt{TradeIdentifier},
+and collateral terms individuate the economics that identifier then names. The
+one structural difference is placement: CDM co-locates the collateral terms ---
+\texttt{Trade.collateral}, a \texttt{Collateral} carrying the
+\texttt{CollateralProvisions} --- inside the \texttt{Trade}, whereas the ledger
+factors the same terms into a separate agreement unit and relates the two by
+projection. That is a finding about the mapping, carried by the
 agreement-reference lineage of Chapter~9; it changes no primitive.
 
 \subsection{Business event maps to transaction}
@@ -120,13 +125,22 @@ shown, not borrowed.
 
 \subsection{Closed enumerations and the product graph}
 
-Two further alignments serve later chapters. First, the CDM is built on closed
-enumerations --- the eight-way \texttt{Payout} choice, the option-type and
-day-count enumerations, the finite instruction set --- and closed choice types
-are exactly a generator universe. The ledger's product-graph node sets are
-closed at registration for the same reason (Chapter~3), and the CDM enumerations
-seed the generator universe of Chapter~15, so that the property tests range over
-the industry's own catalogue of product and event shapes, not an invented one.
+Two further alignments serve later chapters. First, the generator universe of
+Chapter~15 rests only on the enumerations that are genuinely closed. The CDM
+\texttt{Payout} is not one of them: its components \emph{compose} rather than
+exclude. A product's \texttt{EconomicTerms} co-populate one payout component per
+leg --- \texttt{EconomicTerms.payout} has cardinality \texttt{(1..*)}, so an
+interest-rate swap carries two interest-rate legs and a total return swap an
+interest-rate leg alongside a performance leg --- and a product is therefore a
+composition of payout components, not a choice of one from a fixed arity. The
+closed enumerations that do seed the generator universe are the day-count
+fraction, the option type (call or put), and the primitive-instruction set,
+together with the ledger's own closed sets: the regimes \{title-transfer,
+pledge, STM/CTM\}, the coordinate planes \{owned, lent, posted\}, the trigger and
+event kinds, and the product-graph node and edge sets closed at registration
+(Chapter~3). These enumerations seed the generator universe of Chapter~15, so
+that the property tests range over the industry's own catalogue of product and
+event shapes together with the ledger's, not an invented one.
 
 Second, the product graph of Chapter~3 --- nodes the closed lifecycle states,
 edges the guarded transitions that emit transaction templates --- is the natural

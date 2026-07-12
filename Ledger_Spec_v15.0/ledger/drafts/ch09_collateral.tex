@@ -45,7 +45,11 @@ role a balance plays under an agreement, not a kind of thing: the type system
 knows planes and agreement references; what may be posted, and at what
 valuation percentage, is a schedule in the agreement's terms. Admitting a new
 eligible asset class is a terms version, not a code change; an ineligible
-posting is refused at the door. What the type system does enforce is stronger
+posting is refused at the door. The declared eligibility predicate may itself read
+recorded ledger state: a concentration limit makes eligibility portfolio-dependent,
+admitting a posting only while the resulting holding stays within the declared bound
+--- read at the door exactly as the coverage check reads state, and never typed. What
+the type system does enforce is stronger
 than any schedule: a move writes exactly one coordinate of one unit, positive
 quantity, the same coordinate debited at the source and credited at the
 destination, and a move whose coordinate is not owned carries a mandatory
@@ -138,7 +142,20 @@ gap: first-class, recorded, deadline-bearing --- an instrument, not a break.
 Settlement state is thereby load-bearing for entitlement routing: a
 correctness requirement of this design, not a reporting axis. Chapter~11
 carries the settlement-side machinery; the mechanism is stated here because
-the re-booking rule creates the gap it must close.
+the re-booking rule creates the gap it must close. Re-booking at instruction
+also lets a wallet deliver or post a bought-not-yet-settled position; should
+that purchase later fail, the shortfall is not an impossibility but a fails
+cascade the model carries --- order-forced at the door (an owned reduction that
+would drop owned below the mass already posted is refused), then the unmet
+return as a recorded obligation, then, on default, the supervised write-off path
+of this chapter's close --- never a silent breach. That fails obligation is, like
+every obligation, a valued unit, minted --- once the reversal is refused --- by the
+settlement-fail event's contract, symmetric to the market-claim unit the record-date
+firing mints (Chapter~\ref{ch:settlement}; the projection writes nothing). With its
+paired settlement --- delivery-versus-payment --- cash leg it offsets the
+bought-not-yet-settled position at fair value, so net owned value --- and NAV --- is
+preserved across a failed purchase, on the same declared-rate-equals-fair-rate basis as
+the \S8 case-2 return obligation below.
 
 Cash under title transfer is the same shape, by \S4's own admission test: a
 quantity earns a coordinate only when a distinct real-world action can change
@@ -228,10 +245,12 @@ asset value falls by exactly 100, the day's loss.
 an owned move, so no agreement reference is required; idempotence under the
 cause-derived identifier --- a duplicate settlement event proposes nothing
 new.
-\emph{The contrast.} Had the CCP agreement declared CTM, the identical cash
-move would be paired with a return-obligation unit valued at 100 and accruing
-the declared rate: one declared term and one obligation unit of difference,
-not a different machine.
+\emph{The contrast (CTM).} The episode is settled-to-market: the day's exposure is
+extinguished and nothing is owed back. Had the CCP agreement declared CTM, the
+identical cash move would be paired with a return-obligation unit --- the returnable
+margin liability --- valued at 100 and accruing the declared rate. That single unit is
+the whole difference: STM and CTM share one machine and diverge by one declared term
+and one returnable-liability obligation unit, not by a different case.
 \emph{The regime is a declared term of the agreement unit; the machine is the
 same.}
 
@@ -250,6 +269,21 @@ true regime --- \emph{plus} compensating transactions rebooking the obligation
 units and accruals of the affected interval. Both, not one: the amendment
 without the rebooking leaves the interval wrong; the rebooking without the
 amendment repairs history and re-breaks tomorrow.
+
+\medskip
+The regime bit is the worked instance of a rule that governs every declared term of the
+agreement. The eligibility schedule, the valuation percentages, the thresholds and
+deadlines, and the trapping predicates are all \textbf{boundary data}, transcribed once
+from the executed agreement, which is their provenance. A transcription error in any of
+them is not an inconsistency the ledger can catch by recomputation --- recomputation
+reproduces the transcribed term and faithfully reproduces the wrong answer --- but a
+perimeter-reconciliation matter, the same class as the \S13-invisible regime bit above
+and the market-data trust assumption of Chapter~\ref{ch:marketdata}. It is detected by
+boundary reconciliation against the counterparty's own record of the agreement, and
+repaired by the same two-step path: a terms amendment declaring the corrected term
+\emph{plus} compensating transactions rebooking the affected interval, never a silent
+edit. The regime bit carries the largest consequence and earns the worked treatment;
+the duty is general over every declared term.
 
 \subsection{Line valuation}
 
@@ -277,7 +311,11 @@ is vacuously true and the obligation discharges at once: in the ordinary state
 the \emph{condition} vanishes, never the \emph{leg}. An unconditional
 issuer-to-owner pass-through is forbidden: the agreements trap distributions
 exactly when a delivery amount or a default stands, and \S6 binds the ledger
-to the terms as declared.
+to the terms as declared. The predicate traps or releases the gross determined
+entitlement; where an agreement instead declares an \emph{amount} transformation
+--- a manufactured dividend net of withholding, or a contractually reduced
+manufactured rate --- that amount is a declared term of the agreement, read like
+any other declared datum, not a new mechanism.
 
 \medskip\noindent\textbf{Episode (dividend): the unencumbered case.}
 W-ALPHA holds $10{,}000$ ACME; the declared dividend is $1.50$ per share; the
