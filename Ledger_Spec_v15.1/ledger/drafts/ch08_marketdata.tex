@@ -1,0 +1,521 @@
+% Chapter 8 — Ingestion, Corporate Actions, and the Market Data Operator (NAZAROV, 8.5 pp).
+% Discharges Constitution v1.1 §9. Carries G1 (four mechanisms + spin-off/elective-merger
+% half-page examples), G3 (W1-W4), G5 (cum/ex). Declares the boundary-convention slot Ch.12 consumes.
+\section{Ingestion, Corporate Actions, and the Market Data Operator}\label{ch:marketdata}
+
+This chapter discharges constitution clauses C-9.1--C-9.3 (the corporate action as a transaction, the market data operator, and its three governing principles).
+
+\S 9 governs the one place the closed system is not closed: the boundary where external
+data crosses in. Everything inside the ledger conserves quantity by construction
+(Chapter~\ref{ch:objects}); value, by contrast, is supplied from outside --- prices,
+dividend figures, index levels, fixings, corporate-action notices, stamped valuations.
+The conservation properties hold only because the system is closed, so the boundary is
+where they are won or lost. Data admitted without provenance, a corporate action that
+silently re-reads old data in a new frame, a fallback taken without a record: each
+corrupts the closed-system property without violating any single internal invariant. This
+chapter holds the boundary watertight, and it does so with two devices --- the recorded
+observation and the market data operator --- and no third.
+
+\subsection{The boundary, and corporate actions on it}
+
+Two things cross the boundary, and they are recorded the same way. \emph{Market and
+reference data} --- a price, a dividend figure, an index level, a fixing, a stamped NAV
+--- crosses as a recorded observation. A \emph{corporate action} --- a split, a dividend,
+a spin-off, a merger --- crosses first as a recorded notice and is then, on its effective
+date, a transaction like any other: a bundle of moves, unit-state changes, and a new
+version of the instrument's terms, applied atomically through the one Transaction Executor
+(Chapter~\ref{ch:machines}). A corporate action is not a privileged operation on a store;
+it is admitted at the same door as a trade, and it writes ProductTerms, UnitStatus, and
+balances through the same four-kind transaction (Chapter~\ref{ch:objects}).
+
+A corporate action does one thing no trade does: it changes the meaning of all data
+recorded before it. After ACME's two-for-one split, the recorded close $100.00$ still
+names the same economic fact, but a post-split reader who multiplies it by the post-split
+count $20{,}000$ books a phantom. To carry pre-event data into the post-event frame a
+transformation must be applied, and the framework gives that transformation a name: the
+\textbf{market data operator}. Three principles govern it, taken from \S 9 and used
+throughout this chapter:
+
+\begin{enumerate}[label=(\roman*),nosep,leftmargin=2.2em]
+\item the operator is \emph{intrinsic to the pairing} of a kind of data with a kind of
+  event, declared once when the kind of data is introduced and the corporate action is
+  recorded, never improvised at the moment of reading;
+\item the \emph{ledger is the authority} and the pricing data layer merely applies: the
+  operator is declared data on the record, and the pricing data layer computes with it,
+  never around it;
+\item \emph{originals are never overwritten}. The observed data stays on the record
+  exactly as observed; the adjusted value is computed at each read; derived quantities are
+  recomputed from operator-adjusted inputs --- until fresh post-event data is recorded,
+  after which the operator has nothing left to adjust.
+\end{enumerate}
+
+\subsection{The observation door}\label{sec:obs-door}
+
+No data enters the ledger as a bare read. All data crosses as a recorded
+\textbf{observation} carrying its provenance: the source that published it, the time it
+was observed, and the basis frame it was observed in. This is the door that
+Chapters~\ref{ch:valuation} and~\ref{ch:virtual} refer to when a mark or a stamped level
+``enters through the observation door.'' A read against a live feed leaves no record and
+is therefore unreproducible; a recorded observation is a fact of the log, so every
+downstream number is a function of the record alone (\S 12).
+
+\begin{lstlisting}
+data Provenance  = Provenance { source :: SourceId, observed :: Time, basis :: BasisRef }
+data Observation = Observation { reading :: Reading, prov :: Provenance }
+-- all data crosses as a recorded Observation; there is no bare read.
+-- the door admits or refuses; a refusal is a returned value, never a partial write:
+data Ingest      = Admitted Observation | Refused IngestError
+\end{lstlisting}
+
+The provenance frame is what makes ``prices and quantities are never mixed across an
+event'' (\S 8) enforceable rather than hoped for: the frame the data was observed in is on
+the record beside the data, so a read that would combine it with a quantity in a
+different frame is detectable, not silent. That detection is the invariance witness of
+Section~\ref{sec:witness}.
+
+\medskip\noindent\textbf{Episode --- the variance swap (T5): the fixing source is the
+record.}
+\emph{Trigger.} VS-1's scheduled fixing dates arrive; each is a watch on the recorded IDX
+official close (Chapter~\ref{ch:objects}). \emph{The door.} The fixing is not a second
+feed; it is a read of the same recorded official-close observation that FUT-IDX settles
+against. The three settlement days of the future --- IDX closes $1{,}000.00$, $990.00$,
+$1{,}005.00$ --- are fixings $124$, $125$, and $126$ of the swap's $252$-fixing series.
+\emph{Design point.} \emph{One recorded observation source feeds two consumers; because
+the source is on the record, the fixing series is deterministic and replayable at the data
+boundary, and firing $127$ recomputes the same statistic any party would
+(Chapter~\ref{ch:valuation}).}
+
+\medskip\noindent\textbf{Episode --- the total return swap (T6): the bridge is an
+observation.}
+\emph{Trigger.} TRS-1's first quarterly reset arrives; virtual ledger V-1's replayable
+level is stamped at \USD{10{,}300{,}000}. \emph{The door.} That level crosses as an
+observation with provenance --- source the fold of V-1's own log, observed at the reset
+date, in the reference-currency frame --- and is recorded. No move crosses: a move from a
+wallet of V-1 to a wallet of the true ledger has no paired leg that conserves in either
+ledger, so neither Transaction Executor can admit it (Chapter~\ref{ch:virtual}). \emph{The
+door checks.} Provenance present; the crossing is a recorded observation, not a move.
+\emph{Design point.} \emph{The bridge between the virtual ledger and the true ledger is an
+observation, never a move; the reset and financing moves it triggers are the true ledger's
+own (Chapter~\ref{ch:virtual}).}
+
+\subsection{The data-kind registry}\label{sec:registry}
+
+Market data is not one number per name. A dividend forecast is a composite: cash entries
+that carry a price dimension and scale under a split, and proportional entries that carry
+no dimension and stand. An operator that treated the data as a single scalar would either
+scale the proportional part, which is wrong, or leave the cash part, which is also wrong.
+The operator must therefore know the \emph{dimension of each component}, and it learns it
+from the \textbf{data-kind registry}.
+
+A kind is registered once, before any data of that kind crosses, with a component-wise
+declaration: each component's dimension --- price-in-basis, proportional, or quantity ---
+and the quotation convention it renders. Registration is immutable: a correction is a new
+kind plus a retirement of the old, never an edit, so no data ever changes dimension under
+a reader's feet. Data whose kind is not registered is refused at the door.
+
+\begin{lstlisting}
+data Dim      = Price | Proportional | Quantity          -- component dimensions
+data Reading  = Reading { kind :: KindId, comps :: [(Dim, Integer)] }  -- exact minor units
+data IngestError = UnknownUnit | UndeclaredConvention | UnregisteredKind
+-- the market data operator acts on Price components; Proportional stands; Quantity is
+-- walled off to the move plane (Chapter 3) and is never carried on the value frame.
+\end{lstlisting}
+
+The wall between \texttt{Quantity} and the \emph{market data} operator is the same wall as
+the move plane. A share count is not adjusted by the market data operator: the two-for-one
+split moves $10{,}000$ ACME to $20{,}000$ by a paired-leg move from the issuer's virtual
+wallet (Chapter~\ref{ch:objects}), because quantity is conserved and only a move may change
+it. The market data operator acts on value-frame components only. This division is what makes
+the split's arithmetic come out invariant, and it is stated as the witness next. (One
+operator does carry a \texttt{Quantity}-dimensioned thing --- the term-adjustment operator
+acting on a contract's multiplier, Section~\ref{sec:term-operator} --- and there the wall is
+not breached, because a multiplier is a term, not mass.)
+
+The registry is a named trust assumption, and it is the only one the operators rest on.
+
+\begin{quote}
+\textbf{TA-KIND.} A kind declaration faithfully renders the publisher's quotation
+convention --- which components are cash and which are proportional, in which basis.
+\emph{Owner:} the party that governs kind registration (data governance). \emph{Violation:}
+an operator scales a component it should not, or spares one it should scale, misvaluing
+across every subsequent corporate action. \emph{Detection:} the invariance witness at the
+first crossing of a corporate action (Section~\ref{sec:witness}), divergence against an
+independent source (regime W3 below), and \S 13 recomputation. \emph{Residual:} a
+misdeclaration that never meets a corporate action is invisible from inside the boundary
+--- a reconciliation matter at the perimeter, the exact sibling of the collateral regime
+bit of Chapter~\ref{ch:collateral}.
+\end{quote}
+
+\subsection{The market data operator and adjustment-schedule totality}\label{sec:operator}
+
+An operator is a function of the registered kind and the event kind, declared once and
+recorded. It carries value-frame data from the pre-event basis to the post-event basis;
+it is the identity on proportional components and undefined on quantity components, which
+never reach it.
+
+\begin{lstlisting}
+-- one operator per (event kind, data kind), declared once, never improvised at read:
+operator :: EventKind -> KindId -> (BasisFrame -> BasisFrame)
+\end{lstlisting}
+
+The first mechanism is that this declaration is \emph{total}.
+
+\begin{principle}[Adjustment-schedule totality]\label{prin:sched-total}
+For every registered data kind and every event kind the boundary admits, an operator is
+declared --- the identity operator where a kind is genuinely unaffected, but declared, not
+assumed. There is no (data kind, event kind) pair for which a read finds the adjustment
+undefined. A corporate action whose pairing has no declared operator does not cross: it is
+refused at the door, never silently treated as identity.
+\end{principle}
+
+Totality is what turns ``never improvised at read'' into a checkable property. An
+improvised adjustment is precisely a pairing with no declared operator; forbidding the
+improvisation means requiring the declaration in advance, for the whole registered domain.
+The refusal of an undeclared pairing is failure regime W4 (Section~\ref{sec:failures}), and
+it fails closed, as \S 2's Correctness commitment demands: the system stops rather than
+guesses a frame.
+
+Operators compose. Two corporate actions in sequence adjust data by the composition of
+their operators, and the composition is taken \emph{in log order}, because the operators do
+not commute: a split then a special dividend is not the same adjustment as the dividend
+then the split. The log fixes the order, so the composed adjustment is well defined and
+replayable.
+
+\begin{secondtelling}
+Fix a data kind. Its bases are the objects of a small category; each recorded event
+contributes the arrow its operator names, from the pre-event basis to the post-event basis;
+identity events contribute identity arrows. A chain of corporate actions is then a path, and
+the adjustment it induces is the composite arrow --- associative because composition of
+functions is, order-sensitive because the arrows do not commute. The map sending each event
+sequence to its composed operator is a functor from event paths to basis maps; adjustment
+totality is the statement that this functor is defined on every arrow of the source. Nothing
+below depends on this telling.
+\end{secondtelling}
+
+\subsection{The operator menu: the split}\label{sec:menu}
+
+The split shows the whole menu at once. On 2026-06-01 ACME's two-for-one split is
+effective; the recorded split notice had declared the effective-date watch, the Event
+Monitor emits the event, and one transaction carries the move and the new terms version
+(Chapters~\ref{ch:objects} and~\ref{ch:homes}). What each recorded data kind reads as, in
+the new frame, is the operator's work:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Data kind & Operator for the 2-for-1 split & Read after the event \\
+\midrule
+Official close (spot) & scale by $\tfrac12$ & $100.00 \rightarrow 50.00$ \\
+Cash-per-share dividend figure & scale by $\tfrac12$ & $1.50 \rightarrow 0.75$ \\
+Proportional (percentage) figure & identity --- stands & $1.00\% \rightarrow 1.00\%$ \\
+Index divisor (a constituent splits) & adjusted to hold the level & level continuous \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The share count is absent from the menu on purpose: $10{,}000 \rightarrow
+20{,}000$ is a move, not an operator (Section~\ref{sec:registry}). The spot and the
+cash-per-share figure are price-dimensioned and halve; the percentage figure is
+proportional and stands; the index divisor is adjusted so the published level does not jump
+when a constituent splits. Every original stays on the record; each ``read after'' is
+computed at the read, until a fresh post-split close prints and the operator retires for
+that data.
+
+\medskip\noindent\textbf{Episode --- the dividend figure under the split (T3$\times$T4).}
+\emph{Trigger.} On 2026-05-04 ACME's cash dividend of \USD{1.50} per share is announced;
+the announcement is captured at the boundary as a recorded observation, and its declared
+per-share figure $1.50$ enters the record (the three firings that pay it are
+Chapter~\ref{ch:contracts}'s). \emph{The operator.} The split is effective 2026-06-01,
+after the payment date but within the window in which the declared forward figure is still
+read; a read of the $1.50$ figure in the post-split frame applies the split's
+cash-per-share operator and returns $0.75$. \emph{The door checks.} The data kind is
+registered as a cash-per-share (price) component, so the operator scales it; a proportional
+figure beside it would have stood. \emph{Design point.} \emph{One operator, one invariant,
+visible: the same halving that takes the spot from $100.00$ to $50.00$ takes the recorded
+per-share dividend figure from $1.50$ to $0.75$, so the dividend history reads in
+current-share terms --- the scaling of a real figure is shown, not asserted.}
+
+\subsection{The term-adjustment operator: a derivative's own terms}\label{sec:term-operator}
+
+The menu above adjusts \emph{value-frame} data --- a spot, a dividend figure, an index
+level. A unit whose terms \emph{reference} the split stock has a second frame the same event
+must adjust: its own \textbf{declared terms}. OT-1's barrier of $80.00$ names OMEGA's
+official close; when OMEGA splits two-for-one every OMEGA price halves, and a barrier left at
+$80.00$ knocks on the first post-split close near $47.50$ --- a stock at half its former level
+meeting a barrier struck against the whole. The barrier is a declared term, not data, so
+no operator of the menu touches it. The framework gives the missing transformation the exact
+sibling of the market data operator: the \textbf{term-adjustment operator}. Where the market
+data operator carries \emph{data} from a pre-event basis to a post-event basis, the
+term-adjustment operator carries a \emph{declared term} across the same event; it is the
+action of the corporate-action out-edge every referencing unit declares
+(Chapter~\ref{ch:objects}, Section~\ref{sec:termsheet-graphs}), which appends a new
+ProductTerms version with each referencing term carried through its operator.
+
+\begin{lstlisting}
+-- the sibling of  operator  (Section 8.4), acting on the declared-term frame, not value:
+termOp :: EventKind -> TermKind -> (Term -> Term)   -- one per (event kind, term kind)
+\end{lstlisting}
+
+It is total in exactly the sense of Principle~\ref{prin:sched-total}: for every
+(declared-term kind, event kind) pair an operator is declared --- the identity where a term
+is genuinely unaffected, but declared, not assumed --- and a pairing with no declared operator
+refuses the event at the door. Totality here is what forbids a silent stale barrier: an
+undeclared (term kind, event kind) pairing cannot cross, so a split can never leave a
+referencing term unadjusted by default.
+
+The operator reuses the dimension machinery of the registry (Section~\ref{sec:registry}): a
+term carries a dimension, and the dimension fixes how the event moves it.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Declared term & Dimension & Operator for the 2-for-1 split & Read after \\
+\midrule
+Barrier (OT-1 on OMEGA)          & \texttt{Price}        & scale by $\tfrac12$             & $80.00 \rightarrow 40.00$ \\
+Strike (an OMEGA option)         & \texttt{Price}        & scale by $\tfrac12$             & $K \rightarrow K/2$ \\
+Multiplier (a single-name        & \texttt{Quantity}     & scale by $2$ --- \emph{doubles} & $100 \rightarrow 200$ \\
+\quad contract on OMEGA)         &                       &                                & \\
+Participation rate               & \texttt{Proportional} & identity --- stands             & $150\% \rightarrow 150\%$ \\
+Fixed cash payout (OT-1)         & declared absolute     & identity --- stands             & \USD{1{,}000{,}000} unchanged \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Note the direction. A \texttt{Price}-dimensioned term --- a barrier, a strike --- halves,
+exactly as the spot halves, because it is quoted in the units the price is quoted in. A
+\texttt{Quantity}-dimensioned term --- the multiplier of a single-name contract on the split
+stock --- \emph{doubles}, because the split doubles the number of underlying shares one
+contract commands and the payoff $(\text{level} - K)\times\text{multiplier}$ must stand:
+$(S - K)\times 100 = (\tfrac{S}{2} - \tfrac{K}{2})\times 200$. A \texttt{Proportional} term
+--- a participation rate --- stands. And a fixed cash payout is neither \texttt{Price} nor
+\texttt{Proportional} but a \emph{declared absolute}: it is registered as such, and its split
+operator is the identity --- \USD{1{,}000{,}000} is \USD{1{,}000{,}000} whether OMEGA is whole
+or halved.
+
+The multiplier is the one place a \texttt{Quantity}-dimensioned thing is carried by an
+operator. On the balance plane the wall of Section~\ref{sec:registry} is absolute: only a
+move changes a quantity, and no market data operator touches a share count. The term-adjustment
+operator carries a \texttt{Quantity}-dimensioned multiplier and doubles it, and this does not
+breach that wall, because \emph{a multiplier is a term, not mass}. It names how many
+underlying units one contract controls; adjusting it re-describes the same contract in the
+post-split frame and moves no holding of anything. The share count the split really moves ---
+$10{,}000$ OMEGA to $20{,}000$ --- still travels by a paired-leg move and by nothing else
+(Section~\ref{sec:registry}). Mass is carried by moves; a term is carried by its operator; the
+value frame and the balance plane never touch.
+
+\paragraph{Declared identity is still a declaration: VS-1 and FUT-IDX on the index.} Not every
+referencing unit adjusts under every event, but totality requires the non-adjustment be
+\emph{declared}. VS-1's $252$ fixings read IDX official closes, and FUT-IDX settles the IDX
+level at multiplier~$10$; both reference IDX, so both declare a corporate-action out-edge. When
+a \emph{constituent} of IDX splits, the index divisor is adjusted to hold the published level
+continuous (the menu's divisor row above), so the level VS-1 and FUT-IDX read does not jump.
+Their term-adjustment operator for the (IDX-constituent split, fixing) and (IDX-constituent
+split, multiplier) pairings is therefore the \emph{identity} --- but declared, per
+Principle~\ref{prin:sched-total}, not assumed: FUT-IDX's multiplier $10$ stands because the
+level it multiplies is held continuous by the divisor, and VS-1's fixing reads the same
+continuous level. The contrast with the single-name multiplier is the whole point: a contract
+on OMEGA \emph{itself} doubles its multiplier when OMEGA splits, because OMEGA's price halves;
+a contract on the IDX \emph{level} leaves its multiplier alone when a constituent splits,
+because the divisor already held the level. Both are declared operators; neither is silent.
+
+\subsection{State-aware reads: consistency of reference and cum/ex}\label{sec:witness}
+
+Every operator read is state-aware: the frame data reads in is determined by the
+corporate-action state of its underlying at the read, and that state is on the record. Two
+readings of one recorded observation in two frames are two different values, and combining a
+quantity with a price drawn from a different frame produces a phantom. The check that
+refuses phantoms is the \textbf{invariance witness}: the operator on the value frame and
+the move on the quantity are bound so their product --- total value --- is invariant across
+the event.
+
+For the split the witness is arithmetic. Before: $10{,}000 \times 100.00 = \USD{1{,}000{,}000}$.
+After, read in the post-split frame: $20{,}000 \times 50.00 = \USD{1{,}000{,}000}$. The
+phantom the witness refuses is $20{,}000 \times 100.00 = \USD{2{,}000{,}000}$, the new count
+against the stale frame. This is the consistency-of-reference invariant; it is stated
+formally and catalogued in Chapter~\ref{ch:invariants}, and used here.
+
+For a derivative the witness has no move to bind, and it is stated over the declared terms
+instead. OT-1 references OMEGA but carries no OMEGA quantity: its holder holds one option
+before OMEGA's split and one after, so no move fires. The witness is then that the
+\emph{payoff} on the post-event term frame equals the payoff on the pre-event term frame.
+Under OMEGA's two-for-one split the term-adjustment operator (Section~\ref{sec:term-operator})
+carries OT-1's barrier $80.00 \rightarrow 40.00$ and leaves its \USD{1{,}000{,}000} payout
+unchanged --- a declared absolute stands. The witness is the knock predicate read in the new
+frame: a pre-split close at or below $80.00$ pays \USD{1{,}000{,}000}, and a post-split close
+at or below $40.00$ pays the same \USD{1{,}000{,}000} --- one economic event, two frames, one
+payout. The phantom the witness refuses is the dropped-edge failure of Chapter~\ref{ch:objects}
+(Section~\ref{sec:termsheet-graphs}): the first post-split close prints $\approx 47.50$;
+against the stale barrier $80.00$ it reads $47.50 \le 80.00$ and knocks, paying
+\USD{1{,}000{,}000} on a stock that never fell; against the adjusted barrier $40.00$ it reads
+$47.50 > 40.00$ and no knock fires. The stale-frame read is the phantom; the term-adjustment
+operator, appended as the corporate-action edge's new terms version, is what refuses it.
+Quantity-times-price for a holding and payoff-on-terms for a derivative are the two readings of
+one witness.
+
+The same witness governs the cum/ex boundary of a distribution, where no quantity changes
+at all. Before the ex date a price is \emph{cum} --- it includes the coming distribution;
+on and after the ex date it is \emph{ex} --- it excludes it. The cum price and the ex price
+are one data kind read in two states separated by the ex-date event, whose declared
+operator subtracts the distribution's value. A cum price consumed as though it were ex, or
+an ex price consumed as though it were cum, is a phantom of exactly the split's kind ---
+the right number in the wrong frame --- and the same invariance witness refuses it, because
+the state that fixes the frame is the recorded ex-date event, not the wall clock. A read
+that ignores the ex-date state prices the instrument on the wrong side of its own corporate
+action, and the witness catches it before the number reaches a valuation.
+
+One thing the ex-date does not carry is a promise about \emph{when} an ex trade settles
+relative to the record date. That the ex-date is set so an ex trade settles only after the
+record date --- keeping the registered holder and the entitled party the same party --- is
+an external market convention, fixed by the corporate-action calendar and the settlement
+cycle, and it is nowhere on the ledger's record. The ledger records the ex-date as data
+with provenance and routes entitlement against it (Chapter~\ref{ch:settlement}); it does not
+enforce the convention that keeps registration and entitlement aligned. That convention
+breaks lawfully under a due-bills special dividend, whose ex-date falls after the payment
+date and lets an ex trade settle before the record date. The coherence is named as the
+trust assumption TA-EXDATE in Chapter~\ref{ch:requirements}, reconciled against at this
+boundary but not enforced here; the settlement interface handles the case it breaks with the
+mirror market-claim, so correctness does not rest on the convention holding.
+
+\subsection{Recompose and the aggregate weld}\label{sec:recompose}
+
+The split adjusts one unit's data in place. Two further mechanisms handle corporate actions
+that change which units exist: one splits a unit into several, the other merges several into
+one. Both preserve total value, and both are checked by the same witness.
+
+\paragraph{Recompose (one unit becomes many): a spin-off.}
+When an issuer distributes a new entity to its holders, one position becomes a basket, and
+the pre-event data of the parent must be carried onto the resulting units. \emph{Recompose}
+is the operator that does so, per a declared allocation basis recorded with the event.
+Illustratively: HELIOS trades at $120.00$ and spins off LUMEN, one LUMEN share per HELIOS
+share, with a declared allocation of $75\%$ of pre-event value to the HELIOS stub and
+$25\%$ to LUMEN. A holder of $1{,}000$ HELIOS holds, after the event, $1{,}000$ HELIOS and
+$1{,}000$ LUMEN --- the new LUMEN mass arriving by a paired-leg move from the issuer, not by
+an operator. Recompose carries the recorded pre-event close onto the two frames: HELIOS stub
+$90.00$, LUMEN $30.00$. The witness holds: $1{,}000 \times 120.00 = 1{,}000 \times 90.00 +
+1{,}000 \times 30.00 = \USD{120{,}000}$. The original $120.00$ is preserved; the stub and
+spun-off frames are computed at read until fresh post-event closes print for each.
+
+\paragraph{The aggregate weld (many units become one): an elective merger.}
+When one unit is absorbed into another, the resulting position welds into the acquirer's
+aggregate, and the two data histories must weld into one continuous series so that valuation
+and profit and loss run unbroken across the event. The \emph{aggregate weld} is the operator
+that carries the pre-event data of the absorbed unit onto the acquirer's frame, per the
+elected terms recorded at the boundary. An elective merger is captured as an observation ---
+the election result is data with provenance, like any other. Illustratively: TARGET is
+acquired by ACQUIRER, each TARGET share electing either \USD{50.00} cash or $0.4$ ACQUIRER
+shares; ACQUIRER trades at $125.00$. A holder of $1{,}000$ TARGET who elects stock welds to
+$400$ ACQUIRER, and the pre-merger TARGET series is welded onto the ACQUIRER frame at the
+elected ratio $0.4$; the witness holds, $1{,}000 \times 50.00 = 400 \times 125.00 =
+\USD{50{,}000}$. A holder who elects cash has the position retired at settlement and no weld
+occurs --- the elected terms, recorded data, decide which mechanism runs.
+
+Two further composite distributions --- a dividend forecast and a special dividend --- are
+governed by the same registry and the same operators: the forecast is a composite of cash
+and proportional components that the split scales component-wise, and the special dividend
+carries a cum/ex operator like the ordinary one. Their fully worked arithmetic is deferred
+to the Worked-Examples companion (register lines~E71 and~E72); the mechanism here is
+complete without them.
+
+\subsection{Failure regimes at the boundary}\label{sec:failures}
+
+The boundary has four failure modes, and each has a determined, replayable disposition --- a
+function of log state alone, so replay reproduces it bit-identically. None improvises; each
+fails closed or records a flag, never a silent pick.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & Boundary condition & Determined, replayable disposition \\
+\midrule
+W1 & missing data & the operator applies to the last recorded original, carrying a \\
+   &               & staleness flag; with no original, the price is undefined, not \\
+   &               & zero, and valuation over the unit defers (Chapter~\ref{ch:valuation}) \\
+W2 & late data & recorded at its observation-time coordinate; values derived over \\
+   &            & $[\text{observed},\text{arrival})$ are recomputed --- ``as known at $t$'' and \\
+   &            & ``with corrections through $t'$'' are both queryable \\
+W3 & contradictory sources & sources diverging beyond the declared threshold yield a \\
+   &                       & flagged ``aggregation failed'' observation, never a silent \\
+   &                       & pick; sources and threshold are recorded \\
+W4 & unmappable event & a pairing with no declared operator, or data of an \\
+   &                  & unregistered kind, is refused at the door (Principle~\ref{prin:sched-total}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent W1 is the working state of \S 9's ``until fresh post-event data is recorded'':
+between the event and the first fresh observation, every read is the original under its operator,
+flagged stale, and the flag is a fact of the record, not a property of a cache. W2 makes the
+boundary bitemporal, and it is the machinery Chapter~\ref{ch:picture}
+(Section~\ref{sec:bitemporal}) and Theorem~\ref{thm:timetravel} rest on. Every observation
+carries two coordinates: its \emph{valid-time} coordinate --- its observation time, or the
+fixing index~$k$ it belongs to --- and its \emph{transaction-time} coordinate --- the log
+position at which it was recorded. Data arriving late does not rewrite history: it is
+appended at its own transaction-time position while keeping its earlier valid-time
+coordinate, so the as-known-at view --- the projection over any prefix that predates the
+arrival --- is preserved, and the as-of view --- the projection over the prefix that now
+carries the correction --- recomputes the derived folds over the affected valid-time
+interval, bit-exactly (\S 2). Both views survive; neither overwrites the other. An amended
+or withdrawn corporate-action notice is this same case --- superseding data recorded at
+its own transaction-time position, never an edit of the original notice, so the
+pre-amendment frame and the corrected one both survive. That \S 12 names a single timestamp
+where this boundary has required two axes since it was drawn is the conflict parked as entry
+PARK-2 of the parking index (Chapter~\ref{ch:scope}). W3 is the
+multi-source case: a single source is a single point of
+failure, so where data materially affects valuation it is drawn from more than one
+attested source, aggregated by a declared rule, and a divergence beyond the declared
+threshold produces a flagged output rather than a silently chosen one. The divergence
+threshold is a governance parameter, recorded and calibrated, not a silent constant: under
+correlated stress --- every venue diverging at once --- it defers valuation book-wide rather
+than choose a number, an intended fail-closed whose calibration is a governance matter, not a
+hidden behaviour. W4 is
+adjustment-schedule totality enforced: the undeclared pairing cannot cross.
+
+\subsection{The boundary-convention slot}\label{sec:slot}
+
+One class of boundary fact is neither data nor an operator: a \emph{convention} that
+some downstream projection needs and that must be stated once, as data, so that two readers
+of one log compute one answer. \S 9 places such conventions on the record beside the
+operators; this section declares the \textbf{slot} they occupy, and
+Chapter~\ref{ch:reporting} fills and consumes one.
+
+A convention in the slot is a total function of log state. The convention
+Chapter~\ref{ch:reporting} consumes --- the attribution of commingled received value across
+a reinvestment pool --- has three components, and the slot's shape is exactly these three:
+
+\begin{lstlisting}
+data Convention = Convention
+  { pool     :: Predicate (Wallet, Move)   -- the pool over which value is attributed
+  , basis    :: PeriodBasis                -- when the pro-rata ratio is struck
+  , rounding :: RoundingRule }             -- remainders booked explicitly (Chapter 3)
+attribute :: Convention -> LogPrefix -> Partition Amount   -- consumed in Chapter 12
+\end{lstlisting}
+
+The slot declaration is itself a recorded event, so it versions with the log prefix: a
+report computed as of a past date uses the convention then in force, and a changed
+convention is a new recorded version, never an edit. Totality is the requirement that makes
+the slot safe to consume: for every log prefix the convention assigns every attributable
+quantity, the attributed parts and the explicit remainder partition the whole, and the
+rounding rule leaves no quantity silently dropped (\S 4's remainder discipline). A
+convention missing any component is refused, because two readers would then compute
+different figures from one log --- internal reconciliation failure reintroduced through a
+report. Chapter~\ref{ch:reporting} states the totality property and proves the figures it
+builds are projections of coordinates, units, and this declared convention alone; this
+chapter's duty is discharged by declaring the slot and its totality obligation.
+
+\subsection{What an auditor checks}
+
+A candidate implementation satisfies this chapter when six things hold, each mechanically
+checkable over generated data and histories: all data on the record carries provenance,
+and no valuation reads data that does not (Section~\ref{sec:obs-door}); every data kind
+is registered with component dimensions before it crosses, and an unregistered kind is
+refused (Section~\ref{sec:registry}); an operator is declared for every (registered kind,
+event kind) pair, and an undeclared pairing is refused, not defaulted to identity
+(Principle~\ref{prin:sched-total}); every original is preserved and every adjusted value is
+recomputed at read from the original under the declared operators
+(Sections~\ref{sec:menu}--\ref{sec:recompose}); the invariance witness holds across every
+generated corporate action, and a stale-frame or wrong-side-of-ex read is refused
+(Section~\ref{sec:witness}); and each of W1--W4 produces its determined disposition on
+replay (Section~\ref{sec:failures}). These restate as minima in
+Chapter~\ref{ch:requirements}. The boundary is then closed: what crosses it is recorded,
+framed, and replayable, and the conservation the rest of the specification proves rests on
+solid ground.

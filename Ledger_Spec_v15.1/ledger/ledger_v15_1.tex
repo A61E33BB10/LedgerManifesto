@@ -1,0 +1,88 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- encoding + clean PDF text extraction ---
+\usepackage{cmap}                 % must precede fontenc
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}              % must follow fontenc
+\input{glyphtounicode}\pdfgentounicode=1
+\AtBeginDocument{%
+  \DeclareFontShape{T1}{lmr}{m}{scit}{<->ssub*lmr/m/sc}{}%
+  \DeclareFontShape{T1}{lmr}{bx}{scit}{<->ssub*lmr/bx/sc}{}%
+}
+
+% --- math, tables, code, graphics ---
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{textcomp}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+\geometry{margin=1in}
+\setcounter{tocdepth}{2}
+\setlength{\emergencystretch}{3em}
+\newcommand{\EUR}[1]{\mbox{\texteuro#1}}
+\newcommand{\USD}[1]{\mbox{USD~#1}}
+
+% --- theorem-like environments (used sparingly; each stated in plain prose first) ---
+\newtheorem{definition}{Definition}[section]
+\newtheorem{principle}[definition]{Principle}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{invariant}[definition]{Invariant}
+
+% --- second-telling box (GROTHENDIECK; deletable without loss) ---
+\newenvironment{secondtelling}%
+  {\par\medskip\noindent\begin{quote}\small\emph{A second telling, in categorical language; nothing later depends on it.}\par\smallskip}%
+  {\end{quote}\medskip}
+
+% --- Haskell listings (short illustrative snippets only, <= ~10 lines) ---
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=2em,
+  aboveskip=0.5em,
+  belowskip=0.5em,
+  language=Haskell,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\title{The Ledger\\[6pt]
+\large Specification, Version 15.1}
+\author{R.\ Delloye}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+\begingroup
+\setlength{\parskip}{0pt}
+\tableofcontents
+\endgroup
+\clearpage
+
+\input{drafts/ch01_objective}
+\input{drafts/ch02_picture}
+\input{drafts/ch03_objects}
+\input{drafts/ch04_machines}
+\input{drafts/ch05_contracts}
+\input{drafts/ch06_homes}
+\input{drafts/ch07_valuation}
+\input{drafts/ch08_marketdata}
+\input{drafts/ch09_collateral}
+\input{drafts/ch10_virtual}
+\input{drafts/ch11_settlement}
+\input{drafts/ch12_reporting}
+\input{drafts/ch13_cdm}
+\input{drafts/ch14_invariants}
+\input{drafts/ch15_testability}
+\input{drafts/ch16_requirements}
+\input{drafts/ch17_scope}
+
+\end{document}

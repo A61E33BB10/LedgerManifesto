@@ -1,0 +1,381 @@
+the cluaude.md has been updated. # Ledger v15.1 — Adversarial Hardening Pass
+
+**Inputs:** `ledger_v15_0.pdf` (specification, 73pp), `ledger_manifesto.pdf` (Constitution v1.1).
+
+**Outputs:**
+`ledger_v15_1.tex` · `constitution_v1_2_proposed.tex` (**proposed, not authoritative**) · `findings_register.md` · `parking_index.md` · `discharge_matrix.md` · `convergence_log.md` · `certification_record.md`
+
+**This run terminates on its own, and only on unanimous certification.** The owner adjudicates nothing mid-run. Every question that would normally escalate is resolved by the rules below or **parked with exact amendment text**. Do not stop to ask. Do not stop early.
+
+---
+
+## 0. Standing constraints
+
+Violation of any is a **blocking defect**, not a style note. Each has a named certifier (§1, Bench C) who can veto the freeze.
+
+**C1 — Direction of authority is one-way.** The specification is rated against the Constitution. Where they conflict, the specification is *never* drafted around it and the Constitution is *never* silently edited. The conflict goes to `parking_index.md` with the exact proposed amendment text and the exact clause it replaces. `constitution_v1_2_proposed.tex` is a **proposal**, not an amendment; nothing in v15.1 may cite it except the parking index.
+
+**C2 — Category theory is subordinate.** Every categorical passage is a *second telling*, in a marked box, that removes residual ambiguity for a reader who wants it. **Deleting every box must leave the specification complete and every proof intact.** No concept may be introduced categorically first. No proof may depend on a box. The four existing boxes (§2.8, §3.8, §8.4, §14.1) are the **ceiling: the net count in v15.1 must not exceed four.** Two repairs below (F1's term-adjustment operator, F2's two-axis fold) have clean categorical statements and will tempt you. **Resist.** This is not a category theory article; the boxes exist for clarity and nothing else.
+
+**C3 — Surgical addition.** No reformatting. No scope creep. No backward references to superseded versions. Change what the findings require and nothing else. A diff touching a chapter no finding names is rejected on sight.
+
+**C4 — De-pedantry.** Precision kept, ornament cut. Concrete before abstract. No abstraction unless used twice or unless it makes a statement checkable. Every claim stated so a reader with no prior exposure can check it.
+
+**C5 — Page cap 100, and the cap is not the binding constraint.** There is room. **Never cut a claim, a number, or a design point to save a page.** The repairs will *add* roughly 15pp; the redundancy cuts (F14, F15) recover roughly 11pp. Expect to land in the high seventies. The cuts happen because repetition violates **C4**, not because of budget — this is the one place v15.0 fails its own de-pedantry standard, and it fails it badly.
+
+**C6 — Every guarantee is an executable check.** A repair that adds a property to the invariant catalogue (Ch. 14) **must** add the corresponding property to the test regime (Ch. 15) in the form a generator and a shrinker consume, **and that property must demonstrably fire.** A property defended only in prose is not a repair.
+
+---
+
+## 1. Three benches
+
+### Bench A — Authors. They hold the pen. **They may never certify their own work.**
+
+| Agent | Owns |
+|---|---|
+| **KARPATHY** | Document author. Every edit lands through him. Sole owner of C3, C4, C5. |
+| **FORMALIS** | Correctness arbiter. Final say on whether a repair is *sound*, and on every invariant restatement. |
+| **NOETHER** | Conservation, coordinates, the invariant catalogue. Owns F4, F10, Theorem 14.1. |
+| **KLEPPMANN** | Logs, ordering, bitemporality, replay. Owns F2 — the hardest finding in the register. |
+| **WILL WILSON** | Test regime, generator universe, the temporal model. Owns Ch. 15 and F16. |
+| **MATTHIAS** | CDM alignment. Owns Ch. 13 and the gap table. |
+
+### Bench B — Adversaries. They critique. They never write the document.
+
+| Agent | Attacks |
+|---|---|
+| **CARTAN** | Completeness. Hunts false totality claims, enumerations missing a quadrant, homes that don't suffice. |
+| **REGINALD ASHWORTH** | Banking audit. Reads as the partner who will sign or refuse to sign. Hunts what a real corporate-actions or collateral desk breaks in week one. |
+| **LEX MANDATUM** | Regulatory and legal-regime fidelity. Hunts declared-term transcription paths that cannot be reconciled. |
+| **STYLUS** | Prose, against **C4 only** — not elegance. Ornament, repetition, and re-establishment of facts the cast already fixes. |
+| **TALEB** | Tail coverage. Hunts the history that was never generated, the precondition never reached, the green test that witnessed nothing. |
+
+### Bench C — Certifiers. **Each owns one objective. Each holds a veto. None may certify a package they authored.**
+
+| Objective | Certifier | Veto scope |
+|---|---|---|
+| **Self-consistency and constitutional adherence, globally** | **CONCORDIA** | **Absolute — cannot be overruled by any bench, or by unanimity of all of them** |
+| **G1** Every finding F1–F16 repaired **or** parked; nothing silently dismissed | CARTAN | Reopens the finding |
+| **G2** `discharge_matrix.md` complete: every Constitution clause maps to a chapter or to a **named gap** | CONCORDIA | Blocks freeze |
+| **G3** `parking_index.md` well-formed: every entry carries exact proposed amendment text and the exact clause it replaces | LEX MANDATUM | Blocks freeze |
+| **G4** C6 coverage **and anti-vacuity**: every new property fires on ≥ 1% of generated histories | TALEB | Blocks the repair |
+| **G5a** De-pedantry (C4): no fact re-established that the cast already fixes | STYLUS | Blocks the chapter |
+| **G5b** Categorical subordination (C2): ≤ 4 boxes, **and deleting all four leaves every proof intact** | GROTHENDIECK | Blocks freeze |
+| **G6** Every number in every episode still ties — old numbers and new | JACOBI | Blocks the chapter |
+| **G7** `constitution_v1_2_proposed.tex` marked **PROPOSED — NOT AUTHORITATIVE** and cited by nothing in v15.1 but the parking index | CONCORDIA | Blocks freeze |
+| **G8** Operational plausibility: a real desk does not break this in week one | REGINALD ASHWORTH | Blocks the chapter |
+| **G9** CDM alignment (Ch. 13) still holds after every repair | **MATTHIAS-β** | Blocks the chapter |
+
+**Dual-hat rule.** A Bench B critic may certify — CARTAN, LEX MANDATUM, STYLUS, TALEB and ASHWORTH all do. A Bench A author may **never** certify: which is why MATTHIAS authors Ch. 13 and **MATTHIAS-β** certifies it, and why WILSON authors the test regime and **TALEB** certifies its coverage. GROTHENDIECK is a certifier only — he does not draft, and his default answer on any proposed box is **no**.
+
+---
+
+### CONCORDIA — the new agent
+
+**CONCORDIA's sole role is to check self-consistency, correctness, and adherence to the Constitution. She writes nothing. She proposes nothing. She has no view on elegance, on page count, or on what would be nice to have.**
+
+She does exactly three things.
+
+**1. Cross-chapter consistency.** After *every phase* — not every package — she re-reads the **whole document**, never the diff. All three blocking findings in this register arose from chapters that were **individually coherent and jointly not**. F4 is one sentence contradicting another sentence forty pages away. F5 is a claim falsified three pages from where it is made. **A repair that fixes its own chapter and breaks another is a failed repair, and CONCORDIA is the only agent positioned to see it.** She maintains a live claim-conflict table: every normative claim, the chapter that makes it, and every other chapter that restates, narrows, or contradicts it.
+
+**2. Constitutional conformance, clause by clause.** She owns `discharge_matrix.md`. Once F11 numbers the clauses, every clause maps to the chapter that discharges it, or is a **named gap**. A chapter citing a clause it does not discharge is a defect she raises. A clause no chapter discharges is a gap she names. She does not repair either — she reports.
+
+**3. The parking gate.** She is the sole judge of whether a conflict has been **genuinely parked** rather than quietly narrowed. **F12 is the archetype**: the Constitution asserts deposit-neutrality unconditionally; the specification makes it conditional and then *relabels the residue* — "a financing basis, not a deposit" — so that the guarantee still reads as true. **That is a narrowing dressed as a definition, and it is precisely what CONCORDIA exists to catch.** She checks every repair in this run for the same move, and she names it when she finds it.
+
+**Her veto is absolute.** If CONCORDIA does not sign, the run does not freeze — regardless of what every other bench has agreed, and regardless of how many rounds have run.
+
+---
+
+## 2. The findings register
+
+Sixteen findings. Severity: **BLOCKING** (unsound or self-contradictory as written), **MAJOR** (a claim is false as stated), **DE-PEDANTRY** (C4). Each names its chapters, its constitutional impact, and its certifiers.
+
+---
+
+### F1 — BLOCKING — The corporate-action watch is missing from every derivative's product graph
+*Chapters: §3.8, §5, §8.6, Ch. 14, Ch. 15. Constitutional impact: none — this **restores** a Constitution §7 claim the spec dropped. Certifiers: JACOBI (G6), ASHWORTH (G8), TALEB (G4), CONCORDIA.*
+
+**The break.** OT-1's declared watch set is exactly one edge guard: OMEGA's official close against the barrier 80.00. Its graph is three nodes, two edges (touch, expire). Now split OMEGA two-for-one. **No edge of OT-1's graph fires.** The §8.5 operator menu is explicitly *value-frame* — a barrier is a **declared term**, not market data, so no operator touches it. The next recorded close prints ≈ 47.50, the guard `close ≤ 80.00` is met, the Event Monitor emits a touch, and **USD 1,000,000 pays out on a phantom knock.**
+
+This is not a missing paragraph. Invariant 3.2(i) says the watch list *equals* the out-edge set of the current node — so with no corporate-action out-edge from `live`, the term adjustment is **unrepresentable**. The type discipline the specification is proudest of is precisely what forbids the fix.
+
+Constitution §7 already has it right: *"when the underlying stock splits, the contract's strike and multiplier are adjusted by appending a new terms version."* **The spec lost it.**
+
+**Required repair.**
+1. **§3.8:** every unit whose terms *reference* another unit declares, on **each** lifecycle node, a corporate-action out-edge — guard: a recorded corporate-action event on a referenced underlying; action: append a new ProductTerms version applying the declared **term-adjustment operator**. It is a self-loop: the node is unchanged, the terms version is not.
+2. Introduce the **term-adjustment operator** as the exact sibling of the market data operator, acting on the *declared-term* frame rather than the value frame, and subject it to §8.1's **totality**: for every (declared-term kind, event kind) pair an operator is declared — identity where genuinely unaffected, but **declared, not assumed**. An undeclared pairing refuses at the door. Reuse the `Dim` machinery: a barrier and a strike are `Price`-dimensioned and halve; a participation rate is `Proportional` and stands; a multiplier is `Quantity`-dimensioned and **doubles**. Note the direction — and note that this is the **one** place a `Quantity`-dimensioned thing *is* carried by an operator, unlike the balance plane where only a move may change quantity. **Say why the wall differs: a multiplier is a term, not mass.** Do not let this pass without the sentence; an unexplained exception is what rots a design.
+3. **§8.6:** extend the invariance witness to derivatives. For a *holding*, the witness is Q × P invariant across the event, bound by move-and-operator. For a *derivative* there is no move, so the witness is over **declared terms**: the payoff on the post-event frame equals the payoff on the pre-event frame. Work it on OT-1 under the OMEGA split — barrier 80.00 → 40.00; payout USD 1,000,000 **unchanged** (a fixed cash payout is neither `Price` nor `Proportional` but a **declared absolute** — register it as such, and say so); post-split close 47.50 does **not** breach 40.00. **Show the phantom the witness refuses: 47.50 against the stale 80.00.**
+4. **Ch. 14:** catalogue the witness in both readings. **Ch. 15:** `prop_termAdjustmentInvariance` — generate a corporate action on the underlying of a generated derivative; assert payoff invariance, and assert **no spurious guard fires**.
+
+**CARTAN — run the same attack on the other threads.** VS-1's 252 fixings are against IDX closes; an index constituent split moves the *divisor*, not the level — so is VS-1 genuinely unaffected? If so the operator is the **identity**, and §8.1 requires that it be **declared**. FUT-IDX's multiplier 10 — same question. Both must appear as declared identity pairings or as real adjustments. **Silence is the defect.**
+
+---
+
+### F2 — BLOCKING — Bitemporality collides with the single fold
+*Chapters: Ch. 2, §5.5, Ch. 6, §8.8 (W2), Ch. 14, §15.4. Constitutional impact: **an amendment to Constitution §12. Park it.** Certifiers: CONCORDIA (mandatory), TALEB (G4).*
+
+**The break.** The spec tells two incompatible stories about what a home is.
+
+- §6.1, Principle 6.4, Theorem 14.5: each home is a fold of **the log**, in **log order**; re-folding a prefix reproduces it **bit for bit**.
+- §5.5, §6.5, §15.4: the total order for a unit's fixings is the **observation index k**, not log order; a late print is inserted at position k and the tail A_k, A_{k+1}, … is **recomputed from k forward**.
+
+Different sequences, different folds. They disagree the instant a print is late. Three consequences:
+
+**(a) Theorem 14.4 is ambiguous.** "The ledger as of t is the fold of the prefix up to t" — as of t, does A show the pre-insertion or the post-insertion value? §8.8's W2 says **both** must be queryable ("as known at t" and "with corrections through t′"). **W2 is right.** Chapter 14 is written as though there were one axis.
+
+**(b) It is the very thing §2.8 condemns.** "Reinterpreting history through new code is a feature" of event sourcing, and the spec's boast is that it does no such thing. Recomputing a **committed** accrual tail because new information landed **is** reinterpretation of committed history — by data rather than by code, which is better, but not innocent, and "the fold is over the ordered sequence" does not make the problem disappear.
+
+**(c) The recomputation is never proved deterministic.** Theorem 14.5 proves bit-for-bit replay of a **log-order** fold — which is not the fold that runs.
+
+**Required repair (KLEPPMANN leads; FORMALIS arbitrates soundness; CONCORDIA certifies).**
+1. Make both axes **explicit and primitive**. Every projection is parameterised by a pair: **valid time** (which observations are in force — the observation-index order) and **transaction time** (the log prefix — what was known). Write it once, in the Ch. 2 typed picture — `project :: LogPrefix -> KnowledgeHorizon -> View` — and let the whole document use it.
+2. Restate **Theorem 14.4** over the pair. As-of-t / as-known-at-t is the "as it stood" view; as-of-t / as-known-at-now is the corrected view. **Both are folds; both are deterministic; neither rewrites the other.** This is what W2 has been asserting since Chapter 8 with no machinery behind it.
+3. Restate **Theorem 14.5** as determinism over *both* axes, and prove the recomputation case: re-folding in observation-index order over a prefix that includes the late insertion is a function of that prefix alone.
+4. **§2.8:** rewrite the "not event sourcing" paragraph to say what is *true*. Committed transactions are never reinterpreted; a **superseded** figure is corrected by a compensating transaction that names it. The accrual tail is not silently rewritten — it is recomputed **and the difference booked as compensating transactions**, exactly as §6.5 already says for the downstream CCP-cash figures. Say it once, plainly. Drop the hand-wave.
+5. **§15.4:** `prop_bitemporalDeterminism` — generate a history and a late insertion; assert (i) the as-known-at view is **unchanged**, (ii) the as-of view **recomputes bit-exactly**, (iii) **every** superseded downstream figure has a compensating transaction and **none is left standing**.
+
+**Constitutional impact.** Constitution §12 says every historical state is reconstructible "by replaying the log up to the desired **timestamp**" — one timestamp, one axis. If the repair is sound, §12 needs two. **Park the amendment with exact text.**
+
+---
+
+### F3 — BLOCKING — `SettlementState` has no home; homes-sufficiency fails
+*Chapters: Ch. 6, §9.3, Ch. 11, §17.3. Constitutional impact: none — the repair is Constitution §6 applied. Certifiers: CONCORDIA, ASHWORTH (G8), MATTHIAS-β (G9).*
+
+**The break.** Ch. 11 introduces `data SettlementState = Instructed | Settled | Failed` and calls it *"a correctness input, not a presentation dimension."* But it is a property of an **instruction** — and an instruction is neither a unit nor a (wallet, unit) pair. Several instructions on one (wallet, unit) can be open at once, so PositionState's key **cannot** hold it. **Principle 6.1 (one fact, one home) and Principle 6.3 (the homes suffice) are both violated — by the specification's own Chapter 11.**
+
+**Required repair.** The answer is already in §5.6: *every right and obligation the legal contract creates is a unit.* **An instructed-but-unsettled trade is an obligation** — a DvP delivery-and-payment obligation.
+
+1. **Make it a unit.** Its lifecycle node (`instructed | settled | failed`) lives in **its own UnitStatus**, which is exactly a home. Sufficiency restored; no new machinery; no fourth home.
+2. **Collapse three half-specified mechanisms into one graph.** The **market claim** (§11.3), the **fails-cascade obligation** (§9.3), and the settlement obligation are nodes and edges of **one product graph** on the settlement-obligation unit. §9.3 currently mints the fails obligation *"symmetric to the market-claim unit"* without saying it **is** the same unit at a different node. Say it.
+3. **Delete** `data SettlementState` as a free-standing type. Proposition 11.1's "recorded settlement state" reads the settlement-obligation unit's UnitStatus, like any other fact.
+4. This **discharges an open problem** §17.3 currently names ("the fails-cascade obligation's full valuation and lifecycle"). It moves from the open-problems index into the body. **Update §17.3.**
+
+---
+
+### F4 — MAJOR — The coverage inequality's sign is inverted between Ch. 9 and Ch. 14
+*Chapters: §9.2, §9.4, §14.6. Constitutional impact: none. Certifiers: CONCORDIA, JACOBI (G6), CARTAN (independent of NOETHER, who authors it).*
+
+§9.2: received 100 under one agreement, re-posted 60 under another — *"nets to **−40**, within the bound."*
+§14.6: the same sentence — *"nets to coverage **40**,"* plus *"the received ray entering with **positive** sign."*
+§9.4 fixes taker = **−Q**.
+
+The mathematics works with **received-negative**: a wallet with owned 0 that received 100 and re-posts 200 nets to +100 > max(0, 0) → **refused**, correctly. The Chapter 14 prose is wrong on **both** the sign convention and the arithmetic — and this is the invariant the **entire rehypothecation bound** rests on.
+
+**Required repair (NOETHER).** One canonical statement of Invariant 14.6, sign convention fixed explicitly; §9.2 **points to it** rather than restating it (an F14 instance too). Work the numeric example **once**, in the catalogue, and cite it from Ch. 9. Ch. 15: `prop_coverageSignConvention`, with the received-100 / re-post-200 refusal as a **named** test case.
+
+---
+
+### F5 — MAJOR — "No book cost is ever maintained" is false, three pages from where it is asserted
+*Chapters: §7.2, §3.1. Constitutional impact: none. Certifier: CONCORDIA.*
+
+§7.2: *"no second copy of 'realised PnL' or **book cost** is ever maintained alongside the position record."*
+§3.1 (T1): *"One position-state change: W-ALPHA's **traded price 995.00** recorded."*
+
+That **is** book cost, in PositionState — and it **must** be, because the contract needs it to compute variation margin. What the ledger does not maintain is a **derived** figure a projection could recompute. Reword §7.2 to say exactly that, and draw the line where Chapter 6 already draws it: *a home holds a fact a contract must read; it never holds a view a projection can recompute.* As drafted, a hostile reader finds this in ninety seconds.
+
+---
+
+### F6 — MAJOR — PositionState's key cannot carry the facts the episodes put in it
+*Chapters: §6.1, §5.1, §5.3. Constitutional impact: none. Certifiers: CONCORDIA, ASHWORTH (G8).*
+
+`positionState :: (Wallet, Unit) -> PosFacts` is **one slot per pair**. But:
+**(a)** two dividends in flight on ACME with different payment dates need **two live entitlements**;
+**(b)** a futures position with a new lot traded today needs **both** yesterday's settled level **and** the new lot's trade price.
+
+The type sketch quietly promises something the episodes must break. Two admissible repairs — Bench A picks one and defends it:
+
+- **(i)** `PosFacts` is explicitly an **event-keyed collection**, keyed by the cause-derived identifier of the firing that wrote each fact. Say so **in the type**, and state the retirement rule (a fact retires when its obligation discharges).
+- **(ii)** For futures, store the aggregate **settled value** Σ qᵢ·levelᵢ as one integer and compute VM as `settleₜ × Q − storedSettledValue`. This is what CCPs actually do, it preserves the key, and the multi-lot case falls out.
+
+**FORMALIS: (ii) alone does not close (a).** Some form of (i) is required regardless. **ASHWORTH: two dividends in flight is not an exotic case, it is a Tuesday.**
+
+---
+
+### F7 — MAJOR — The cause-derived identifier is under-specified, and idempotence contradicts the cascade
+*Chapters: §4.3, §13.5, Ch. 14, Ch. 15. Constitutional impact: none — but note in the discharge matrix that Constitution §5's one-sentence treatment is what let this through. Certifiers: CONCORDIA, MATTHIAS-β (G9), TALEB (G4).*
+
+§4.3: *"a retried, duplicated, or late proposal for an already-processed **event** is recognised and committed exactly once."*
+§13.5: the **coordinated cascade** — one cause, **many** units, **many** transactions — is explicitly admitted, tied together by the cause-derived key.
+
+**Event-level idempotence suppresses the second, legitimate transaction of the same cascade.** As drafted, idempotence and the cascade are inconsistent.
+
+**Required repair.** State the derivation rule **once, normatively**, in Ch. 4:
+
+`txid = H(causeEventId, contractId, unitId, seq)`
+
+— or an equivalent that is **injective over a cascade** and **constant under retry**. **Prove both properties.** Then §13.5's lineage claim becomes true rather than aspirational. Ch. 15: `prop_cascadeIdempotence` — a cascade delivered twice commits each of its n transactions **exactly once**, and commits **all n**.
+
+---
+
+### F8 — MAJOR — Proposition 11.1 is not total: the fourth quadrant is missing
+*Chapters: §11.3, Ch. 8, §16.3. Constitutional impact: none, but a **new named trust assumption**. Certifiers: CARTAN (G1), ASHWORTH (G8), LEX MANDATUM.*
+
+Four quadrants of (cum / ex) × (settled / unsettled at record date). **You enumerate three.** The missing one: **ex trade, settled before the record date.** The buyer is the registered holder, the owned plane shows the buyer, so determination pays the buyer — who bought **ex** and is **not entitled**. The seller should receive it, via the mirror claim.
+
+In practice an external convention saves you: the ex-date is set relative to the record date and the settlement cycle *precisely so that* an ex trade cannot settle in time to register. But **that convention is nowhere on the record** — and it breaks in exactly the case that matters: a large special dividend under a **due-bills** regime, where the ex-date falls **after** the payment date.
+
+**Required repair — do both.**
+- **(a)** Handle the fourth quadrant with the **mirror market-claim unit**. The machinery exists; §11.3 already says *"the construction is symmetric."*
+- **(b)** Name the coherence as **TA-EXDATE** in the §16.3 trust-assumption list, alongside TA-KIND and TA-TERMS, in the same four-field shape: owner, violation, detection, residual.
+
+(a) is cheap; (b) is honest, because a due-bills regime violates the assumption **lawfully**. What you may not do is **claim totality on three quadrants**.
+
+---
+
+### F9 — MAJOR — The price of a settled-to-market future is undefined
+*Chapters: Definition 7.1, §7.3, §15.4. Constitutional impact: none. Certifiers: CONCORDIA, JACOBI (G6), ASHWORTH (G8).*
+
+Definition 7.1 sums `owned(w,u) · P(u, σ(u))` over **valued** units. FUT-IDX **is** a valued unit; W-ALPHA holds +1, W-CCP holds −1. If `P(FUT-IDX)` is the futures level, **NAV double-counts against the VM cash already settled** — and the flagship instrument's NAV is **undefined**.
+
+The spec states the analogous rule for OT-1 (triggered ⇒ price 0) and §15.4 even makes it a **safety invariant** (`NoDoubleCount`) — but never states it for the future.
+
+**Required repair.** One sentence in §7.3; one line in the model:
+- `P(STM future) ≡ 0` in every state after the day's settlement has been applied — the exposure is **extinguished**, so there is nothing left to mark.
+- `P(CTM future) =` mark against the last settled level — because there **is** a return obligation, and it **is** a unit.
+
+This is §9.5's STM/CTM regime key applied to **valuation**. Note in §7.3 that the regime bit therefore carries a **second** consequence beyond the balance sheet — which sharpens, rather than duplicates, §9.5's warning about its misdeclaration. Extend `NoDoubleCount` in §15.4 to quantify over **all** extinguishing lifecycle events, not just OT-1's trigger.
+
+---
+
+### F10 — MAJOR — The coordinate is really (plane, agreement), and §3.7 does not say so
+*Chapters: §3.7, §9.2, Theorem 14.1, Ch. 12. Constitutional impact: **an amendment to Constitution §4. Park it.** Certifiers: CONCORDIA, CARTAN (independent of NOETHER).*
+
+§3.7 defines a 3-vector `(owned, lent, posted)`. Chapter 9 and Theorem 14.1 then **silently** use `posted_G(w, u)`.
+
+If `posted` is a single signed axis, a wallet posting 100 under G1 and receiving 100 under G2 **nets to zero and both facts vanish**. Same for lent-out against borrowed. **The encumbrance projection of Ch. 12 then reads zero for a wallet that is fully encumbered under G1.**
+
+Conservation *does* hold per (unit, coordinate, agreement) — every marker move is paired-leg with the same agreement reference, which §9.1's `Placement` type already enforces. So:
+
+**Required repair (NOETHER).** State the **finer law as primitive** and derive the coarser one — exactly as the spec already does for per-coordinate versus per-unit:
+
+`∀u, ∀c, ∀G:  Σ_w bal_{c,G}(w, u) = 0`
+
+with the 3-vector as the **aggregate projection**. §3.7's closing paragraph currently defers all of this to Ch. 9 — **that deferral is what hid the defect.** Fix the definition where it lives.
+
+**Constitutional impact.** Constitution §4's coordinate sentence (as amended by Amendments 2 and 3) names three coordinates, not (coordinate × agreement). **Park the amendment with exact text.**
+
+---
+
+### F11 — MAJOR — The Constitution is not citable at clause granularity
+*Chapters: Constitution (all), every spec chapter opener, §17.3. Constitutional impact: **structural, non-semantic. Park as a proposed editorial amendment.** Certifier: CONCORDIA — this is her instrument, and it ships first.*
+
+Every spec chapter opens *"this chapter discharges §N of the constitution."* **That is unfalsifiable.** Constitution §4 is eleven paragraphs of running prose carrying perhaps twenty normative claims. If authority is genuinely one-way and the specification is genuinely **rated**, the rating must be **mechanical**.
+
+**Required repair.**
+1. In `constitution_v1_2_proposed.tex`: number **every normative clause** — **C-4.1 … C-4.n** — with **not one word of prose changed**. This is pure **addressing**, which is exactly why it can be proposed without semantic risk.
+2. In v15.1: every chapter opens with the **list of clause IDs** it discharges.
+3. Produce `discharge_matrix.md`: clause ID × discharging chapter. A clause with no chapter is a **named gap**. A chapter citing a clause it does not discharge is a **defect**. **Run it. Report the gaps.**
+4. §17.3's claim that the parking index is empty is only **checkable** once this matrix exists.
+
+**Highest-leverage repair in the register, and it costs zero pages.** It is also the instrument CONCORDIA needs to do her job at all — so it lands **first**, in Phase 1, before anything else.
+
+---
+
+### F12 — MAJOR — Deposit-neutrality is asserted unconditionally in the Constitution and quietly narrowed in the spec
+*Chapters: Constitution §8, Proposition 7.3, §17.3. Constitutional impact: **a real conflict. Park it.** Certifiers: CONCORDIA (mandatory), LEX MANDATUM (G3).*
+
+Constitution §8: *"a deposit cannot move profit and loss — not because a formula subtracts it, but because it cannot change net owned value,"* with case 2 being financing *"against an **equal** obligation."* **Unconditional.**
+
+Proposition 7.3: it is a theorem *"**exactly when** the declared financing rate equals the fair rate,"* and otherwise *"the day-one difference is a **financing basis, not a deposit**."*
+
+**That last clause is a definitional escape.** NAV *does* move at receipt of off-market financing. The specification has **narrowed a constitutional guarantee and then relabelled the residue so the guarantee still reads as true.** This is the archetype CONCORDIA screens every other repair against.
+
+**Required repair.** This is what Principle 17.1 exists for.
+1. **Park it**, with exact proposed amendment text. Suggested: Constitution §8 case 2 becomes *"a contribution or financing received against an obligation created in the same transaction **and valued at fair value**, any day-one difference between the inflow amount and the obligation's fair value being **recognised as financing basis**."*
+2. In v15.1, Proposition 7.3 **states the conflict openly** and cites the parking index. It does not paper over it.
+3. §17.3's *"the index of parked amendments is empty"* becomes **false** the moment this is filed — **as it should be.** Rewrite it.
+
+> **An empty parking index across a 73-page specification was never a sign of health. It was a sign the mechanism had never been exercised.** This register expects **F2, F10, F11, F12** to be parked. **If the final parking index is empty, the run has failed, and LEX MANDATUM and CONCORDIA must both veto the freeze.**
+
+---
+
+### F13 — MAJOR — The "not event sourcing" argument overreaches in one clause
+*Chapter: §2.8 — and the same overreach sits in Constitution §3; note it in the discharge matrix. Constitutional impact: none. Certifier: CONCORDIA.*
+
+*"an admission door event sourcing has no equivalent of"* — **it does**: the command handler / aggregate invariant check. An experienced reader stops at that sentence and **discounts the whole section**.
+
+The genuinely distinguishing claims are the two made immediately after, and they are strong:
+- a **single total order**, not per-aggregate streams stitched back together;
+- **replay re-reads transactions and never re-executes contracts.**
+
+Lead with those. Drop the door claim. **Losing a false argument makes the section more persuasive, not less.**
+
+---
+
+### F14 — DE-PEDANTRY — The thread device has tipped into repetition
+*Chapters: §2.7, §4.4, §5.4, §7.3, §9.8, §12.5, §14.6, §15.4. Certifier: STYLUS (G5a) — he may **block any chapter** that re-establishes a fact the cast already fixes. JACOBI (G6) re-verifies every tie after the cut.*
+
+**OT-1 is fully re-established eight times.** Each telling restates the payout, the barrier, W-BANK / W-ALPHA, the 400,000 mark, and the 79.00 close. The future's three prints (1,000 / 990 / 1,005) appear **five** times. *"A discretely-monitored (closing-price) one-touch"* appears **six** times verbatim.
+
+The thread device is **genuinely good** — it is what makes the numbers checkable across chapters. It has simply exceeded the document's own de-pedantry standard, which is the one standard v15.0 sets for itself and then breaks.
+
+**Required repair.**
+1. A **Cast** section (expand §2.1, or a one-page appendix) carrying the **full** terms of T1–T6 **once**: parties, dates, quantities, headline numbers, and the one-line characterisation each.
+2. Every episode thereafter opens with a **pointer** and only the facts **that episode adds**. The five-part episode shape (trigger / contract / transactions / door / design point) **stays** — it is doing real work. What goes is the **re-establishment**.
+3. **Not one claim, number, or design point is lost.**
+
+---
+
+### F15 — DE-PEDANTRY — Chapters 1–2 of the spec re-derive the Constitution
+*Certifiers: STYLUS (G5a), CONCORDIA (this is an authority-direction question as much as a prose one).*
+
+§1 and §2 are near-verbatim re-runs of Constitution §1–§3. **If authority is one-way, the specification cites; it does not re-derive.** Keep the abstract; keep the six commitments **with the one consequence each forces** — that part is spec-specific and load-bearing; keep the six threads. **Cut the re-derivation.**
+
+---
+
+### F16 — MAJOR (method) — The temporal model in §15.4 is neither one thing nor the other
+*Chapter: §15.4. Author: WILSON. Certifiers: TALEB (G4), FORMALIS.*
+
+The block mixes **TLA+** (`[]`, `~>`, `\A`, `=<`) with **Haskell**, without saying which it is — and the **fairness condition** under which `Liveness` holds sits in the **prose**, not in the model.
+
+Resolve it, and **say which**:
+- it is a **real model you have machine-checked** → **name the tool**, state the fairness assumption **inside** the model, and report that it checks; **or**
+- it is **pseudocode** → **say so, in one sentence**, and stop dressing it as a proof.
+
+The `Safety` / `Liveness` split — coverage always **□**, sufficiency only **⇝** — is the best idea in Chapter 15 and deserves to be **either proved or honestly labelled**. **FORMALIS: a half-formalism is worse than either.**
+
+---
+
+## 3. Work packages
+
+Packages within a phase run in parallel; phases are sequential. **CONCORDIA re-reads the whole document at the end of every phase** — never the diff — and no phase closes without her signature.
+
+- **Phase 1 — Foundations.** **F11** ships **first**: the clause numbering is the instrument CONCORDIA needs to work at all. Then **F2** (KLEPPMANN), **F10** (NOETHER). These three change what the later chapters are *about*; nothing else starts until they converge and CONCORDIA signs.
+- **Phase 2 — Objects and state.** **F1**, **F3**, **F6**, **F4**.
+- **Phase 3 — Valuation, boundary, settlement.** **F9**, **F5**, **F8**, **F12**, **F7**.
+- **Phase 4 — Verification and prose.** **F16**; the **C6 sweep** across every Phase 1–3 repair (no repair ships without its property; no property ships without firing); **F13**, **F14**, **F15**.
+- **Phase 5 — Certification and freeze.** §5 below.
+
+---
+
+## 4. PARETO convergence, per package
+
+1. **Bench A drafts.** Named owner writes; KARPATHY holds the pen; the diff is surgical (C3).
+2. **Bench B critiques, independently.** No critic sees another's. Each critique states: the claim attacked, the **counterexample or the named missing case**, and the severity. **A critique with neither is discarded before voting.**
+3. **Bench A votes** each critique **valid** or **invalid**, with a reason. Valid → repaired next round. Invalid → **answered** in `convergence_log.md`. Answered, not ignored.
+4. **Stopping rule.** Minimum **3** rounds, maximum **7**. **Early stop when ≥ 75% of a round's critiques are voted invalid by ≥ 75% of Bench A.**
+5. At round 7 without convergence, the residue is **parked** as a named open problem with the exact disagreement recorded. Not resolved by fiat. Not escalated.
+6. **Escalation is forbidden.** Every question that would go to the owner goes to `parking_index.md` instead, with exact proposed amendment text. **The run does not stop. The run does not ask.**
+
+**Anti-vacuity (TALEB certifies).** A property whose precondition is never generated **passes without witnessing anything**. Every property added under C6 must be shown to **fire**: report, per property, how many generated histories reach its precondition. **Zero is a blocking defect, not a green test.** The specification says exactly this about its own generators (§15.2) — hold the repairs to it.
+
+---
+
+## 5. Certification, and the only way this run ends
+
+**PARETO convergence is necessary and not sufficient.** A converged package goes to **Bench C**.
+
+1. Each certifier examines **only their objective**, against the **whole document** — not the diff.
+2. A certifier returns **CERTIFIED** or **VETOED**. A veto **must** state the objective missed and the evidence. **A veto without evidence is void.**
+3. **A veto reopens the package** and **resets its PARETO round count**. Bench A repairs; Bench B re-critiques; the package returns to certification.
+4. **The run freezes when, and only when, every certifier has returned CERTIFIED — and CONCORDIA has returned CERTIFIED on the whole document, at the end, after every other signature is in.** Hers is the last one taken and the only one that cannot be worked around.
+5. **Deadlock, and how it terminates without the owner.** If a package is vetoed on **three** full certification cycles, the residue may be **parked** — but parking is admissible **only if the vetoing certifier and CONCORDIA both sign the parking entry.** If they do, the veto is discharged and the entry stands as a named open problem with the dissent recorded **verbatim**. If they do not, the cycle continues. **There is no third exit, and there is no exit through the owner.**
+6. `certification_record.md` logs every signature, every veto, every veto's evidence, and every discharged veto with its parking entry. It is the run's audit trail, and it is held to the standard of the ledger it describes: **nothing is silently dropped.**
+
+---
+
+## 6. What this run is not
+
+It is **not a rewrite**, and it is **not a re-argument of settled design**. The architecture — map then fold, one writer, three homes, the coordinate vector, contracts as pure transcriptions of legal terms — **is not on trial.** Every finding in this register is **internal** to it: each names a place where the document **fails to be what it claims**, not a place where the claim is wrong.
+
+Repair what is broken. Cut what is repeated. **Park what conflicts.** Certify. Freeze.

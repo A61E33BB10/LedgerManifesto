@@ -1,0 +1,737 @@
+% ============================================================================
+%  constitution_v1_2_proposed.tex
+%  PROPOSAL — NOT AUTHORITATIVE.
+%
+%  Finding F11 instrument: clause-level addressability of the Constitution.
+%  This file renders Ledger Framework Constitution v1.1 with an identifier
+%  C-<sec>.<n> on EVERY normative clause. It is pure addressing: not one word
+%  of Constitution prose is changed. The three PARKED amendments (F2/F10/F12
+%  = PARK-2/3/4) are folded in as clearly marked v1.2 deltas — the only prose
+%  deltas; everything else is verbatim v1.1 + labels.
+%
+%  Authority is one-way and does NOT turn here. The Constitution v1.1
+%  (LedgerManifesto/leddeger_manifesto.md) remains the sole authority; this
+%  proposal is cited by nothing in the specification except the parking index.
+%  Compile: latexmk -pdf constitution_v1_2_proposed.tex
+% ============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+
+\setlength{\emergencystretch}{3em}
+
+% --- running header: unmissable, on every page ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\small\bfseries PROPOSED --- NOT AUTHORITATIVE}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- a normative clause: bold address, then verbatim v1.1 prose ---
+\newcommand{\clause}[2]{\par\medskip\noindent\textbf{#1}\hspace{0.6em}#2}
+
+% --- a parked-amendment delta box ---
+\newcommand{\pk}[3]{%
+  \par\smallskip\noindent
+  \fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+    \small\textbf{[PARKED AMENDMENT --- #1]}\par\smallskip
+    \emph{Clause replaced (verbatim, Constitution v1.1):} #2\par\smallskip
+    \emph{Proposed v1.2 replacement (verbatim):} #3}}\par\smallskip}
+
+\begin{document}
+
+\begin{center}
+\fbox{\parbox{0.95\linewidth}{\centering
+  \bfseries PROPOSED --- NOT AUTHORITATIVE.\\
+  Cited by nothing in the specification except the parking index.\\[3pt]
+  \normalfont\small
+  This document renders Ledger Framework Constitution v1.1 with a clause-level
+  address \textbf{C-\textit{sec}.\textit{n}} on every normative clause --- pure
+  addressing, \emph{not one word of Constitution prose changed} --- and folds in
+  the three parked amendments (F2, F10, F12) as marked v1.2 deltas. The
+  Constitution v1.1 (\texttt{LedgerManifesto/leddeger\_manifesto.md}) remains the
+  sole authority; authority is one-way and does not turn here.}}
+\end{center}
+
+\begin{center}
+\large\bfseries The Ledger Framework --- Architectural Constitution\\
+\normalsize\normalfont Clause-Addressed Rendering (proposed v1.2) of v1.1
+\end{center}
+
+\noindent\emph{Non-normative material omitted from clause numbering:} the
+Abstract and the Amendment Record of v1.1 are summary and historical prose
+respectively; they carry no requirement, definition, principle, or guarantee of
+their own and so bear no clause identifier. Every normative clause of
+\S1--\S14, Scope, and Authority is reproduced below, verbatim, with its address.
+
+% ===================================================================
+\section*{\S1 --- The Objective and the Problem}
+% ===================================================================
+
+\clause{C-1.1}{The objective of the Ledger project is to build a clean post-trade
+and risk-management platform: one system of record from which positions,
+valuations, profit and loss, collateral, and reports are all derived --- exactly,
+deterministically, and reproducibly.}
+
+\clause{C-1.2}{The root cause is architectural: \textbf{the same fact is stored
+more than once.}}
+
+\clause{C-1.3}{Two stores of one fact maintained by independent logic will
+eventually disagree, and no amount of process removes a failure mode the
+architecture itself provides.}
+
+\clause{C-1.4}{There is exactly one canonical record --- an ordered, append-only
+stream of atomic transactions --- and every other number is computed on demand as
+a projection of that stream: balances, valuations, profit-and-loss statements,
+balance sheets, regulatory reports.}
+
+\clause{C-1.5}{Two projections of one record cannot disagree about any fact the
+record contains.}
+
+% ===================================================================
+\section*{\S2 --- The Six Commitments}
+% ===================================================================
+
+\clause{C-2.1}{\textbf{Full auditability.} Every number is traceable, mechanically
+and completely, to the recorded events that produced it. History is never
+rewritten: a mistake is repaired by a recorded correction that names what it
+supersedes, so the error and its repair both survive.}
+
+\clause{C-2.2}{\textbf{Full reproducibility.} Given the same record, any party ---
+the firm, a counterparty, an auditor, a regulator --- recomputes the same state,
+the same views, the same contract outputs, to the last minor unit.}
+
+\clause{C-2.3}{\textbf{Time travel embedded in the design.} The exact state of the
+system at any past moment is reconstructible from the record alone, at any time,
+forever --- independently of whether the software that produced the events still
+exists.}
+
+\clause{C-2.4}{\textbf{Correctness.} Illegal states are made unrepresentable
+wherever possible: a check can be forgotten or bypassed; a type cannot. Where
+wrongness cannot be prevented --- a contract can always compute the wrong
+economics --- it is made mechanically detectable and deterministically
+repairable. Defaults fail closed: the system stops rather than improvises.}
+
+\clause{C-2.5}{\textbf{Testability.} The ledger is correct because it is built to
+be tested. Every step is a pure, versioned function with explicit inputs, explicit
+outputs, and strong types --- typing alone eliminates whole classes of defects
+before a single test runs --- and every core invariant is expressed as an
+executable check over generated products, events, and histories, never defended
+only in prose. Correctness then composes: because the steps are pure and their
+composition is fixed --- the map, then the fold --- verifying each part verifies
+the whole. A property that cannot be tested mechanically is redesigned until it
+can be. This is not an afterthought: the architecture is deliberately shaped so
+that its core guarantees are executable --- property-based testing is a
+construction principle, not a phase at the end.}
+
+\clause{C-2.6}{\textbf{Clarity.} One name per component and one component per name;
+behaviour carried as declared data rather than hidden in code; every claim stated
+so that it can be checked by a reader with no prior exposure.}
+
+% ===================================================================
+\section*{\S3 --- The Whole Architecture in One Picture}
+% ===================================================================
+
+\clause{C-3.1}{Everything this framework does can be stated as a map followed by a
+fold. A \emph{map} processes a list element by element: given a way to turn an a
+into a b, it carries [a] to [b], one element at a time. A \emph{fold} accumulates
+a list into a single result: each element of [a] is processed in turn and absorbed
+into a running value, [a] to b.}
+
+\clause{C-3.2}{A \textbf{unit} is anything that can be held or owed --- a stock, a
+bond, an option, a currency; a \textbf{wallet} is where units are held, in signed
+quantities called balances; a \textbf{transaction} is the atomic bundle of changes
+the ledger records; and a \textbf{projection} is any view computed from the
+record.}
+
+\clause{C-3.3}{Every unit declares, from its terms, the conditions its life
+requires watching, and the Event Monitor evaluates those watches against the clock
+and the recorded observations, emitting an event onto the record the moment a
+condition is met.}
+
+\clause{C-3.4}{The smart contracts are the mapping functions: each is a stateless
+piece of code that, given one event and the current state of the ledger, computes
+the transaction the event requires. The Events Executor applies the map over the
+list, E = [e] to T = [tx]: for each event it fires the responsible contract at the
+right time, hands it the event together with the current projection of the ledger,
+and collects the proposed transaction. Many contracts, one Events Executor; the
+contracts carry all the product knowledge, the Events Executor carries none.}
+
+\clause{C-3.5}{The Transaction Executor performs the fold, T = [tx] to Ledger: it
+serialises, validates, and applies each transaction, and the immutable log is
+precisely the list being folded. Every view --- a balance, a valuation, a report
+--- is a further fold of the same list.}
+
+\clause{C-3.6}{Three kinds of thing appear in this picture, and they must never be
+confused: data, functions, and machines. The data are Event, Transaction, and
+Ledger. The functions are the arrows between the data. The machines are what
+evaluate the arrows --- one machine per arrow.}
+
+\clause{C-3.7}{The clock is the single input that is not on the record, and the
+Event Monitor is the single place it is consulted. The event the Monitor emits is
+recorded, so everything downstream of it is a function of the record alone ---
+which is exactly why a late firing produces the identical transaction. Because
+watches are declared and the Monitor is deterministic, even the emission of events
+is verifiable: given the record and the clock, anyone can recompute which events
+should have been emitted, and when.}
+
+\clause{C-3.8}{Both contract and apply can refuse --- a contract may find nothing
+due; apply rejects a malformed transaction and writes nothing --- and a refusal is
+a returned value, never a half-applied state.}
+
+\clause{C-3.9}{Map and fold therefore advance together, one event at a time, in a
+single total order.}
+
+\clause{C-3.10}{The map is proposed while the fold is authoritative: a transaction
+joins the list only when the Transaction Executor admits it, and economic
+verification is simply re-running the map on the recorded event and comparing ---
+which is why both the events and the transactions are on the record.}
+
+\clause{C-3.11}{Replay re-reads transactions and never re-executes contracts, so
+history cannot be silently reinterpreted; a wrong interpretation is repaired by a
+compensating transaction, in the open. Verification lives with the events;
+authority lives with the transactions.}
+
+% ===================================================================
+\section*{\S4 --- The Objects}
+% ===================================================================
+
+\clause{C-4.1}{At the highest level, a ledger is three things and a record: units
+--- what can be held; wallets --- where it is held; balances --- how much of each
+unit each wallet holds; and the immutable log that records every change to them.}
+
+\clause{C-4.2}{A \textbf{unit} is anything that can be held or owed inside the
+ledger: a currency (USD in cents), an equity security (identified by its ISIN), a
+bond, a listed or OTC derivative, a securities loan, a managed-account mandate, a
+margin obligation under a collateral agreement (a CSA), or any other contractual
+instrument. Units are first-class and extensible: adding a new instrument type
+adds a new element to the universe of units, never a modification of the
+machinery. Because every unit --- asset, liability, or contractual obligation ---
+is represented uniformly, the same move machinery and the same conservation
+discipline apply without special cases.}
+
+\clause{C-4.3}{Units divide into valued and non-valued. A unit is \textbf{valued}
+if and only if it represents an economic claim whose value exists independently of
+the governance or continued operation of the instrument that created it. A stock,
+a bond, and a client's redemption claim on a managed account are valued. A
+mandate's rulebook, a portfolio-swap reset mechanism, or a quantitative investment
+strategy's governance shell is non-valued: its price is undefined --- not zero ---
+because pricing the governance structure beside the claim it governs would count
+the same economic reality twice.}
+
+\clause{C-4.4}{Every unit carries three things: its terms (the contractual text,
+versioned and append-only), its state (where it stands in its lifecycle), and its
+smart contracts --- the executable form of those terms. From its terms follow its
+\textbf{watches}: the dates, observations, and conditions the Event Monitor must
+observe on its behalf. Declaring them is the unit's duty --- at registration, and
+again whenever a later transaction creates a new obligation --- and the
+declaration is exhaustive: the Monitor does exactly what the units have asked of
+it, nothing more and nothing less.}
+
+\clause{C-4.5}{A \textbf{wallet} is a named logical partition of position space ---
+a container, and deliberately nothing more. Its state at any moment is a signed
+quantity, its balance, for each unit it holds. A wallet names two parties: a
+\textbf{manager}, who is authorised to perform transactions on it, and a
+\textbf{beneficial owner}, who is legally accountable for the book. Wallets carry
+no smart contract and no logic of their own; where a wallet appears to need
+behaviour --- the rules of a managed account, for instance --- that behaviour is a
+unit (the mandate).}
+
+\clause{C-4.6}{An \textbf{atomic move} is the sole operation that changes a
+balance: it transfers a positive quantity of exactly one unit from a source wallet
+to a destination wallet in a single indivisible step. Quantities are exact
+integers in minor units; where an event divides unevenly, the rounding convention
+is part of the declared terms and the remainder is booked explicitly as its own
+move --- nothing is ever silently dropped. Because a move only transfers, it can
+never create or destroy quantity.}
+
+\clause{C-4.7}{A \textbf{transaction} is an atomic, all-or-nothing bundle of four
+kinds of change: moves, unit-state changes, position-state changes, and terms
+changes. The four align one-for-one with the four components of the ledger's
+state: balances, and the three homes of Section 7. A transaction applies in full
+or not at all. Some transactions carry no moves (for example, the registration of
+a new unit or the recording of a barrier breach).}
+
+\clause{C-4.8}{The \textbf{immutable log} is the ordered, append-only,
+hash-chained record of every admitted transaction --- hash-chained so that any
+alteration of history is detectable. It is the sole canonical source of truth.
+Three words are used precisely throughout this document: the \textbf{log} is the
+recorded sequence itself; the \textbf{ledger} is the state obtained by folding the
+log; and the \textbf{record} is everything that has been recorded --- the log and
+all it carries, transactions, events, and observations alike. ``On the record''
+means present there, and a projection is any view computed from it.}
+
+\clause{C-4.9}{Every counterparty outside the system is represented by a virtual
+wallet inside it, so the system is closed. Conservation holds by construction, not
+by check.}
+
+\clause{C-4.10}{When a balance must carry more information than a single number, it
+generalises to a signed vector of coordinates --- owned, lent, posted --- whose
+named rays are: lent out and borrowed, the two signs of lent; posted as collateral
+and received as collateral, the two signs of posted.}
+
+\pk{F10 (PARK-3), amends \S4}{%
+  ``When a balance must carry more information than a single number, it generalises
+  to a signed vector of coordinates --- owned, lent, posted --- whose named rays
+  are: lent out and borrowed, the two signs of lent; posted as collateral and
+  received as collateral, the two signs of posted.''}{%
+  ``When a balance must carry more information than a single number, it generalises
+  to a signed vector indexed by (coordinate, agreement): the coordinates owned,
+  lent, posted, with named rays lent-out/borrowed and posted/received, each
+  non-owned coordinate qualified by the collateral or margin agreement under which
+  the quantity sits. Conservation holds per (unit, coordinate, agreement); the
+  three-coordinate vector is the aggregate projection that sums over agreements.''}
+
+\clause{C-4.11}{A quantity earns a coordinate only when a distinct real-world
+action can change that coordinate independently of ownership. Only the owned
+coordinate carries economic value and drives profit and loss. The remaining
+coordinates carry mass, never value: they record possession and encumbrance under
+a named agreement, no quantity reaches them without reference to the agreement
+unit that governs it, and a lifecycle event extinguishes value, never mass --- a
+unit leaves the ledger only from the zero vector. Anything computable from the
+coordinates is a projection, computed when needed and never stored.}
+
+% ===================================================================
+\section*{\S5 --- The Machines}
+% ===================================================================
+
+\clause{C-5.1}{The framework has three machines --- one for each arrow of the
+picture in Section 3. All three are generic machinery carrying no product
+knowledge, and only the last ever writes the ledger: three roles, one writer.}
+
+\clause{C-5.2}{The \textbf{Event Monitor} owns time and attention. It holds every
+declared watch and evaluates them against the clock and the recorded observations,
+emitting an event onto the record the moment a condition is met. It holds no
+private list --- the watches it evaluates are on the record --- and it emits
+events, never transactions. The relationship between the units and the Monitor is
+a recorded handshake. Each declared watch is acknowledged by the Monitor, and the
+acknowledgement --- an event like any other, flowing through the same pipeline ---
+is written into the unit's state; a watch is thus visibly \emph{declared}, then
+\emph{armed}, then \emph{fired} or \emph{expired}.}
+
+\clause{C-5.3}{A declared watch that is never armed is therefore a visible gap,
+never a silent one. The full chain is on the record and can be walked in either
+direction: register a unit, the conditions it declares, the acknowledgements, the
+events, the transactions, the state updates. The Monitor can affect timeliness and
+liveness, but it cannot affect the correctness of ledger state, because it only
+emits events --- it never proposes transactions.}
+
+\clause{C-5.4}{The \textbf{Events Executor} owns delivery. It captures and records
+the events arriving from outside, and, for each event --- arrived or emitted ---
+it fires the responsible smart contract, handing it the event together with the
+current projection of the ledger, and collects the proposed transaction. It runs
+the contracts; it never writes the ledger; its output is only proposals.}
+
+\clause{C-5.5}{The \textbf{Transaction Executor} owns the record. It is the
+gatekeeper of the ledger door: the single component through which every
+transaction must pass, and the only component permitted to change the ledger's
+state. It validates structure --- conservation is automatic; authorisation,
+idempotence, consistency of reference, and writer discipline are enforced --- and,
+if the transaction is admissible, appends it to the immutable log. It creates
+nothing and runs nothing; it admits or refuses. There is no other way to change
+the ledger's state.}
+
+\clause{C-5.6}{Every proposed transaction carries an identifier derived from its
+cause, so a retried or duplicated proposal is recognised and committed only once.}
+
+\clause{C-5.7}{The single-writer discipline is a correctness requirement. The
+Transaction Executor therefore presents to the log a strictly monotonic sequence
+of committed transactions; where two simultaneous events on the same instrument do
+not commute and declare no precedence, it refuses rather than guesses an order.}
+
+\clause{C-5.8}{The roles sit at different levels of trust. The Transaction Executor
+is the trusted component: the ledger's integrity rests on it and on nothing else.
+The contracts, the Event Monitor, and the Events Executor are outside the trust
+boundary, untrusted in different ways: a contract can be economically wrong, so
+its output is verified by recomputation; the Monitor and the Events Executor
+cannot corrupt the ledger at all --- a late emission or firing produces the
+identical transaction, a duplicate is committed once, a spurious one finds nothing
+due and is refused --- but the timeliness of the system depends on them. Integrity
+owes them nothing; liveness is conditional on them.}
+
+% ===================================================================
+\section*{\S6 --- Smart Contracts}
+% ===================================================================
+
+\clause{C-6.1}{Financial instruments are not passive data records; they are active
+contracts that, when triggered by an event, emit the transactions reflecting the
+economic consequences of that event. The Ledger performs none of this
+product-specific logic: it admits well-formed transactions and records them. Since
+the ledger is only a transaction processor, anything coming from outside must be
+converted into a transaction, and the smart contract is the converter.}
+
+\clause{C-6.2}{Everything a smart contract consumes must itself be on the record.}
+
+\clause{C-6.3}{A contract never waits and never remembers: the watch waits in the
+record, the Event Monitor notices when its condition is met, the Events Executor
+delivers the firing --- and whatever a contract must carry from one firing to the
+next, it records.}
+
+\clause{C-6.4}{Every smart contract is a pure, deterministic function of its
+inputs: the declared terms of the instrument, the recorded observations, and the
+visible unit and position state at the moment of invocation. Each contract is
+therefore a stateless, machine-readable encoding of the legal terms and conditions
+of the instrument it governs.}
+
+\clause{C-6.5}{The alignment with the legal contract runs deeper: every right and
+obligation the legal contract creates is represented in the ledger as a unit. A
+subscription is booked as an exchange --- cash against the client's redemption
+claim --- never as a transfer for nothing.}
+
+\clause{C-6.6}{Treating the client's redemption claim as a valued unit has direct
+consequences for fee accrual and NAV attribution in managed accounts; these
+consequences are resolved in the detailed specification consistently with the
+principles stated here.}
+
+% ===================================================================
+\section*{\S7 --- State: The Three Homes}
+% ===================================================================
+
+\clause{C-7.1}{Every unit progresses through a well-defined sequence of lifecycle
+states. Some elements of state are properties of the unit alone; others are joint
+properties of the unit and a specific wallet.}
+
+\clause{C-7.2}{The three-home state model encodes the distinction: (i) ProductTerms
+--- the immutable, append-only versions of an instrument's contractual terms; (ii)
+UnitStatus --- a materialised, replayable projection of events that affect the unit
+as a whole; and (iii) PositionState --- per-wallet, per-unit attributes.}
+
+\clause{C-7.3}{Because all three are derived from the immutable log rather than
+being independent mutable stores, they can be discarded and rebuilt by replay at
+any time without loss of information. Each non-balance fact has exactly one legal
+writer.}
+
+\clause{C-7.4}{The three homes are not bookkeeping conveniences: together with the
+balances, they must carry \textbf{all the information the smart contracts require
+in order to execute}. Each such fact is written into its home by an earlier
+firing, so that the next firing finds its entire context on the record; if a
+contract would ever need to remember something, that something has a home.}
+
+\clause{C-7.5}{One event --- a settlement print, a margin payment, a split ---
+lands in exactly one home, and the home is determined by what the fact is a
+property of: the unit alone, the unit-and-holder pair, or the contract's terms.}
+
+% ===================================================================
+\section*{\S8 --- Valuation and Profit and Loss}
+% ===================================================================
+
+\clause{C-8.1}{The initial NAV of a wallet is the cash it took to build the
+portfolio at inception; the current NAV is the cash you would hold if you unwound
+every position at prevailing prices; and the profit and loss (PnL) is the
+difference between the two.}
+
+\clause{C-8.2}{At any point in time the NAV of a wallet is obtained by (i)
+replaying the transaction log to recover the wallet's current composition and (ii)
+multiplying that composition by the current price vector supplied by the pricing
+data layer, the sum running over the valued units only.}
+
+\clause{C-8.3}{Because unit state affects value, the pricing function is also
+parameterised by the current lifecycle state of the instrument --- obtained from
+the ledger, never from a store of its own.}
+
+\clause{C-8.4}{A central and non-negotiable property follows: the profit and loss
+of any wallet is exactly the variation in its NAV. PnL between two dates is
+path-independent, and no second copy of ``realised PnL'' or ``book cost'' is ever
+maintained alongside the position record.}
+
+\clause{C-8.5}{For the variation in NAV to be exactly profit, deposits and
+contributions must not create profit. Every inflow of value is one of three
+things:}
+
+\clause{C-8.6}{an exchange paired with an equal-valued outflow --- settled-to-market
+margin is this case, a settlement extinguishing the day's exposure with no return
+obligation;}
+
+\clause{C-8.7}{a contribution or financing received against an equal obligation
+created in the same transaction --- collateral received under title transfer, cash
+included, is this case, owned by the receiver against an equivalent-return
+obligation that is itself a unit;}
+
+\pk{F12 (PARK-4), amends \S8 case 2}{%
+  ``a contribution or financing received against an equal obligation created in the
+  same transaction --- collateral received under title transfer, cash included, is
+  this case, owned by the receiver against an equivalent-return obligation that is
+  itself a unit''.}{%
+  ``a contribution or financing received against an obligation created in the same
+  transaction and valued at fair value, any day-one difference between the inflow
+  amount and the obligation's fair value being recognised as financing basis ---
+  collateral received under title transfer, cash included, is this case, owned by
+  the receiver against an equivalent-return obligation that is itself a unit''.}
+
+\clause{C-8.8}{or value held in custody without being owned, recorded on the
+collateral-received coordinate --- collateral received under a security interest
+without right of use, segregated cash included, is this case.}
+
+\clause{C-8.9}{Where an inflow moves under a margin or collateral agreement, which
+case governs it is declared once, on that agreement unit. A deposit therefore
+cannot move profit and loss --- not because a formula subtracts it, but because it
+cannot change net owned value.}
+
+% ===================================================================
+\section*{\S9 --- Corporate Actions and the Market Data Operator}
+% ===================================================================
+
+\clause{C-9.1}{A corporate action is, first of all, a transaction like any other: a
+list of moves, together with unit-state changes and a new version of the
+instrument's terms, all applied atomically through the same Transaction Executor.}
+
+\clause{C-9.2}{A corporate action also changes the meaning of all the market data
+recorded before it. To carry pre-event market data into the post-event frame, a
+transformation must be applied. The framework gives it a name: the \textbf{market
+data operator}. Every kind of market data is equipped with its own operators, one
+per kind of event --- declared once, when the kind of data is introduced and the
+corporate action is recorded, never improvised at the moment of reading.}
+
+\clause{C-9.3}{Three principles govern the operators. First, the operator is
+intrinsic to the pairing of the kind of data and the kind of event. Second, the
+ledger is the authority; the pricing data layer applies. Third, originals are
+never overwritten. The observed price stays on the record exactly as observed; the
+adjusted value is computed at each read. Derived quantities are recomputed from
+operator-adjusted inputs.}
+
+% ===================================================================
+\section*{\S10 --- Strategies, Virtual Ledgers, and Total Return Swaps}
+% ===================================================================
+
+\clause{C-10.1}{A \textbf{virtual ledger} is a complete instance of the same
+machine --- units, wallets, balances, an immutable log, the three machines ---
+whose holdings are notional: it settles nothing, and none of its wallets ever
+reaches a settlement instruction or the balance sheet. Virtual ledgers are subject
+to the same six commitments as true ledgers, especially full reproducibility and
+time travel. The word virtual keeps one meaning: on the far side of the settlement
+boundary.}
+
+\clause{C-10.2}{A deterministic strategy is a smart contract whose rulebook is the
+terms of a (non-valued) strategy unit. The hypothetical portfolio it manages is a
+wallet in a virtual ledger. Each rebalancing is a recorded transaction triggered
+by stamped market observations. The strategy's level is that wallet's NAV --- a
+projection computed by the same fold as any other; because the strategy ledger is
+replayable, any party holding the recorded rules and observations recomputes the
+level exactly, and an index restatement is a compensating entry, never a rewrite.}
+
+\clause{C-10.3}{Two disciplines make this safe. First, the bridge between ledgers
+is an observation, never a move. Second, the wall between models and the ledger
+holds level by level: the true ledger never runs the strategy; it consumes the
+level as an observation.}
+
+\clause{C-10.4}{When the strategy's trades are real, the strategy's output toward
+the world is an order (an instruction, not a fact). The executions that come back
+are external events, mapped by contracts and folded into a real wallet of the true
+ledger. The virtual ledger becomes the benchmark: it holds what the rules say the
+portfolio should be, the real wallet holds what execution achieved, and the
+difference between the two folds is the slippage --- exact, never estimated.}
+
+\clause{C-10.5}{A total return swap is then one definition: the reference leg of a
+TRS is the NAV of a designated wallet (or virtual ledger). In every case the TRS
+is an ordinary unit in the true ledger whose smart contract, at each reset, reads
+the stamped NAV observation and emits the reset and financing moves.}
+
+% ===================================================================
+\section*{\S11 --- Structural Invariants and the Impossibility of Broken States}
+% ===================================================================
+
+\clause{C-11.1}{The Ledger is deliberately engineered so that certain classes of
+inconsistent or illegal state cannot be represented at all.}
+
+\clause{C-11.2}{\textbf{Atomicity.} A transaction is applied in full or not at
+all.}
+
+\clause{C-11.3}{\textbf{Consistency of reference.} A quantity and a price may be
+combined only when they refer to the same state of the instrument. After a
+two-for-one split, 1,000 shares at 100 become 2,000 at 50; multiplying the new
+count of 2,000 by the stale price of 100 would book a phantom valuation.}
+
+\clause{C-11.4}{\textbf{Writer discipline.} Lifecycle facts are written only by the
+single legal writer for that fact.}
+
+\clause{C-11.5}{These three join the invariants established earlier ---
+conservation by construction (Section 4), the append-only log (Section 4), the
+single writer (Section 5), the determinism of every arrow (Section 3), and
+idempotence under the cause-derived identifier (Sections 5 and 12) --- to form the
+catalogue that the property-based tests of the Testability commitment exercise.
+Together they render the classes of internal reconciliation failure that dominate
+conventional architectures unreachable within the Ledger's scope: what cannot be
+represented cannot break.}
+
+% ===================================================================
+\section*{\S12 --- Time Travel, Replayability, and Idempotence}
+% ===================================================================
+
+\clause{C-12.1}{Every historical state of the Ledger is exactly reconstructible by
+replaying the immutable transaction log up to the desired timestamp.}
+
+\pk{F2 (PARK-2), amends \S12}{%
+  ``Every historical state of the Ledger is exactly reconstructible by replaying
+  the immutable transaction log up to the desired timestamp.''}{%
+  ``Every historical state of the Ledger is exactly reconstructible from the
+  immutable transaction log along two axes: a transaction-time horizon (the log
+  prefix --- what was known) and a valid-time horizon (which recorded observations
+  are in force). Fixing both yields a deterministic projection; the as-known-at
+  view over a prefix is never rewritten by a later correction, and the as-of view
+  recomputes bit-exactly from the prefix that includes the correction.''}
+
+\clause{C-12.2}{Because it reads only committed transactions and never re-executes
+smart contracts, the historical record is independent of the machinery that
+produced it.}
+
+\clause{C-12.3}{Smart contracts must be idempotent. The mechanism is the
+cause-derived identifier of Section 5: a retried or late-arriving proposal for an
+already-processed event produces no duplicate effect.}
+
+% ===================================================================
+\section*{\S13 --- Two Layers of Correctness}
+% ===================================================================
+
+\clause{C-13.1}{\textbf{Structural correctness} is guaranteed by the Transaction
+Executor. These properties hold regardless of whether the smart contract that
+produced the transaction was correct, careless, or malicious.}
+
+\clause{C-13.2}{\textbf{Economic correctness} is not guaranteed at admission; it is
+made checkable by recomputation. A smart contract may emit a perfectly well-formed
+transaction that nevertheless books the wrong economics. The discrepancy is
+detected after the fact by recomputing the transaction from the recorded inputs.
+The difference constitutes a defect of the contract, not of the ledger, and it is
+repaired by a subsequent compensating transaction through the same door.}
+
+\clause{C-13.3}{The Ledger relies on structural correctness because it is
+guaranteed by construction; it expects economic correctness of its contracts and
+renders it mechanically verifiable. Detection is after the fact. The framework
+prefers a detectable, repairable error over a pretence of prevention it cannot
+deliver.}
+
+% ===================================================================
+\section*{\S14 --- Minimum Requirements}
+% ===================================================================
+
+\subsection*{\S14.1 The Event Monitor and the Events Executor}
+
+\clause{C-14.1}{The Event Monitor and the Events Executor are infrastructure
+outside the ledger's trust boundary. Any implementation must satisfy, at
+minimum:}
+
+\clause{C-14.2}{Durable watches and timers. A watch registered for a future date or
+condition fires when it is met, regardless of restarts or failures; timer state is
+persisted.}
+
+\clause{C-14.3}{At-least-once emission. No event is ever lost; a duplicate is
+harmless because of idempotence checking.}
+
+\clause{C-14.4}{Acknowledged watches. Every declared watch is acknowledged, and the
+acknowledgement is recorded in the unit's state; a watch that remains
+unacknowledged beyond its arming window is a visible, overdue item, never
+silence.}
+
+\clause{C-14.5}{Triggers carry timing, not data. A trigger says when; everything
+the event means is read from the record.}
+
+\clause{C-14.6}{Deterministic, replayable orchestration. Each machine's own state
+is reconstructible by replaying its append-only history.}
+
+\clause{C-14.7}{No privilege. Neither machine holds write access to the ledger.}
+
+\clause{C-14.8}{Obligation liveness. Every contractual obligation is registered
+with a deadline, a test for its discharge, and a fallback action, and by its
+deadline it is discharged, compensated, or declared defaulted; a duty that fails to
+fire is a visible, overdue item, never silence.}
+
+\subsection*{\S14.2 The Pricing Stack and the Pricing Data Layer}
+
+\clause{C-14.9}{The ledger records the outputs of pricing models and never runs
+one.}
+
+\clause{C-14.10}{Valuation is state-dependent and obtains that state from the
+ledger.}
+
+\clause{C-14.11}{Valuations are reproducible from recorded inputs.}
+
+\clause{C-14.12}{Prices and quantities are never mixed across an event.}
+
+\clause{C-14.13}{Originals are preserved; adjusted values are computed; derived
+values are recomputed.}
+
+\clause{C-14.14}{Estimates and entitlements are kept apart.}
+
+\clause{C-14.15}{Model outputs re-enter only as new observations, carrying
+sufficient provenance. Reproducing a valuation from recorded inputs and identified
+prices is unconditional; reproducing a model's number requires the model itself,
+whose retention is a governance matter outside the ledger's scope.}
+
+% ===================================================================
+\section*{Scope of the Ledger Project}
+% ===================================================================
+
+\clause{C-Scope.1}{The Ledger project encompasses the design, formal
+specification, reference implementation, and verification of the following
+components:}
+
+\clause{C-Scope.2}{The closed double-entry move model, the conservation law, and
+the single-door admission function.}
+
+\clause{C-Scope.3}{The immutable, hash-chained transaction log and the projection
+machinery that derives all views from it.}
+
+\clause{C-Scope.4}{The three-home state architecture (ProductTerms, UnitStatus,
+PositionState) and the conditions that render illegal states unrepresentable.}
+
+\clause{C-Scope.5}{The smart-contract framework, its event-triggering discipline,
+and the purity and idempotence requirements.}
+
+\clause{C-Scope.6}{The market data operators and the integration layer between
+lifecycle state, pricing models, and the corporate-action adjustment machinery.}
+
+\clause{C-Scope.7}{The time-travel and historical-replay machinery, with its
+guarantees of determinism and reproducibility.}
+
+\clause{C-Scope.8}{The formal invariant catalogue and the property-based testing
+regime.}
+
+\clause{C-Scope.9}{The settlement-projection layer.}
+
+\clause{C-Scope.10}{The virtual-ledger mechanism: subordinate, non-settling
+instances of the same machine whose projections enter the true ledger only as
+stamped observations.}
+
+\clause{C-Scope.11}{Explicitly out of scope are: price discovery and executable
+pricing; legal enforceability or validity of contracts; settlement finality,
+payment-system access, and CSD connectivity; regulatory-submission gateways and
+report formatting; model governance and validation; and accounting-policy
+decisions. These concerns lie outside the Ledger boundary and are reconciled
+against it only at its perimeter.}
+
+% ===================================================================
+\section*{Authority and Amendment}
+% ===================================================================
+
+\clause{C-Auth.1}{This manifesto is the authoritative statement of intent and scope
+for the Ledger project --- its architectural constitution --- and the direction of
+authority is one-way: the manifesto is rated against nothing; everything else is
+rated against it.}
+
+\clause{C-Auth.2}{All specifications, implementations, tests, and integration
+layers --- including every existing version of the ledger specification --- shall
+be assessed for conformance against it and brought into line where they deviate.}
+
+\clause{C-Auth.3}{Where a genuine improvement requires departing from this
+document, the manifesto is amended explicitly first; a design choice that cannot be
+traced to its principles shall be rejected.}
+
+\clause{C-Auth.4}{Its vocabulary --- unit, wallet, balance, move, transaction,
+watch, the immutable log, projection, the Event Monitor, the Events Executor, the
+Transaction Executor, smart contract, the market data operator, the three homes,
+virtual wallet, virtual ledger --- is fixed: one name per component, and no
+specification shall introduce a synonym for any of them.}
+
+\vfill
+\begin{center}\small\itshape
+--- End of clause-addressed rendering. 110 normative clauses. Three parked
+amendments (F2, F10, F12) shown as marked v1.2 deltas. Not one word of
+Constitution v1.1 prose changed. ---
+\end{center}
+
+\end{document}

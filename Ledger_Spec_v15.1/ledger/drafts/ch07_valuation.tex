@@ -1,0 +1,378 @@
+\section{Valuation and Profit and Loss}\label{ch:valuation}
+
+This chapter discharges constitution clauses C-8.1--C-8.9 --- NAV as a projection, PnL as NAV variation, and the three-case deposit-neutrality of \S8 as amended in v1.1 (the inflow-regime clauses C-8.6--C-8.9 jointly with Chapter~\ref{ch:collateral}).
+
+Net Asset Value (NAV) has an operational meaning before it has a formula.
+The initial NAV of a wallet is the cash it took to build the portfolio at
+inception; the current NAV is the cash you would hold if you unwound every
+position at prevailing prices; and the profit and loss (PnL) is the
+difference between the two. Nothing in this chapter is a new store: every
+number it produces is a projection of the immutable log, computed on demand
+and never written back.
+
+\subsection{Net Asset Value}
+
+The operational account becomes a formula in two steps. First, replay the log
+to recover the wallet's current composition --- the signed coordinate vector,
+per unit, that the fold of Chapter~2 produces. Second, multiply that
+composition by the current price vector supplied by the pricing data layer,
+summing over the valued units only.
+
+\begin{definition}[Net Asset Value]
+The NAV of a wallet $w$ at a log position is
+\[
+  \mathrm{NAV}(w) \;=\; \sum_{u \,\text{valued}} \mathrm{owned}(w,u)\,\cdot\, P\!\left(u, \sigma(u)\right),
+\]
+where $\mathrm{owned}(w,u)$ is the owned coordinate of $w$'s balance in unit
+$u$ (Chapter~3), $\sigma(u)$ is the current lifecycle state of $u$ read from
+the ledger, and $P$ is the price the pricing data layer supplies for that unit
+in that state.
+\end{definition}
+
+Only the owned coordinate enters. The lent and posted coordinates carry mass,
+never value (Chapter~3): a security posted as collateral is still owned by the
+poster and is already counted once, on its owned coordinate; counting the
+posted marker as well would value one economic reality twice. Non-valued units
+--- a strategy rulebook, a mandate's governance shell --- have no price and
+enter no sum; their value is undefined, not zero. A valued unit may nonetheless
+price at zero, and that is a different thing: when a lifecycle event has
+extinguished its exposure --- a triggered one-touch, or a settled-to-market
+future after the day's margin (\S\ref{sec:pricing-state}) --- the unit stays
+valued and enters the sum at $P=0$, so its contribution is defined and it is
+FUT-IDX, not a strategy shell.
+
+Two disciplines are visible in the definition and are carried by the machinery
+of Chapters~3 and~8. The composition is one number per coordinate, obtained
+from one fold of one log, so no two readers can disagree about what is held.
+And a price is never combined with a quantity across a corporate-action event:
+after a two-for-one split, $2{,}000$ shares are multiplied by the post-split
+frame $50.00$, never by the stale $100.00$ --- consistency of reference,
+catalogued in Chapter~14.
+
+\begin{lstlisting}
+type Points = Integer                      -- money in minor units, exact
+price :: Unit -> State -> PriceVector -> Points   -- pricing is state-parameterised
+nav   :: Composition -> PriceVector -> Points
+nav c pv = sum [ q * price u (stateOf c u) pv     -- owned coordinate, valued units
+               | (u, q) <- ownedBalances c, valued u ]
+\end{lstlisting}
+
+\subsection{Profit and loss is the variation in NAV}\label{sec:pnl}
+
+\begin{principle}[PnL is NAV variation]
+The profit and loss of any wallet between two log positions is exactly the
+variation in its NAV over that interval. PnL is therefore path-independent,
+and no derived figure a projection could recompute --- no second copy of
+``realised PnL,'' no running valuation --- is ever maintained alongside the
+position record.
+\end{principle}
+
+The principle is a consequence of the definition, not an additional
+convention. NAV is a function of the composition and the price vector alone;
+its variation between two positions depends only on the endpoints, never on
+the sequence of transactions that connected them. A stored realised-PnL figure
+would be a second record of a fact the log already determines --- precisely
+the redundancy the framework exists to remove. Book cost is the opposite
+case, and the distinction is Chapter~6's: a home holds a fact a contract must
+read, never a view a projection can recompute. W-ALPHA's traded price 995.00,
+recorded into PositionState at the trade (Chapter~3, T1), is book cost --- a
+fact the future's contract must read to compute each day's variation margin
+--- so it is held, not recomputed; realised PnL is a view, so it is
+recomputed, never held. Realised and unrealised PnL
+remain available as \emph{projections}, cut from the same log by a reporting
+convention (Chapter~12), but neither is a source of truth.
+
+\paragraph{Episode --- the future.}
+FUT-IDX is a cash-settled future on index IDX, multiplier $10$, USD,
+settled-to-market. Wallet W-ALPHA buys one contract at $995$ on day~0. The
+official settlement prints on the three settlement days are $1{,}000$, then
+$990$, then $1{,}005$; the contract's smart contract fires on each print and
+emits the day's variation-margin (VM) move.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Settlement day & Print & VM move (owned cash) & Running NAV change \\
+\midrule
+Day 1 & $1{,}000$ & $+50$ & $+50$ \\
+Day 2 & $\phantom{0}990$ & $-100$ & $-50$ \\
+Day 3 & $1{,}005$ & $+150$ & $+100$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each VM is a settlement --- an owned-cash move that extinguishes the day's
+exposure, with no return obligation, because none exists in law for a
+settled-to-market contract (§8, case~1; developed in Chapter~9). The
+cumulative VM is $50 - 100 + 150 = 100$, and the position's PnL is
+$(1{,}005 - 995)\times 10 = 100$. The two agree, and the second computation
+never touches the intermediate prints $1{,}000$ and $990$: the path is
+irrelevant, only the endpoints $995$ and $1{,}005$ matter.
+\emph{PnL is the variation in NAV, and it is path-independent.}
+
+\subsection{Pricing is parameterised by state read from the ledger}\label{sec:pricing-state}
+
+Because a unit's value depends on where it stands in its lifecycle, the price
+function is parameterised not only by the unit but by its state --- and that
+state is obtained from the ledger, from UnitStatus and PositionState
+(Chapter~6), never from a store the pricing layer keeps of its own. The pricing
+layer computes; the ledger is the sole authority for the state it computes in.
+
+\paragraph{Episode --- the one-touch.}
+OT-1 (Cast, \S\ref{sec:cast}) is marked \USD{400,000} by the pricing layer while
+live. When OMEGA's official close prints $79.00$, the Event Monitor
+emits the touch and the option's contract records the lifecycle transition:
+UnitStatus $\rightarrow$ \emph{triggered}. The pricing layer, reading that
+state from the ledger, now prices the same unit in state \emph{triggered} at
+$0$: the contingent claim has resolved, its economic value realised as the
+cash payout that Chapter~9 discharges.
+
+The mark on OT-1 collapses from \USD{400,000} to $0$, but the mass does not
+move: one unit of OT-1 remains on W-ALPHA's owned coordinate, and any posted
+marker over it remains on its posted coordinate, until the payout completes and
+the unit retires from the zero vector. \emph{A lifecycle event extinguishes
+value, never mass: coordinates carry mass, prices carry value, and the price
+turns on a state that lives on the record.}
+
+\paragraph{Episode --- the settled-to-market future.}
+The same rule fixes the price of FUT-IDX, and fixes it where an undisciplined
+mark would double-count. W-ALPHA is long one contract and W-CCP is short it, so
+the two owned coordinates carry $+1$ and $-1$, and FUT-IDX is a valued unit that
+Definition~7.1 sums. But the day's variation margin has already settled as owned
+cash (the episode of \S\ref{sec:pnl}). Were the pricing layer now to mark FUT-IDX
+at the futures level, it would count the day's move twice --- once in the VM cash
+already owned, once in the mark --- and W-ALPHA's NAV would be overstated by
+exactly that move, while W-CCP's would be understated. So in every committed
+state, after the day's settlement has been applied, a settled-to-market future
+prices at $0$: its exposure is extinguished, and there is nothing left to mark.
+A collateralised-to-market future prices instead against the last settled level,
+because a return obligation survives the settlement, and that obligation is itself
+a unit (Chapter~\ref{ch:collateral}).
+
+\begin{lstlisting}
+-- FUT s bundles the declared regime (a term of the unit) and PositionState.
+price u s _ | isFuture u, stm u = 0                     -- STM: exposure extinguished; VM already owned
+            | isFuture u, ctm u = markAt (lastSettled s)  -- CTM: return obligation survives; it is a unit
+\end{lstlisting}
+
+This is \S\ref{sec:cashmargin}'s regime key --- the one declared bit that
+separates settled-to-market from collateralised-to-market --- read on the
+valuation plane. The bit therefore carries a \emph{second} consequence beyond
+the balance sheet: it decides not only whether a return-obligation unit is booked
+(the balance-sheet consequence of \S\ref{sec:cashmargin}) but whether the future
+is marked at all. A misdeclaration corrupts NAV as well as the balance sheet ---
+declare a settled-to-market future as collateralised-to-market and the pricing
+layer marks an exposure that is already extinguished, double-counting the day's
+move; declare the converse and it drops a mark it should carry. This sharpens
+\S\ref{sec:cashmargin}'s warning about the regime bit's misdeclaration, giving it
+one more symptom, rather than repeating it.
+
+\subsection{Deposits do not move profit and loss}
+
+For the variation in NAV to be exactly profit, an inflow of value must not, by
+itself, create profit. The constitution's guarantee (§8, as amended) is that
+every inflow of value is one of three things, and which one is not a matter of
+asset class but of the legal regime declared once on the governing agreement
+unit.
+
+\begin{enumerate}[label=(\arabic*),leftmargin=*]
+\item \textbf{An exchange paired with an equal-valued outflow.}
+  Settled-to-market margin is this case: an owned-cash move that settles the
+  day's exposure with no return obligation, because the settlement
+  extinguishes the exposure outright. The future's VM above is the worked
+  instance.
+\item \textbf{A contribution or financing received against an equal obligation
+  created in the same transaction.} Collateral received under title transfer,
+  cash included, is this case: the receiver owns the inflow and owes an
+  equivalent-return obligation that is itself a unit.
+\item \textbf{Value held in custody without being owned.} Collateral received
+  under a security interest without right of use, segregated cash included, is
+  this case: it is recorded on the received-collateral coordinate and never
+  touches owned.
+\end{enumerate}
+
+Case~1 adds equal and opposite owned value; case~3 adds no owned value at all.
+Case~2 is the one that could leak profit; whether it does turns on the declared
+financing rate, as the next proposition shows.
+
+\begin{proposition}[Deposit-neutrality of title-transfer financing, and its off-market limit]
+Constitution~\S8 asserts deposit-neutrality \emph{unconditionally}: a financing
+received against an equal obligation created in the same transaction ``cannot
+change net owned value.'' That claim is a theorem in one case and false in
+another. The gap is a genuine conflict with the constitution, parked openly below
+rather than defined away.
+
+The return obligation minted in case~2 is a valued unit. When the declared
+financing rate equals the fair rate for the term, its fair value is exactly the
+inflow amount --- par plus accrued --- so at receipt the owned cash and the
+obligation are equal and opposite in the owned sum, net owned value is unchanged,
+and NAV does not move. In that case deposit-neutrality is a theorem, not an
+approximation.
+
+When the declared rate is off-market, it is not. Receive \USD{100} of cash
+against an obligation whose fair value is \USD{98} --- financing taken below the
+fair rate --- and net owned value rises by \USD{2} at receipt: NAV moves. That
+\USD{2} is a day-one \emph{financing basis}, the correct measurement of the
+off-market terms; but naming it does not make the inflow neutral. The
+constitutional guarantee, asserted for every case, does not hold here: it is
+narrowed to fair-value financing.
+
+This is a genuine conflict between the specification and Constitution~\S8. It is
+parked --- not resolved, and not relabelled --- as entry PARK-4 of the parking
+index (Chapter~\ref{ch:scope}). The parked amendment makes \S8 case~2 conditional
+on the obligation being valued at fair value, with any day-one difference
+recognised as financing basis. Until it is adopted, the unconditional guarantee
+stands in the constitution and the off-market case stands against it, in the open.
+\end{proposition}
+
+In the fair-rate case, because the obligation is priced at par-plus-accrued, its
+value tracks the cash it returns for the life of the financing, and the receipt
+neither raises nor lowers NAV; only the subsequent accrual --- a genuine
+financing cost or
+benefit --- moves it, as it should. This is why PnL needs no regime branch. The
+regime decides \emph{where} an inflow lands --- owned plus an obligation unit,
+a posted marker, or an owned settlement --- but once it has landed, PnL is
+computed uniformly.
+
+\begin{principle}[No regime branch in PnL]
+PnL is $\sum \mathrm{owned}\cdot P$ over the valued units, with no branch on
+collateral regime. The regime is a property of the transaction shape and the
+agreement unit's declared terms, not of the valuation.
+\end{principle}
+
+A fair-value deposit therefore cannot move profit and loss --- not because a
+formula subtracts it, but because it cannot change net owned value. Off-market
+financing is the one case that can, and that case is the parked conflict above.
+The full mechanics of the three regimes, the obligation and claim units, and
+the entitlement trap are Chapter~9's; this chapter uses only their valuation
+consequence.
+
+\subsection{Mid-life valuation is read from the record}
+
+State-parameterised pricing extends past a binary knock to any unit whose value
+depends on facts its own history has accrued. The point is that those facts
+have a home on the record (Chapter~6), so the pricing layer reads them; it does
+not remember them.
+
+\paragraph{Episode --- the variance swap.}
+VS-1 is a one-year OTC variance swap on IDX, $252$ scheduled fixings against
+the recorded official closes, variance strike $K = 400$ points, variance
+notional $N = \USD{1,000}$ per point, no cap. Its declared convention
+annualises over $252$ returns, so realised variance in points is
+$\sigma^2_R = 10^4 \cdot \sum_{i=1}^{252} R_i^2$, where $R_i$ is the $i$-th log
+return of the close series. Each firing writes the running
+sum-of-squared-returns statistic into UnitStatus as an integer at scale
+$10^{-8}$, so firing $k$ finds fixings $1,\dots,k-1$ already on the record.
+
+VS-1 fixes on the same recorded IDX closes the future settles against. The
+future's three settlement days are fixings $124$, $125$, $126$ of the series
+(closes $1{,}000$, $990$, $1{,}005$); the future's final settlement level,
+$1{,}005$, is therefore the variance swap's mid-life checkpoint close at fixing
+$126$ --- one recorded fact, two consumers.
+
+At the mid-life checkpoint (fixing $126$, half the fixings elapsed) the accrued
+statistic is $A_{126} = \sum_{i=1}^{126} R_i^2 = 0.018050$, stored as the
+integer $1{,}805{,}000$. Expressed in points and annualised to date this is
+$10^4 \cdot A_{126}\cdot(252/126) = 361$ points --- a realised $19$-vol over the
+first half. The mid-life mark to the variance receiver is that accrued
+statistic plus the remaining implied variance, both taken from the record: with
+remaining implied variance $I = 484$ points ($22$-vol) over the remaining
+half-year fraction $126/252$,
+\[
+  V_{126} \;=\; N\left[\,10^4\!\cdot A_{126} \;+\; I\cdot\tfrac{126}{252} \;-\; K\,\right]
+         \;=\; 1{,}000\left[\,180.5 + 242 - 400\,\right] \;=\; \USD{22,500}.
+\]
+The accrued term ($180.5$ points) is a projection of a UnitStatus integer; the
+implied term ($242$ points) is a market observation with provenance
+(Chapter~8); the strike is a declared term. No figure is stored as a mark. When
+the year completes, the remaining fixings accrue $10^4\!\cdot\!\sum_{127}^{252}
+R_i^2 = 260.5$ points, the realised variance is $180.5 + 260.5 = 441$ points,
+and the settlement is $1{,}000\times(441 - 400) = \USD{41,000}$ to the receiver
+--- the mid-life mark and the endpoint cut from one accruing statistic.
+\emph{A mid-life value is not a stored quantity; it is the record, priced.}
+
+\paragraph{Episode --- the total return swap.}
+TRS-1's reference leg is defined as the NAV of a designated wallet, W-QIS, in a
+virtual ledger. Valuing that leg requires no new machinery: it is the identical
+fold, $\sum \mathrm{owned}\cdot P$ over W-QIS, that values any wallet. The
+stamped NAV enters the true ledger as an observation, never a move
+(Chapters~8 and~10), and the TRS contract reads it at each reset.
+\emph{The reference leg of a swap is a NAV projection, folded like any other.}
+
+\subsection{Dual valuation: two price vectors over one position set}
+
+A wallet is valued for two purposes that demand different prices. Settlement,
+margining, and reconciliation against a counterparty, a CCP, or a custodian
+demand the price at which value actually changes hands --- the mark-to-market
+price, $P^{\mathrm{mk}}$, which may differ by venue. Risk aggregation and PnL
+attribution demand one internally consistent price across the book --- the
+mark-to-mid price, $P^{\mathrm{md}}$. The ledger supplies both as projections
+over one and the same composition.
+
+\begin{principle}[One position set, two price vectors]
+Mark-to-market and mark-to-mid are two price vectors applied to the single
+composition produced by the fold. Position divergence is impossible: there is
+one position record, so only two money figures --- $\mathrm{NAV}^{\mathrm{mk}}$
+and $\mathrm{NAV}^{\mathrm{md}}$ --- can differ, never the positions
+themselves.
+\end{principle}
+
+The classical source of internal reconciliation failure is that a settlement
+system and a risk system each keep their own positions and drift apart. Here
+they cannot: both read the same coordinates from the same log. The two numbers
+that differ are honest reflections of two questions --- what would settle, and
+what is the consistent risk mark --- and their difference is a basis, computed
+on demand, never a break to be repaired.
+
+\paragraph{Example --- three venue marks, one risk mid.}
+A wallet holds $3{,}000$ units of $U$, sub-custodied across three venues:
+$1{,}500$ at venue~A, $1{,}000$ at venue~B, $500$ at venue~C. Each venue
+publishes its own official settlement close, used for that venue's margin and
+reconciliation: $A = 100.20$, $B = 100.00$, $C = 99.60$. Risk marks the whole
+holding at one mid, $100.00$.
+\[
+  \mathrm{NAV}^{\mathrm{mk}} = 1{,}500(100.20) + 1{,}000(100.00) + 500(99.60)
+    = \USD{300,100},
+\]
+\[
+  \mathrm{NAV}^{\mathrm{md}} = 3{,}000(100.00) = \USD{300,000}.
+\]
+The two money figures differ by \USD{100}, the cross-venue basis. The
+$3{,}000$ is one number from one fold: each venue's sub-position reconciles
+against its own statement under $P^{\mathrm{mk}}$, and the book aggregates for
+risk under $P^{\mathrm{md}}$, but the position cannot diverge because there is
+only one of it.
+
+\subsection{The pricing-stack requirements}
+
+The valuation discipline above forces a small set of requirements on the
+pricing stack and the pricing data layer. They are derived here as consequences
+of NAV being a projection; Chapter~16 restates them as the minima any
+implementation must meet.
+
+\begin{enumerate}[label=P\arabic*.,leftmargin=*]
+\item \textbf{The ledger records pricing outputs and never runs a model.}
+  Model outputs re-enter only as observations carrying sufficient provenance;
+  reproducing a valuation from recorded prices is unconditional, while
+  reproducing a model's number requires the model itself, whose retention is a
+  governance matter outside scope.
+\item \textbf{Valuation is state-parameterised, and the state comes from the
+  ledger.} $P(u,\sigma(u))$ reads $\sigma(u)$ from UnitStatus and
+  PositionState, never from a pricing-owned store --- the one-touch and the
+  variance swap both turn on this.
+\item \textbf{Valuations are reproducible from recorded inputs.} The
+  composition is a fold of the log and the prices are identified on the record,
+  so any party recomputes any NAV to the minor unit.
+\item \textbf{Prices and quantities are never mixed across an event.} Each
+  is taken in the same state of the instrument --- consistency of reference.
+\item \textbf{Two price vectors are both projections over one composition.}
+  Mark-to-market and mark-to-mid share the single position record; positions
+  never diverge.
+\item \textbf{Estimates are kept apart from entitlements}, and originals are
+  preserved while adjusted and derived values are computed at read
+  (Chapter~8).
+\end{enumerate}
+
+Each is a property that can be checked mechanically over generated products and
+histories, and each is exercised by a thread episode in this chapter. Valuation
+adds no store to the ledger: it is the log, folded and priced.
