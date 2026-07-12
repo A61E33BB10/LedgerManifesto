@@ -1,0 +1,236 @@
+\section{Smart Contracts}\label{ch:contracts}
+
+This chapter discharges \S6 of the constitution.
+
+The ledger admits well-formed transactions and records them; it performs no
+product-specific logic of its own. What a dividend, an expiry, a barrier knock,
+or a settlement print means for a particular instrument lives in that
+instrument's \emph{smart contract}. An event arrives from the outside or is
+emitted by the Event Monitor; the ledger can do nothing with it until it is a
+transaction; the smart contract is the one function that performs the
+conversion. Since the ledger is a transaction processor and nothing more,
+everything reaching it from outside must be turned into a transaction, and the
+contract is the converter.
+
+One signature states the entire interface.
+
+\begin{lstlisting}
+contract :: Event -> Ledger -> Transaction
+
+-- what a contract is NOT (each of these would be a defect):
+--   contract :: Event -> State Memory Transaction   -- it may not remember
+--   contract :: Event -> IO Transaction             -- it may not reach out
+--   contract :: Event -> Clock -> Transaction        -- it may not read time
+\end{lstlisting}
+
+Read the signature as a claim about what a contract may touch. Its only inputs
+are the event and the ledger as it currently stands: the declared terms of the
+instrument, the recorded observations, and the visible unit and position state
+at the moment of firing. There is no clock among the inputs --- the clock is
+consulted once, by the Event Monitor of Chapter~4, and never again downstream
+--- no private store, and no channel to the world. A smart contract is
+therefore a pure, deterministic function of its inputs, and, because none of
+those inputs is private to it, a stateless one. Each contract is exactly this: a
+stateless, machine-readable transcription of the legal terms and conditions of
+the instrument it governs. Purity is what makes economic verification possible
+at all: to check a recorded transaction, re-run the same contract on the same
+recorded event and compare (Chapter~15). A function that read a clock, a store,
+or the network could not be re-run to the same answer, and the guarantee would
+be lost.
+
+Two principles govern every contract, and the rest of this chapter is their
+working-out.
+
+\begin{principle}[Everything a contract consumes is on the record]
+Every input a smart contract reads --- the instrument's terms, the observations
+it depends on, the positions it acts upon --- is present on the record at the
+moment of firing. A contract reads nothing that is not recorded, so its output
+is a function of the record alone.
+\end{principle}
+
+\begin{principle}[A contract never waits and never remembers]
+The waiting is done by the watch, which sits in the record, and by the Event
+Monitor, which notices when the watch's condition is met; the contract is
+invoked only after its event has fired, runs once, and returns. Whatever a
+firing must carry forward to a later firing it writes into the record --- into
+one of the three homes of Chapter~6 --- and the later firing reads it back. A
+contract that had to remember would need private state, and private state is a
+second store of the very facts the ledger already holds: the one thing this
+architecture exists to abolish.
+\end{principle}
+
+\subsection{The dividend: three firings, one contract}
+
+The dividend shows both principles in one instrument fired three times. Wallet
+W-ALPHA holds 10{,}000 shares of the stock ACME.
+
+\emph{The trigger.} On 2026-05-04 the issuer announces a cash dividend of
+\USD{1.50} per share on ACME. The announcement is captured at the boundary and
+recorded --- an external event, like a trade.
+
+\emph{The contract that catches it.} The stock's smart contract fires on the
+announcement, and fires again on each date the announcement creates. The three
+firings are one contract, invoked three times on three different events; it
+carries nothing between them.
+
+\emph{The transactions it produces.}
+
+\begin{center}
+\begin{tabular}{clll}
+\toprule
+Firing & Date & Event & Transaction emitted \\
+\midrule
+1 & 2026-05-04 & announcement & arm the record-date and payment-date watches; \\
+  &            &              & \emph{no move} \\
+2 & 2026-05-15 & record date  & PositionState: W-ALPHA entitlement \\
+  &            &              & $= 10{,}000 \times \USD{1.50} = \USD{15{,}000.00}$; \emph{no move} \\
+3 & 2026-05-22 & payment date & move \USD{15{,}000.00}, issuer $\rightarrow$ W-ALPHA; \\
+  &            &              & PositionState: entitlement discharged \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The first firing pays nothing; it registers the two watches the dividend
+creates and writes them into the unit's state. The second reads the owned
+positions as the ledger then stands and records each holder's entitlement --- a
+moveless transaction: no cash changes hands, but the position state now carries
+what each holder is owed. The third reads those recorded entitlements and emits
+the cash moves against them. Nothing links the firings but the record: firing~2
+does not remember firing~1, it reads the armed watch; firing~3 does not remember
+firing~2, it reads the recorded entitlement.
+
+\emph{What the door checks.} On firing~3 the Transaction Executor checks
+conservation --- the \USD{15{,}000.00} debited from the issuer wallet equals the
+amount credited to W-ALPHA, a paired-leg move that can neither create nor
+destroy quantity --- and idempotence: the payment proposal carries an identifier
+derived from its cause, so a retried or late firing commits once (Chapter~4).
+
+\emph{Where an agreement encumbers the holder} --- the shares pledged, the cash
+trapped --- the payment routes through a conditional obligation unit instead of
+paying directly; that refinement is Chapter~9's, and it changes what firing~3
+emits, never that the contract is stateless and fired three times.
+
+\emph{Three firings, three transactions, one stateless contract; between them
+the contract remembers nothing --- the armed watches, the recorded entitlement,
+and the positions are all on the record.}
+
+\subsection{The trigger classes differ in what they read, never how they run}
+
+The three firings of the dividend were reached three different ways. The
+announcement arrived from outside. The record date and the payment date were
+calendar conditions the Event Monitor noticed against the clock. A fourth way
+remains: a predicate on a recorded observation --- a settlement price printing,
+a close falling below a barrier. These are the trigger classes, and they
+classify what a contract reads, never how it runs.
+
+\begin{lstlisting}
+data Trigger
+  = External  Observation  -- captured at the boundary (a dividend announcement)
+  | Calendar  Date         -- a date arriving (a record, payment, or expiry date)
+  | Condition Predicate    -- a predicate on a recorded observation (a print, a touch)
+-- every trigger, whatever its class, fires the same  contract  above.
+\end{lstlisting}
+
+The class decides which watch the Monitor evaluates and which inputs the firing
+reads; the signature above is unchanged across all of them. A future exercises
+two of the classes on one instrument.
+
+\subsection{The future: settlement prints and the expiry unwind}
+
+FUT-IDX is a cash-settled future on the index IDX, multiplier~10, settled to
+market. W-ALPHA holds one contract, entered at 995 against the clearing house
+wallet. Its terms declare a watch on each daily settlement print and a watch on
+its expiry.
+
+\emph{The trigger and the contract.} On each recorded settlement print the
+Monitor emits and the future's contract fires. It reads two facts, each already
+on the record: the day's settlement level, a UnitStatus fact identical for every
+holder, and W-ALPHA's last applied level, a PositionState fact. From the two it
+computes the day's variation margin and emits it. On the third print, which is
+also the expiry, the same contract additionally unwinds the position --- in one
+atomic transaction.
+
+\begin{center}
+\small
+\begin{tabular}{clrll}
+\toprule
+Day & Print & Variation margin & Move & PositionState \\
+\midrule
+1 & 1{,}000.00 & $(1000-995)\times 10 = +50$   & \USD{50}, CCP $\rightarrow$ W-ALPHA  & level $\leftarrow 1{,}000.00$ \\
+2 & \phantom{0}990.00 & $(990-1000)\times 10 = -100$ & \USD{100}, W-ALPHA $\rightarrow$ CCP & level $\leftarrow 990.00$ \\
+3 & 1{,}005.00 & $(1005-990)\times 10 = +150$  & \USD{150}, CCP $\rightarrow$ W-ALPHA & position unwound \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The contract never remembers yesterday's level; it reads it from PositionState,
+computes against today's print, and writes today's level back for tomorrow's
+firing. Cumulative variation margin is $+50-100+150 = +100 = (1005-995)\times 10$
+--- exactly the position's profit, arrived at one recorded firing at a time.
+
+\emph{What the door checks.} The margin move is conserved --- what W-ALPHA
+receives the clearing house pays, and conversely --- and each firing multiplies
+the multiplier by \emph{the recorded settlement level}, never a stale one, so no
+firing books a quantity against a price from a different state (Chapter~14).
+
+\emph{The daily print and the expiry unwind are the same contract fired on
+different events; the settlement print and the dividend announcement differ in
+what the contract reads, never in how it runs.}
+
+\subsection{The one-touch: one firing, one transaction, and idempotence}
+
+OT-1 is a one-touch on the stock OMEGA that pays \USD{1{,}000{,}000} the first
+time OMEGA trades at or below its barrier of 80.00. It is written by W-BANK and
+held by W-ALPHA; its terms declare one watch, on OMEGA's recorded official
+close against the barrier.
+
+\emph{The trigger and the contract.} OMEGA closes at 79.00; the close is
+recorded, the condition is met, and the Monitor emits the touch. The contract
+fires and reads exactly two things from the record: the declared payout and who
+holds the option. It returns one transaction --- a single move of
+\USD{1{,}000{,}000} from W-BANK to W-ALPHA, together with one unit-state change,
+OT-1 $\rightarrow$ \emph{triggered}.
+
+\emph{What the door checks.} Conservation on the payout, and idempotence.
+Idempotence is not something the contract defends: should the Monitor emit the
+touch a second time --- barriers are often crossed on many later days --- the
+next firing reads the unit and finds it already \emph{triggered}, so it proposes
+nothing, and even a duplicate of the original proposal carries the same
+cause-derived identifier and commits once at the door.
+
+\emph{Idempotence is guaranteed not by the contract's vigilance but by the
+recorded state and the cause-derived identifier; the touch contract is a pure
+function of the record --- terms and holder in, one transaction out.}
+
+\subsection{The variance swap: a contract never remembers}
+
+VS-1 is a one-year variance swap on IDX with 252 scheduled fixings against the
+same recorded official closes the future settles on. Each scheduled fixing is a
+declared watch; on fixing~$k$ the Monitor emits and the contract fires. To
+extend the realised variance the firing needs the previous close and the running
+accrued statistic --- the fixings $1 \ldots k-1$. It does not hold them: the
+previous close is a recorded observation, and the accrued statistic is a
+UnitStatus fact that firing~$k-1$ wrote for exactly this purpose (Chapter~6).
+Firing~$k$ reads both, forms the return, adds its square, and writes the updated
+accrued statistic back for firing~$k+1$. A firing 200 days into the swap's life
+reconstructs its entire history from the record and holds nothing of its own
+between firings.
+
+\emph{Firing~$k$ finds fixings $1 \ldots k-1$ on the record; a contract never
+remembers.}
+
+\subsection{Faithfulness: every right and obligation is a unit}
+
+Purity and statelessness say how a contract runs. One further demand says what it
+must produce: the alignment with the legal contract runs deep enough that every
+right and obligation the legal contract creates is represented in the ledger as
+a unit. A subscription is booked as an exchange --- cash against the client's
+redemption claim --- never as a transfer for nothing. A dividend not yet paid is
+a recorded entitlement, seen above. A payout trapped by a collateral agreement
+is a conditional obligation unit (Chapter~9). Because each such right and
+obligation is a unit or a declared term of one, the contract that transcribes
+the instrument has, at every firing, a home on the record for everything it must
+carry --- which is why it can afford to remember nothing. Statelessness and
+faithfulness are the same discipline seen from two sides: the contract keeps no
+private state precisely because the record already holds, as units and their
+declared terms, every fact its next firing will need.

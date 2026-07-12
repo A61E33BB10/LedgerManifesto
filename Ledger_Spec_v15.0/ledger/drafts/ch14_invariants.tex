@@ -1,0 +1,341 @@
+% Chapter 14 — The Invariant Catalogue (NOETHER). Budget 6 pp. Discharges §11 and §12.
+\section{The Invariant Catalogue}\label{ch:invariants}
+
+This chapter discharges \S 11 and \S 12 of the constitution.
+
+The chapters before this one \emph{use} invariants; this chapter states each one
+once, as an executable property, and discloses the inner ground for it --- the
+reason it holds, not merely the fact that it does. The catalogue divides in two.
+A \textbf{law} holds by construction: no check runs, because the property is a
+theorem about the fold, and a state violating it is unrepresentable. A
+\textbf{guard} is enforced at the door: the Transaction Executor computes it on
+every admission, and a violation is refused, never written. Each property below
+is stated in the form a test consumes; the executable-check regime of Chapter~15
+(Testability and the Executable-Check Regime) exercises all of them over
+generated products, events, and histories, together with the product-graph
+consistency invariant of Chapter~\ref{ch:objects} --- restated there, not here.
+
+\subsection{Conservation per (unit, coordinate)}
+
+The central law is a conservation law, and it is stated per coordinate, not per
+unit. For a wallet $w$, a unit $u$, and a coordinate $c\in\{\text{owned, lent,
+posted}\}$, write $\mathrm{bal}_c(w,u)$ for the balance obtained by folding the
+log (Chapter~\ref{ch:picture}).
+
+\begin{theorem}[Conservation]\label{thm:conservation}
+For every unit $u$, every coordinate $c$, and every position in the log,
+\[
+\sum_{w}\ \mathrm{bal}_c(w,u)\ =\ 0,
+\]
+the sum running over all wallets --- virtual counterparty and issuer wallets
+included, because the system is closed (Chapter~\ref{ch:objects}).
+\end{theorem}
+
+Issuance is the first paired-leg owned move out of the issuing wallet;
+retirement is the log position after which every wallet's vector for $u$ is the
+zero vector. The per-unit summed law --- $\sum_w\sum_c \mathrm{bal}_c(w,u)=0$ ---
+is a corollary, never the primitive: the per-coordinate form is primitive
+because it alone forbids a cross-coordinate rebooking that fabricates custody on
+the posted plane while conserving the gross sum.
+
+\begin{proof}
+Induction on the log. \emph{Base:} the empty log gives every $(u,c)$ plane a sum
+of zero. \emph{Step:} the only operation that writes a balance is an atomic move,
+which debits one wallet and credits another in the same coordinate of the same
+unit by the same positive quantity $q$, adding $(-q)+(+q)=0$ to the sum; the
+other three kinds of change a transaction bundles --- unit-state, position-state,
+terms --- touch no balance. The sum is therefore invariant across every admitted
+transaction, and remains $0$.
+\end{proof}
+
+\begin{lstlisting}
+conserved :: Log -> Unit -> Coord -> Bool
+conserved l u c = sum [ balance c w u (fold l) | w <- wallets l ] == 0
+-- a law, not a guard: the fold cannot reach a prefix where this is False.
+\end{lstlisting}
+
+The word \emph{conservation} is exact: the vanishing sum is the quantity a
+symmetry of the log preserves. Reorder any two independent transactions --- ones
+that share no (wallet, unit, coordinate) --- and every coordinate sum is
+unchanged, because each is a sum of paired-leg contributions that commute.
+Permutation invariance of independent moves and the vanishing coordinate sum are
+one fact seen twice; the first is itself a checkable (metamorphic) property.
+
+\medskip\noindent\textbf{Episode --- the future (T1): variation margin is
+conservation, not a check.}
+\emph{Trigger.} FUT-IDX (multiplier $10$, settled-to-market) prints official
+settlements $1{,}000$, $990$, $1{,}005$ on its three days; W-ALPHA is long one
+contract, bought at $995$ on day~0, against the central counterparty wallet
+W-CCP. \emph{Contract.} Each print fires the future's contract, which proposes one
+owned(USD) move between the two wallets (Chapter~\ref{ch:collateral}).
+\emph{Transactions.} Three, one per print:
+\begin{enumerate}[label=(\arabic*),nosep,leftmargin=2.2em]
+\item day~1, $995\!\to\!1{,}000$: move owned(USD) \USD{50}, W-CCP $\to$ W-ALPHA;
+\item day~2, $1{,}000\!\to\!990$: move owned(USD) \USD{100}, W-ALPHA $\to$ W-CCP;
+\item day~3, $990\!\to\!1{,}005$ (final): move owned(USD) \USD{150}, W-CCP $\to$
+  W-ALPHA; the position unwinds.
+\end{enumerate}
+\emph{The door.} Each move is paired-leg owned(USD): whatever W-ALPHA gains W-CCP
+loses, so $\mathrm{bal}_{\text{owned}}(\text{W-ALPHA},\text{USD}) +
+\mathrm{bal}_{\text{owned}}(\text{W-CCP},\text{USD})$ contributed by these moves is
+zero at every print. The cumulative variation margin to W-ALPHA is
+$50-100+150 = 100 = (1{,}005-995)\times 10$, exactly the position's profit and
+loss (Chapter~\ref{ch:valuation}).
+\emph{Design point.} \emph{Variation margin is zero-sum because it is
+conservation per (unit, coordinate); no reconciliation enforces the zero-sum ---
+the paired-leg move makes any other outcome unrepresentable --- and the cumulative
+$100$ W-ALPHA gains is exactly what W-CCP pays, and equals the profit and loss.}
+
+\begin{secondtelling}
+Fix $(u,c)$. The map sending a log to the wallet-indexed integer vector of
+balances is a homomorphism from the free monoid of moves under concatenation to
+the group of such vectors under addition: the empty log maps to the zero vector,
+concatenation to addition. Each move maps to a vector carrying $+q$ and $-q$ in
+two entries and zero elsewhere --- an element of the subgroup whose entries sum to
+zero --- and a homomorphism into that subgroup keeps every image inside it.
+Conservation is the statement that the image lies in the kernel of the
+sum-over-wallets map. Nothing below depends on this telling.
+\end{secondtelling}
+
+\subsection{The log's structural invariants}
+
+Four further properties are laws of the log itself, guaranteed by the
+single-writer discipline of the Transaction Executor (Chapter~\ref{ch:machines}).
+Each is stated once, in the form a test consumes.
+
+\begin{lstlisting}
+atomic       :: Tx  -> Ledger -> Bool   -- apply writes the whole bundle or nothing
+appendOnly   :: Log -> Log    -> Bool   -- a later log extends an earlier one; no edit
+verifyChain  :: Log -> Bool             -- each entry carries its predecessor's hash
+idempotent   :: Tx  -> Ledger -> Bool   -- re-applying a seen cause is a no-op
+\end{lstlisting}
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+\item \textbf{Atomicity.} A transaction applies in full or not at all: the
+  Transaction Executor computes the whole four-kind bundle against the current
+  ledger and either appends all of it or writes nothing. A refusal is a returned
+  value, never a half-applied state --- no log position exists at which some but
+  not all of a transaction's changes are present. The split shows it: no instant
+  exists at which $20{,}000$ shares stand beside pre-split terms
+  (Chapter~\ref{ch:objects}).
+\item \textbf{Append-only and hash-chained.} An admitted transaction is never
+  edited or removed; a mistake is repaired by a compensating transaction that
+  names what it supersedes. Each entry carries the hash of its predecessor, so
+  any alteration of history breaks the chain and is detectable
+  (Chapter~\ref{ch:objects}).
+\item \textbf{Determinism of every arrow.} Each of the three arrows --- watch,
+  contract, apply --- is a pure function of its recorded inputs
+  (Chapter~\ref{ch:picture}): the same record and clock emit the same events, the
+  same event and ledger propose the same transaction, the same transaction and
+  ledger reach the same ledger. Determinism is the ground on which replay and
+  economic recomputation (Chapter~15) stand.
+\item \textbf{Idempotence.} Every proposed transaction carries an identifier
+  derived from its cause (Chapters~\ref{ch:machines} and~\ref{ch:picture}); a
+  retried or late-arriving proposal for an already-processed cause is recognised
+  and committed once. Applying a transaction whose identifier is already on the
+  log changes nothing.
+\end{itemize}
+
+\subsection{Consistency of reference}
+
+A quantity and a price name value only when both refer to the same state of the
+instrument. Every recorded datum carries the basis frame it was observed in
+(Chapter~\ref{ch:marketdata}); the guard refuses a read that would combine a
+quantity with a price drawn from a different frame.
+
+\begin{invariant}[Consistency of reference]\label{inv:consistency}
+A quantity $Q$ and a price $P$ may be combined only when $Q$ and $P$ are read in
+the same corporate-action frame. Across an event carrying a quantity change (a
+move) and a value-frame change (an operator), total value is preserved:
+$Q_{\text{pre}}\times P_{\text{pre}} = Q_{\text{post}}\times P_{\text{post}}$.
+This binding is the \emph{invariance witness}, and a product taken across
+mismatched frames is refused as a phantom.
+\end{invariant}
+
+\medskip\noindent\textbf{Episode --- the split (T4): the phantom the witness
+refuses.}
+\emph{Trigger.} ACME's $2$-for-$1$ split is effective; W-ALPHA's $10{,}000$
+shares become $20{,}000$ by a paired-leg move, and the recorded price frame reads
+$100.00$ as $50.00$ under the split's operator (Chapter~\ref{ch:marketdata}).
+\emph{The witness.} Before: $10{,}000\times 100.00 = \USD{1{,}000{,}000}$. After,
+in the post-split frame: $20{,}000\times 50.00 = \USD{1{,}000{,}000}$. The phantom
+is $20{,}000\times 100.00 = \USD{2{,}000{,}000}$ --- the new count against the
+stale frame. \emph{The door.} The $20{,}000$ is stamped in the post-split basis
+and the $100.00$ in the pre-split basis; the frames do not match, so the product
+is refused. The count changes by a move, the frame by an operator, and the two
+are bound so their product is invariant.
+\emph{Design point.} \emph{$20{,}000\times$ stale $100.00$ is a phantom
+\USD{2{,}000{,}000} against a true \USD{1{,}000{,}000}; the witness refuses it
+because the quantity and the price are read in different frames --- the same
+witness Chapter~\ref{ch:marketdata} leans on for every corporate action.}
+
+The same witness governs a distribution's cum/ex boundary, where no quantity
+changes at all. A \emph{cum} price includes the coming distribution; an \emph{ex}
+price excludes it; the two are one datum kind read in states separated by the
+recorded ex-date event, whose declared operator subtracts the distribution's
+value. A cum price consumed as ex, or an ex price consumed as cum, is a phantom of
+the split's kind --- the right number in the wrong frame --- and the same witness
+refuses it, because the frame is fixed by the recorded ex-date state, not the wall
+clock. Chapter~\ref{ch:marketdata} cross-references this invariant for both
+readings.
+
+\subsection{Writer discipline}
+
+\begin{invariant}[One legal writer]\label{inv:writer}
+Every non-balance fact has exactly one legal writer --- the smart contract of the
+instrument the fact belongs to --- and the Transaction Executor refuses a
+transaction that writes a fact outside its writer's authority
+(Chapter~\ref{ch:homes}, constitution \S 11).
+\end{invariant}
+
+One writer per fact, one home per fact (Chapter~\ref{ch:homes}): a fact cannot be
+written into disagreement with itself, because no second writer and no second home
+exist to hold a rival copy. This is what keeps the three homes ---
+ProductTerms, UnitStatus, PositionState --- free of the divergence a second store
+would breed. Each is a \emph{materialised projection}: a cached, one-writer,
+rebuildable read of the log, provably equal to the fold it caches, and \emph{not}
+a second store of any derived quantity. No figure a valuation or a report
+recomputes is materialised anywhere --- NAV, profit and loss, availability,
+encumbrance are computed on demand (Chapters~\ref{ch:valuation}
+and~\ref{ch:reporting}) --- so there is nothing derived to reconcile against the
+record. Writer discipline over facts, and the refusal to store views, are jointly
+the condition under which replay reproduces the homes exactly.
+
+\subsection{Time travel and replay}
+
+Section \S 12's guarantees are theorems of the fold.
+
+\begin{theorem}[Time travel]\label{thm:timetravel}
+Every historical state of the ledger is the fold of a log prefix. For any past
+position $t$, the ledger as of $t$ is $\mathrm{fold\ step}$ over the prefix up to
+$t$, and every view --- a balance, a NAV, a report --- is a further fold of that
+same prefix. Because the fold reads only committed transactions and never
+re-executes contracts, the historical state is independent of the machinery that
+produced it and reconstructible at any time, forever.
+\end{theorem}
+
+\begin{theorem}[Replay determinism]\label{thm:replay}
+Discarding the ledger and the three homes and re-folding a log prefix reproduces
+them bit for bit. The apply arrow is deterministic (the determinism of every
+arrow, above), each home is a materialised projection with one legal writer
+(Invariant~\ref{inv:writer}), and a retried or late proposal is
+idempotent under its cause-derived identifier; so replay adds nothing and drops
+nothing.
+\end{theorem}
+
+\begin{proof}
+The ledger is defined as the fold of the log (Chapter~\ref{ch:picture});
+restricting to a prefix folds fewer transactions, and determinism of apply makes
+the result a function of the prefix alone. Each home is the fold of its own kind
+of change over the same prefix (Chapter~\ref{ch:homes}), hence reproduced by the
+same replay. Idempotence guarantees a duplicated cause contributes once.
+\end{proof}
+
+These two theorems are the executable ground of the constitution's Full
+Reproducibility and Time-Travel commitments. Chapter~15 (Testability and the
+Executable-Check Regime) exercises them --- regenerating a mid-life firing from
+the recorded fixings and comparing --- and this catalogue does not restate the
+test.
+
+\subsection{The coverage invariant and the two-guard contrast}
+
+Collateral introduces one guard and one obligation that look alike and are
+structurally opposite. This is their canonical home; Chapter~\ref{ch:collateral}
+uses both.
+
+\begin{invariant}[Possession coverage]\label{inv:coverage}
+No wallet delivers what it neither owns nor holds. On every admission, per wallet
+$w$ and unit $u$, net over agreements $G$,
+\[
+\sum_{G}\ \mathrm{posted}_G(w,u)\ \le\ \max\bigl(\mathrm{owned}(w,u),\,0\bigr),
+\]
+the received ray entering with positive sign, and the analogue with lent in place
+of posted.
+\end{invariant}
+
+The sum over signed balances lets received mass offset re-posted mass: a wallet
+that received $100$ under one agreement and re-posted $60$ under another nets to
+coverage $40$, within the bound, so a rehypothecation chain passes and is bounded
+by possession. The $\max$ binds only the posting direction, so a negative-owned
+wallet with nothing posted --- an issuer wallet that conservation itself creates,
+a plain short --- is admissible, while a poster with owned $-5{,}000$ attempting to
+post $5{,}000$ is refused at the door. Coverage is never lawfully false, because a
+transaction is atomic and possession is instantaneous within it: that is what
+makes it an invariant.
+
+\begin{center}
+\begin{tabular}{@{}p{0.20\textwidth}p{0.30\textwidth}p{0.16\textwidth}p{0.24\textwidth}@{}}
+\toprule
+Guard & Statement & Lawfully false? & Kind \\
+\midrule
+Possession coverage & $\sum_G \mathrm{posted}_G \le \max(\mathrm{owned},0)$ & never (atomic, instantaneous) & invariant, checked at the door \\
+Value sufficiency & collateral value $\ge$ exposure & intraday, routinely & obligation: deadline, discharge predicate, close-out as compensation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Value sufficiency is the guard coverage is never to be confused with. A
+market move, a knock, or a call in flight leaves collateral value below exposure
+with no party in breach; sufficiency is therefore not an invariant but an
+obligation --- a deadline, a discharge predicate (the delivery amount met), and
+close-out as the declared compensation (Chapter~\ref{ch:collateral}, \S 14.1). A
+book below its sufficiency line is not a broken state; it is an open,
+deadline-bearing item on the record.
+
+\medskip\noindent\textbf{Episode --- the one-touch (T2): coverage on the
+discharge; value extinguished, mass intact.}
+\emph{Setup.} W-ALPHA owns OT-1 (payout \USD{1{,}000{,}000}, marked
+\USD{400{,}000}), pledged under security-interest agreement G to counterparty
+wallet B at a $50\%$ valuation percentage: W-ALPHA posted $+1$, B posted $-1$;
+collateral value to B \USD{200{,}000} against exposure \USD{150{,}000}. OMEGA
+prints an official close of $79.00 \le$ the barrier $80.00$.
+\emph{The discharge transaction.} The payout obligation discharges under its
+trapping predicate in one transaction, two moves: owned(USD) \USD{1{,}000{,}000}
+W-BANK $\to$ W-ALPHA, and posted(USD) \USD{150{,}000} W-ALPHA $\to$ B under G;
+\USD{850{,}000} stays free.
+\emph{The door.} Coverage holds within the transaction: W-ALPHA's owned cash
+$1{,}000{,}000 \ge$ posted $150{,}000$, so the posting is admitted --- a posting
+of collateral W-ALPHA did not possess would be refused.
+\emph{Value versus mass.} The knock extinguishes value, never mass: pricing the
+triggered OT-1 at $0$ collapses its value, but its coordinate balance is unchanged
+--- coordinates carry mass, prices carry value. Retirement is only from the zero
+vector: the marker return clears the posted plane of OT-1 first --- coverage
+forces the order, refusing to extinguish owned while posted mass remains --- then
+owned(OT-1) moves W-ALPHA $\to$ W-BANK, taking every wallet's vector for OT-1 to
+zero, and OT-1 retires.
+\emph{Design point.} \emph{Coverage is checked at the door on the discharge
+(owned $1{,}000{,}000 \ge$ posted $150{,}000$) and again as the order of close-out;
+the lifecycle event extinguishes OT-1's value but not its mass; and between knock
+and call the intraday shortfall is carried by the sufficiency obligation, not by a
+broken invariant.}
+
+\subsection{The post-and-return metamorphic property}
+
+The last property makes ``only the owned coordinate carries economic value''
+(Chapter~\ref{ch:objects}, constitution \S 4) machine-checkable.
+
+\begin{proposition}[Post-and-return]\label{prop:postreturn}
+A pledge posting writes the posted plane and never owned, so $V=\sum
+\mathrm{owned}\cdot P$ is unchanged by any post-and-return round trip. Inserting a
+post-and-return pair within any watch-free interval of the referenced agreement
+leaves every later valuation identical.
+\end{proposition}
+
+The side condition is real and named: an insertion spanning the agreement's
+valuation watch lawfully changes later firings and cash, so the property owns the
+move algebra, not the watched case. The watched case is the temporal residual
+carried by the safety and liveness model of Chapter~15 (Testability and the
+Executable-Check Regime). As a test the proposition is metamorphic: insert the
+pair into a generated history and assert that every subsequent NAV is unchanged to
+the minor unit.
+
+\subsection{What the catalogue buys}
+
+Every property above is stated once and executable, none defended in prose alone.
+Together with the product-graph consistency invariant of
+Chapter~\ref{ch:objects}, they are the surface Chapter~15 tests over one
+generator universe. Their joint effect is the constitution's claim in \S 11: the
+classes of inconsistent state that internal reconciliation exists to detect ---
+unbalanced books, a fact written twice into disagreement, a quantity valued in the
+wrong frame, collateral delivered that was never possessed --- are not caught
+here; they are unreachable. What cannot be represented cannot break.

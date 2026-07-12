@@ -1,0 +1,248 @@
+% Chapter 12 — Presentation and Reporting Projections (MINSKY, 4 pp)
+\section{Presentation and Reporting Projections}\label{ch:reporting}
+
+This chapter discharges \S 1 and \S 3 of the constitution --- a report is a
+projection of the one record, computed on demand --- and the auditability and
+reproducibility commitments of \S 2.
+
+\subsection{The projection principle}
+
+Every reporting figure is a projection: a pure, total, deterministic function of
+the record and of the declared terms the record carries, and of nothing else.
+There is no reporting store and no parallel reporting pipeline; a report is
+computed when asked for and discarded when read.
+
+The principle is forced, not chosen. \S 1 removes reconciliation by recording
+each fact exactly once; a reporting database would be a second store of the same
+facts, maintained by its own logic on its own schedule, and two stores of one
+fact eventually disagree. The divergence would surface in the documents third
+parties read --- the balance sheet, the disclosure, the supervisory return ---
+which is the worst possible place for the failure mode the architecture exists
+to abolish. So no reporting figure is ever kept: what can be computed from the
+coordinates, the units, and the declared terms is computed from them, every
+time.
+
+Three commitments of \S 2 are discharged at once, by construction rather than by
+apparatus. \emph{Auditability}: a projection is a fold over the immutable log
+(Chapter~2), so every figure decomposes mechanically into the transactions that
+entered the fold --- drill-down is the fold's own trace. \emph{Reproducibility}:
+the function is pure and its inputs are recorded, so any party holding the
+record recomputes the same figure to the last minor unit; where a figure
+involves value, the prices come from the pricing layer, itself reproducible from
+recorded inputs (Chapter~16). \emph{Time travel}: a report as of any past date
+is the same function applied to the log up to that date, and a restated report
+is a new projection of a longer log containing recorded corrections --- never an
+edited document.
+
+One input class stands outside the record: reference data --- identifiers,
+classifications, counterparty attributes --- owned by external authorities, per
+the constitution's scope. It is supplied at the boundary by the authority that
+owns it and joined to the projection as the report is built. The join attaches
+labels and groupings; it can never alter a quantity. A figure carrying a wrong
+identifier is a labelling defect at the boundary, repaired by re-joining fresh
+reference data to the unchanged projection --- never a ledger defect. The same
+division of labour governs format: the ledger computes what the figures are; a
+submission gateway, outside the boundary, arranges them into whatever shape a
+supervisory template requires. Per-regime field inventories therefore live
+outside this specification and are recorded as exclusions in the Exclusions
+Register; where a template requires a figure, the figure is derived here from
+the record and shown to satisfy the template --- the template is never the
+derivation.
+
+\begin{lstlisting}
+-- One arrow, no state of its own, total in every argument.
+-- Declared terms and conventions travel inside the prefix.
+report :: LogPrefix -> BoundaryRef -> Report
+\end{lstlisting}
+
+\subsection{The presentation projection}
+
+Chapter~9's regime key decides what a collateral inflow writes; the
+presentation projection recovers from those writes the figures that a balance
+sheet or a supervisory template asks of a firm that finances, pledges, and
+re-uses assets. It reads coordinates, units, and declared terms alone. Four
+figures cover the surface.
+
+\emph{Transferred assets and associated liabilities.} Under title-transfer
+financing the poster's asset re-books to the taker; the poster holds a
+claim-for-equivalent unit and the taker a repurchase or redelivery obligation
+unit, both per governing agreement (Chapter~9). The projection maps each claim
+held under a financing agreement to a transferred asset at fair value --- the
+claim priced by the pricing layer, parameterised by the taker's state
+(Chapter~7) --- and maps the paired obligation to its associated liability. The
+presentation is complete within the ledger's fair-value scope.
+
+\emph{Encumbrance, poster side.} Under pledge the asset never leaves the
+poster's owned coordinate; its encumbered mass is the posted-as-collateral ray,
+per agreement. Under title-transfer financing the encumbered position is the
+claim held under the financing agreement. Unencumbered mass is owned less
+posted, and it is non-negative because the coverage invariant (Chapter~14)
+bounds posting by ownership --- the report cannot show negative free assets
+because the door refused the state that would produce one.
+
+\emph{Re-use, receiver side.} Mass held on the received-as-collateral ray is
+available for re-use. Actual re-use is read from re-pledge moves, each of which
+carries a source-agreement reference beside its governing reference
+(Chapter~9); the source is an observable fact of the custody instruction, so
+nothing fictitious is stored, and received, re-used, and available project as
+per-(unit, agreement) actuals.
+
+\emph{Fungible received mass.} Title-transfer received cash and securities land
+on owned, commingled with proprietary holdings of the same unit. The record
+cannot say which dollar was re-invested, because no bank statement can say it
+either: a per-dollar ``actual'' over commingled mass would be a stored fiction.
+Figures over this mass --- how much of the received value was re-used, and where
+--- are attributions, computed by the declared convention of the next
+subsection.
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Reported figure & Read from --- and from nothing else \\
+\midrule
+Transferred asset / associated liability & claims and obligation units under financing agreements \\
+Encumbrance under pledge & posted-as-collateral ray of owned units, per agreement \\
+Encumbrance under financing & claims held under financing agreements \\
+Re-use actuals (pledge form) & source-agreement references on re-pledge moves \\
+Re-use of received fungibles & owned mass, obligation units, the declared convention \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The attribution convention is total}
+
+The convention is data, not code: it is declared once, in the declared-data
+slot of Chapter~8, and consumed here --- behaviour carried as declared data,
+per \S 2. It has exactly three components:
+
+\begin{enumerate}[nosep]
+\item the \emph{pool predicate} --- a declared wallet and move predicate
+  defining the pool over which received value is attributed (for instance, the
+  wallets and moves constituting the reinvestment book);
+\item the \emph{period basis} --- the timestamp or period on which the pro-rata
+  ratio is struck;
+\item the \emph{rounding rule} --- with remainders booked explicitly, per
+  \S 4's remainder discipline; nothing is silently dropped.
+\end{enumerate}
+
+\begin{principle}[Attribution totality]\label{prin:attr-total}
+The declared convention is a total function of log state: for every log prefix
+it assigns every attributable quantity; the attributed parts and the explicit
+remainder partition the whole; and two readers of one log and one declared
+convention compute identical figures to the last minor unit.
+\end{principle}
+
+A convention missing any of the three components is a defect: two readers of
+one log would compute different figures, which is internal reconciliation
+failure reintroduced through a report. The projection therefore fails closed
+--- it refuses to produce the figure rather than improvise a ratio (\S 2,
+Correctness).
+
+\begin{lstlisting}
+data Convention = Convention
+  { pool     :: Predicate (Wallet, Move) -- who is in the pool
+  , basis    :: PeriodBasis              -- when the ratio is struck
+  , rounding :: RoundingRule }           -- remainder explicit
+attribute :: Convention -> LogPrefix -> Partition Amount
+\end{lstlisting}
+
+\subsection{The reconciled surface}
+
+An attributed figure is single-sided: it is the firm's own aggregate, and no
+counterparty computes a matching number to break against. For such figures the
+correctness standard is Principle~\ref{prin:attr-total} --- totality and
+determinism --- not agreement with a second party, because no second party
+exists.
+
+One figure on this surface is genuinely two-sided: the collateralisation of net
+exposure under a governing agreement. The counterparty computes the same figure
+from the same agreement, and the two are compared at the boundary. It is
+therefore sourced from the governing agreement unit's declared terms ---
+valuation percentages, thresholds, netting --- consistently with the
+counterparty, and it is named beside the single-sided aggregates in every
+presentation, so that a reader never mistakes an attribution for a reconciled
+fact. Where the two sides disagree, the disagreement is a boundary
+reconciliation item against an external authority --- the class the
+constitution's scope leaves at the perimeter --- never an internal break: inside
+the boundary there is one log and one declared convention.
+
+\subsection{Episode: the pledged one-touch in the encumbrance projection}
+
+OT-1, the one-touch of Chapter~2, pays \USD{1{,}000{,}000} on a touch of OMEGA
+at or below 80.00; it is held by W-ALPHA, marked 400{,}000 pre-knock, and
+pledged security-interest to counterparty B under agreement G at a declared
+valuation percentage of 50\%: W-ALPHA posted $+1$, B posted $-1$ (Chapter~9).
+Before the knock, the encumbrance projection reads, with no store of its own:
+under G, mass posted 1; price 400{,}000; collateral value
+$400{,}000 \times 50\% = \USD{200{,}000}$ against an exposure of
+\USD{150{,}000} --- sufficiency holds.
+
+\emph{The trigger.} OMEGA's official close 79.00 is recorded, at or below the
+declared barrier 80.00; the Event Monitor emits the touch.
+
+\emph{The contract.} OT-1's contract fires on the event with the current
+projection of the ledger and proposes one moveless transaction.
+
+\emph{The transaction.}
+\begin{center}
+\begin{tabular}{@{}rl@{}}
+\toprule
+1 & UnitStatus of OT-1: \emph{live} $\to$ \emph{triggered} \\
+2 & conditional payment obligation created: writer owes W-ALPHA
+    \USD{1{,}000{,}000}, predicate G's trapping terms \\
+\bottomrule
+\end{tabular}
+\end{center}
+No moves; no coordinate changes anywhere.
+
+\emph{The door.} Conservation holds trivially --- there are no moves; writer
+discipline --- the unit's contract is the sole writer of its UnitStatus; a
+duplicate emission finds the unit already \emph{triggered} and proposes
+nothing.
+
+\emph{The read after.} The same projection, one transaction later: mass posted
+under G is still 1 --- a lifecycle event extinguishes value, never mass
+(\S 4) --- but the pricing layer, parameterised by unit state, now prices the
+triggered OT-1 at 0, so collateral value reads $0 \times 50\% = \USD{0}$
+against the unchanged exposure of \USD{150{,}000}. The shortfall does not live
+in the report: it surfaces as G's margin-call obligation at G's declared
+valuation watch, with a deadline (Chapter~9), and the report shows both the
+collapsed line and the open obligation from the record alone.
+
+\emph{The projection reads mass from the coordinates and value from the pricing
+layer, so the collapse is on the report the instant it is on the record --- and
+there was no report-side store to go stale.}
+
+\subsection{Verification and the audit gate}
+
+Per the Testability commitment, the projections of this chapter enter the
+executable-check regime of Chapter~15 as properties over generated logs,
+agreements, and conventions:
+
+\begin{enumerate}[nosep]
+\item \emph{Presentation completeness} --- every claim held under a financing
+  agreement appears exactly once as a transferred asset, and its paired
+  obligation unit exactly once as the associated liability.
+\item \emph{Encumbrance bound} --- per (wallet, unit), reported encumbered mass
+  never exceeds $\max(\text{owned}, 0)$: the coverage invariant of Chapter~14,
+  read back from the report.
+\item \emph{Attribution partition} --- attributed parts plus the explicit
+  remainder equal the whole, for every generated log and declared convention.
+\item \emph{Re-use bound} --- per source agreement, re-pledged mass never
+  exceeds the mass received under it.
+\item \emph{Mass--value separation} --- a lifecycle event inserted into a
+  generated history changes reported values, never reported mass, exactly as
+  the episode above exhibits.
+\item \emph{Recomputation} --- every published figure equals the figure
+  recomputed from the log prefix and the boundary join: the reporting analogue
+  of \S 13's economic verification.
+\end{enumerate}
+
+Two readers of one log compute identical reports; the properties above make
+that sentence executable rather than asserted. One gate remains before the
+specification freezes: the auditor bench signs the faithfulness of the
+presentation projection --- that the mapped figures state what a fair-value
+presentation asks --- against these property tests. The sign-off is recorded
+here as a Phase~4 gate of the drafting programme. It confirms that the
+derivation is faithfully presented; the derivation itself rests on the
+constitution alone.

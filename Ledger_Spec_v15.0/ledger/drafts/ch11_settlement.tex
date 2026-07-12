@@ -1,0 +1,263 @@
+% Chapter 11 — The Settlement Interface. Author: KLEPPMANN. Budget 5 pp.
+% Folds MINSKY's D2 insert (settlement state and the market claim) into KLEPPMANN's voice.
+% Seam (for FORMALIS): MC-1 is created by the record-date contract firing, not by the
+% settlement projection, which writes nothing. Numbers per the frozen thread map.
+
+\section{The Settlement Interface}\label{ch:settlement}
+
+This chapter discharges the constitution's Scope commitment to the
+settlement-projection layer; it cites \S3, which makes every view a projection of
+the record, and \S4, which fixes what the record is.
+
+\subsection{Settlement as a projection}
+
+The settlement interface is where the closed ledger meets the open infrastructure
+of settlement. It is a projection like any other (\S3): a function of the committed
+log that reads the moves the ledger has admitted and emits \emph{settlement
+instructions}. The division of labour is exact --- the ledger records \emph{what}
+settles; the external infrastructure decides \emph{how}, and how is out of scope
+(settlement finality, payment-system access, and central-securities-depository
+connectivity are external authorities the ledger reconciles against, never
+functions it performs). An instruction is the boundary object: it names the
+transfer to be performed and carries none of the machinery that performs it.
+
+What the interface never does is write. It is not the Transaction Executor and
+holds none of its privilege; it proposes nothing to the door and changes no
+balance. The single-writer discipline (\S5) is not bent here --- the interface
+reads and emits, and only the Transaction Executor writes. Every fact the interface
+consumes is already on the record, and every fact it produces is an instruction,
+never a move. Four properties follow, and each is load-bearing.
+
+\begin{itemize}[nosep]
+\item \emph{Pure.} It reads the recorded log alone --- no clock, no call to the
+outside world --- so any party recomputes the same instructions from the record
+(\S2, \S3).
+\item \emph{Total.} It is defined on every committed transaction. A transaction
+that carries no boundary-crossing move --- a moveless corporate-action component, a
+holding in a virtual ledger (\S10) --- has the empty instruction list as its image,
+by construction, not by a special rule.
+\item \emph{Deterministic.} The same log yields the same instructions, always.
+\item \emph{Idempotent.} Because it is a function of the recorded log and the
+recorded settlement state, re-running it produces the same instructions, and an
+instruction whose transfer the record already shows as settled is recognised and
+not performed twice.
+\end{itemize}
+
+\begin{lstlisting}
+settle :: Ledger -> [Instruction]   -- pure, total, deterministic, idempotent; writes nothing
+
+data Instruction                    -- the boundary object: what settles, never how
+  = Cash     WalletId WalletId UnitId MinorUnits  -- from, to, currency, amount
+  | Delivery WalletId WalletId UnitId Quantity     -- from, to, security, quantity
+\end{lstlisting}
+
+One consequence is stated once and relied on throughout: \emph{settlement failure
+is a recorded event, never a reversal}. A settlement that does not complete returns
+as an external event, recorded as a new fact; the instruction's underlying move is
+not undone. History is never rewritten (\S2): a trade ultimately unwound is unwound
+by a compensating transaction, through the same door, never by deleting the booking
+that instructed it.
+
+\subsection{Three episodes}
+
+\textbf{Dividend: cash projects to one instruction.} W-ALPHA holds $10{,}000$ ACME;
+the declared dividend is $1.50$ per share, and nothing encumbers the holding. The
+payment-date firing has already produced its transaction
+(Chapter~\ref{ch:collateral}): the conditional payment obligation discharges
+vacuously, and one move crosses the boundary --- owned(USD) \USD{15{,}000}, ACME's
+issuer wallet $\to$ W-ALPHA.
+\emph{The projection} reads that committed move.
+\emph{The instruction:}
+\begin{enumerate}[label=(\arabic*),nosep]
+\item Cash \USD{15{,}000}, ACME issuer $\to$ W-ALPHA.
+\end{enumerate}
+The moveless component of the same transaction --- the obligation's creation and
+vacuous discharge --- crosses nothing and projects to the empty list.
+\emph{The door} is not the interface's: the move already passed the Transaction
+Executor, and the projection only reads what was admitted.
+\emph{The ledger determined and recorded the entitlement; the interface instructs
+only the cash that leaves the ledger's edge.}
+
+\medskip\noindent\textbf{Future: each day's margin, and the expiry unwind.} FUT-IDX
+is settled-to-market, multiplier $10$; W-ALPHA is long one contract bought at
+$995.00$. On each settlement print the future's contract fires and emits the day's
+variation-margin move (Chapter~\ref{ch:collateral}); the interface projects each to
+one instruction, and the expiry's final settlement to a settlement instruction that
+also closes the contract.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Recorded print & Variation margin & Committed move & Instruction \\
+\midrule
+day 1 \ $1{,}000.00$ & $+50$ & owned(USD) $50$, W-CCP $\to$ W-ALPHA & Cash $50$ to W-ALPHA \\
+day 2 \ $990.00$ & $-100$ & owned(USD) $100$, W-ALPHA $\to$ W-CCP & Cash $100$ to W-CCP \\
+day 3 \ $1{,}005.00$ & $+150$ & owned(USD) $150$, W-CCP $\to$ W-ALPHA & Settlement $150$ to W-ALPHA \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent At expiry the position unwinds: the final settlement of \USD{150}
+projects to the settlement instruction above, while the unit-state change that
+retires the contract carries no move and projects to nothing.
+\emph{The door} again belongs to the Transaction Executor; the interface reads
+three admitted moves and emits three instructions.
+Cumulative variation margin is $50-100+150 = 100$, the total profit and loss
+(Chapter~\ref{ch:valuation}) --- but the interface never sees the profit and loss,
+only the cash that crosses each day.
+\emph{The ledger nets the day to a single move; the interface settles exactly that
+move, and no valuation reaches the boundary.}
+
+\medskip\noindent\textbf{Split: the moveless corporate action projects to nothing.}
+ACME splits two-for-one, effective 2026-06-01. One transaction carries the
+re-denomination and the new terms (Chapters~\ref{ch:objects} and~\ref{ch:marketdata}):
+\begin{enumerate}[label=(\arabic*),nosep]
+\item move owned(ACME) $10{,}000$, ACME issuer $\to$ W-ALPHA --- W-ALPHA's
+$10{,}000$ shares become $20{,}000$;
+\item a new ProductTerms version: price frame $100.00 \to 50.00$, with the market
+data operators declared (spot scales by $\tfrac12$; the cash dividend figure scales
+$1.50 \to 0.75$; proportional figures stand).
+\end{enumerate}
+\emph{The projection.} Component~(2) carries no move; its image is the empty list by
+the projection's totality. Component~(1) is the ledger mirroring a re-denomination
+the external register performs of its own accord as the corporate action; the
+interface issues no delivery or payment instruction for it, because a split settles
+nothing between counterparties.
+\emph{The door} admitted a well-formed transaction whose consistency of reference
+is checked in Chapter~\ref{ch:invariants} ($20{,}000$ against the fresh $50.00$,
+never the stale $100.00$); the interface adds no check and emits nothing.
+\emph{What crosses the boundary is a transfer; a corporate action that
+re-denominates terms crosses nothing, so it projects to nothing --- by
+construction.}
+
+\subsection{Settlement state and the market claim}
+
+One recorded fact upstream of the projection is load-bearing for its correctness:
+the settlement state of a trade. A determination turns on it --- who receives a
+distribution when a trade is instructed but unsettled across a record date --- and
+the fact must be read, not assumed away.
+
+\medskip\noindent\textbf{Owned re-books at instruction.} Title moves on the
+instruction event, on the record (\S4), not on settlement confirmation --- the
+trade-date booking of Chapter~\ref{ch:collateral}. The instant a trade is
+instructed the owned plane shows the buyer; the settlement instruction the
+interface projects is the promise that the external register will catch up. Between
+the two lies the instruction-to-settlement gap, and the gap is carried explicitly
+--- never elided, never back-filled at read time.
+
+\medskip\noindent\textbf{A record date inside the gap.} Entitlement determination
+reads the owned plane (Chapter~\ref{ch:collateral}): who owns a unit at the record
+date is who is owed its distribution. But the paying agent credits the \emph{record
+holder} at the external register, and while a sale is unsettled the record holder is
+still the deliverer --- the seller --- not the buyer the owned plane already shows.
+The two disagree by construction, and the disagreement is not a break to be
+reconciled at report time: it is a recorded obligation. The \textbf{market claim} is
+that obligation --- a unit (\S6) whose obligee holds it positive and whose obligor
+holds it negative, the buyer's claim-for-equivalent on one side and the deliverer's
+duty to remit on the other, created over the gap by the record-date firing and
+discharged when the deliverer receives the distribution. Here is the seam that keeps
+the projection pure: the market claim is created not by the projection, which writes
+nothing, but by the contract that fires at the record date. That contract reads the
+owned plane and the recorded settlement state and proposes the reconciling leg as
+one component of the determination transaction, which the Transaction Executor
+admits like any other. The projection then reads the resulting committed moves; it
+originates none of them.
+
+\begin{lstlisting}
+data SettlementState = Instructed | Settled | Failed  -- a recorded fact, read by routing
+
+-- The market claim is a unit (S6): the obligee holds it +, the obligor -.
+-- Conservation makes the two signed sides one fact.
+data MarketClaim = MarketClaim
+  { distribution  :: UnitId        -- what the deliverer receives and owes onward
+  , parAmount     :: MinorUnits    -- valued at par; the deliverer's owned value nets to zero
+  , dischargePred :: Predicate     -- satisfied by the deliverer's receipt of the distribution
+  }
+\end{lstlisting}
+
+\begin{proposition}[Entitlement routing]
+The recipient of a distribution is a total function of the recorded owned plane and
+the recorded settlement state at the record date. Determination reads owned; where
+the settlement state of an owned re-booking is unsettled across the record date, the
+paying agent credits the deliverer and a market-claim unit carries the reconciling
+leg from the deliverer to the owner. No distribution reaches any wallet except by a
+recorded move against a determined entitlement or the discharge of a market-claim
+unit.
+\end{proposition}
+
+\medskip\noindent\textbf{Worked micro-example (dividend).} Stock ACME pays a cash
+dividend of $1.50$ per share; the record date is 2026-05-15. Wallet W-ALPHA holds
+$10{,}000$ ACME and sells them to a buyer, wallet W-BETA: the sale is instructed on
+2026-05-14 for settlement on 2026-05-16, so the record date falls in the gap. (The
+cash consideration settles symmetrically and does not bear on the entitlement.)
+
+\emph{2026-05-14 --- the sale; owned re-books at instruction.} One transaction:
+\begin{enumerate}[label=(\arabic*),nosep]
+\item move owned(ACME) $10{,}000$, W-ALPHA $\to$ W-BETA --- re-booked at
+instruction; the settlement instruction, due 2026-05-16, is recorded as unsettled.
+\end{enumerate}
+The owned plane now shows W-BETA holding $10{,}000$ ACME and W-ALPHA holding none.
+
+\emph{2026-05-15, record date --- determination and the market claim.} The
+record-date watch fires; the stock's contract determines the entitlement and,
+reading the recorded settlement state, proposes the reconciling leg. One
+transaction:
+\begin{enumerate}[label=(\arabic*),nosep]
+\item determination reads the owned plane --- W-BETA owns $10{,}000$ --- and records
+the entitlement, $10{,}000 \times 1.50 = \USD{15{,}000}$, to W-BETA in PositionState;
+\item settlement state reads unsettled across the record date: the paying agent will
+credit the record holder, the deliverer W-ALPHA. Issue the market-claim unit MC-1,
+valued at par: move owned(MC-1) $1{,}500{,}000$ (minor units, $=\USD{15{,}000}$),
+W-ALPHA $\to$ W-BETA --- W-ALPHA holds $-1{,}500{,}000$ (the duty to remit once
+received), W-BETA holds $+1{,}500{,}000$ (the claim-for-equivalent). MC-1's discharge
+predicate is the deliverer's receipt; the obligation is contingent on it and is
+matched by the deliverer's record-holder receivable, so the conduit's owned value is
+neutral. While W-ALPHA performs the claim is valued at par, and it decouples to a
+recovery claim on W-ALPHA's default.
+\end{enumerate}
+This transaction is admitted through the door; MC-1 exists because the record-date
+firing wrote it, not because the projection did.
+
+The sale settles on 2026-05-16, recorded as an external confirmation; this updates
+the register but not the record-date snapshot that governs the distribution --- the
+paying agent still credits the record holder as of 2026-05-15.
+
+\emph{2026-05-22, payment date --- the distribution and the discharge.} The
+payment-date watch fires. One transaction, two moves:
+\begin{enumerate}[label=(\arabic*),nosep]
+\item move owned(USD) \USD{15{,}000}, ACME issuer wallet $\to$ W-ALPHA --- the paying
+agent credits the record holder;
+\item move owned(USD) \USD{15{,}000}, W-ALPHA $\to$ W-BETA --- the market claim
+discharges under its predicate, and MC-1 retires at the zero vector.
+\end{enumerate}
+W-ALPHA nets to zero across the two moves --- a conduit, not an owner; W-BETA ends
+with the \USD{15{,}000} it economically owns. \emph{The door}: conservation per
+(unit, coordinate) on every paired-leg move; MC-1 retires only from the zero vector;
+idempotence --- a duplicate payment-date event finds MC-1 discharged and proposes
+nothing. Each of these two cash moves is what the interface then projects to a cash
+instruction; the market claim itself never crosses the boundary --- it is the
+internal record that keeps the two boundary-crossing payments consistent.
+
+\medskip\noindent\textbf{Settlement failure is a recorded event, never a reversal.}
+Should the sale fail to settle on its due date, the failure returns as an external
+event and is recorded as a new fact; the instruction's owned re-booking is not undone
+and the market claim is not withdrawn. The market claim, an obligation unit, carries
+a deadline, a discharge predicate, and a fallback (\S14.1); by its deadline it is
+discharged, compensated, or declared defaulted --- a failed distribution is a
+visible, overdue item, never a silent balance edit.
+
+\medskip\noindent\textbf{Load-bearing, not a reporting axis.} Settlement state is
+therefore a correctness input, not a presentation dimension. A design that read owned
+alone would instruct the venue to pay the buyer directly --- an instruction it cannot
+honour, since the buyer is not yet the record holder --- and the cash would arrive at
+the deliverer with nowhere on the record to go, resurfacing as exactly the
+reconciliation break the ledger exists to abolish. Reading settlement state, and
+recording the market claim as a first-class unit, makes the routing both faithful to
+what the venue will do and reproducible by any party from the record alone (\S2,
+\S3). The construction is symmetric: where an owned re-booking runs the other way
+across the record date, the same unit carries the reverse claim with its signs
+reversed --- one mechanism, total over the gap.
+
+\emph{The ledger says what settles and, across the gap, who is owed; the interface
+projects that settled activity into instructions, writing nothing and inventing
+nothing.}

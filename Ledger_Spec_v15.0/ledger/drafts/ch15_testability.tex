@@ -1,0 +1,246 @@
+% Chapter 15 — Testability and the Executable-Check Regime (WILSON). Budget 5.5 pp.
+% Discharges Constitution v1.1 §13 (two layers of correctness) and the §2 Testability commitment.
+\section{Testability and the Executable-Check Regime}\label{ch:testability}
+
+This chapter discharges \S 13 of the constitution --- the two layers of correctness ---
+and the Testability commitment of \S 2. The claim it makes good is the constitution's: the
+ledger is correct because it is built to be tested. Every invariant catalogued in
+Chapter~\ref{ch:invariants} is an executable check run over generated products, events, and
+histories, never a property defended only in prose; and correctness composes, because the
+steps are pure and their composition is fixed --- the map, then the fold --- so verifying
+each part verifies the whole. This chapter does not restate the invariants. It makes them
+the surface a test regime exercises, states the regime, and turns the specification's three
+binding conditions into executable gates rather than intentions.
+
+\subsection{Two layers of correctness}
+
+Correctness rests on two layers, and each is checked by its own means.
+
+\emph{Structural} correctness holds by construction, at the door. An illegal state is not
+detected and rejected; it is unrepresentable --- no program writes it. A balance changes
+only through a move (Chapter~\ref{ch:objects}); a marker coordinate is unwritable without
+its governing agreement reference (Chapter~\ref{ch:collateral}); a knocked note has no
+un-knock constructor (Chapter~\ref{ch:objects}, Invariant~\ref{inv:graph-consistency});
+conservation is automatic because every move is paired-leg and the system is closed. These
+properties hold whatever the contract that proposed the transaction did --- correct,
+careless, or malicious --- because the Transaction Executor admits on structure alone and
+is the sole writer (Chapter~\ref{ch:machines}). The test obligation for this layer is
+negative: no generated event, however adversarial, drives the ledger into a state the type
+discipline forbids or the door should refuse.
+
+\emph{Economic} correctness is not guaranteed at admission; it is made checkable by
+recomputation. A contract may emit a perfectly well-formed transaction that books the wrong
+economics. The check is to re-run the map on the recorded event and compare the result with
+what was recorded.
+
+\begin{lstlisting}
+-- the economic oracle: re-run the map on the recorded event and compare
+prop_recompute :: Recorded (Event, Transaction) -> Property
+prop_recompute (e, txRecorded) = contract e (ledgerBefore e) === txRecorded
+-- a mismatch is a defect of the CONTRACT, not the ledger; it is repaired by a
+-- compensating transaction through the same door -- never by an edit to history.
+\end{lstlisting}
+
+Purity is what makes this oracle exist at all: a contract reads only the event and the
+record (Chapter~\ref{ch:contracts}), so its recomputation is exact and unconditional. A
+mismatch is a defect of the contract, never of the ledger, and it is repaired the way every
+change is made --- by a compensating transaction through the same door. The regime-bit
+repair of Chapter~\ref{ch:collateral} (a new terms version \emph{plus} the compensating
+rebooking of the affected interval) is the worked instance; the valuations of
+Chapter~\ref{ch:valuation} are recomputable under the same discipline. The two layers
+divide the labour exactly and neither substitutes for the other: structure is proved once
+and tested negatively, economics is re-derived per recorded event and tested by comparison,
+and a structurally valid transaction can still be economically wrong.
+
+\subsection{The generator universe and the adversarial scheduler}
+
+The enumerations this specification builds on are closed: the lifecycle states and edges of
+a product graph, fixed at registration (Chapter~\ref{ch:objects}); the collateral regimes
+and marker planes (Chapter~\ref{ch:collateral}); the component dimensions of the datum-kind
+registry and the boundary failure regimes W1--W4 (Chapter~\ref{ch:marketdata}); the trigger
+classes of a contract (Chapter~\ref{ch:contracts}). Because they are closed and declared,
+one generator universe ranges over the whole domain, and its coverage of each enumeration is
+itself a checkable fact --- every inhabitant is reachable by the generators, so a property
+that never exercises a case is a visible gap, not a silent one.
+
+\begin{lstlisting}
+genProduct :: Gen ProductGraph          -- a well-typed graph over the closed node/edge set
+genEvent   :: ProductGraph -> Gen Event -- on-menu guards, and off-menu adversarial events
+genHistory :: Gen [Transaction]         -- interleaved admitted walks of many products
+-- every generator is paired with a shrinker: a violation shrinks to a minimal history,
+-- and every counterexample is replayable from its seed (a defect is a reproduction).
+\end{lstlisting}
+
+Generation is adversarial by design, because the test environment must be harder than
+production. The Event Monitor and the Events Executor are outside the trust boundary and may
+duplicate, delay, and reorder firings; integrity owes them nothing
+(Chapter~\ref{ch:machines}). The scheduler therefore explores every legal interleaving the
+Transaction Executor's total order permits --- duplicated proposals, late firings, events
+delivered out of arrival order --- and injects pathological-but-legal behaviour rather than
+only the happy path: this is precisely what exercises idempotence and the temporal model
+below. One discipline guards the generators against vacuity: a property whose precondition
+is never generated passes without witnessing anything. A generated history that never knocks
+a pledged note, never re-posts received collateral, never delivers a duplicate is not
+evidence; the generators are measured by the states they reach, not the cases they cover.
+
+\subsection{The test surface: the invariant catalogue and the product graph}
+
+The invariants of Chapter~\ref{ch:invariants} are the test surface, in a ramp from the
+universal to the domain-specific. At the base sit the properties no history may violate: no
+transaction half-applies (atomicity), no balance is created or destroyed off the paired-leg
+move (conservation per (unit, coordinate)), the log is append-only and hash-chained, and
+every arrow is deterministic. Above them sit the structural invariants --- consistency of
+reference, writer discipline --- and above those the safety properties of the collateral
+planes: coverage is an invariant, checked at the door on every admission, while sufficiency
+is an obligation, lawfully false intraday and bounded by a deadline, and the test regime
+must assert the first as an invariant and the second only as a liveness obligation. Stating
+sufficiency as an invariant would be a false theorem the generators refute at once, and
+insisting on it would forbid lawful states: the two guards are never collapsed, in the tests
+least of all.
+
+Carried onto this surface are the four properties of the product-graph consistency invariant
+(Invariant~\ref{inv:graph-consistency}, defined in Chapter~\ref{ch:objects}), stated here as
+executable checks over generated products and histories:
+
+\begin{lstlisting}
+-- for every unit, at every commit, the three interpreters of its graph agree:
+prop_watchesAreOutEdges   :: History -> Property  -- (i) watch list == out-edges(current node)
+prop_firedMatchesOneEdge  :: History -> Property  -- (ii) fired event -> exactly one edge, lands on its target
+prop_actionEqualsRecorded :: History -> Property  -- (iii) emitted tx == edge action applied to recorded inputs
+prop_traversalExpiresSibs :: History -> Property  -- (iv) traversal expires exactly the declared siblings
+\end{lstlisting}
+
+Property~(i) is checked at every log position: the Event Monitor's live watch set is folded
+from the record and compared with the out-edge set of the unit's current node. Property~(ii)
+rejects any firing that matches no edge or more than one, or that lands the unit off the
+edge's declared target. Property~(iii) is the graph-level face of the economic oracle above:
+the transaction the contract emitted must equal the edge's declared action applied to the
+recorded inputs. Property~(iv) walks the sibling set and confirms that a traversal expires
+those edges and no others. The graph declares watches, state schema, and actions from one
+object; these four properties are the statement, made executable, that its three interpreters
+never disagree.
+
+\subsection{The three binding conditions as executable gates}
+
+Three conditions the specification relies on are stated here as gates a candidate
+implementation must pass, not as intentions it may assert.
+
+\paragraph{(i) Moves are the sole balance mutator.}
+The constitution makes the move the only operation that changes a balance
+(Chapter~\ref{ch:objects}); the gate makes that mechanically decidable. Applying a
+transaction, then applying only its move list, must leave identical balances --- so a
+unit-state, position-state, or terms change that touched a balance is caught as a divergence.
+
+\begin{lstlisting}
+prop_movesOnly :: Transaction -> Property
+prop_movesOnly tx = balances (apply tx l0) === balances (apply (onlyMoves tx) l0)
+  where l0 = ledgerBefore tx
+-- corollary, tested jointly:  apply (dropMoves tx) l0  leaves every balance fixed.
+\end{lstlisting}
+
+\paragraph{(ii) Determinism and replay.}
+The clock is the single input not on the record, and the Event Monitor is the single place it
+is consulted (Chapter~\ref{ch:machines}); every arrow downstream is a function of the record
+alone. Two gates follow. \emph{Idempotence:} a duplicated or late proposal, carrying the same
+cause-derived identifier, commits once and produces the identical transaction. \emph{Replay
+determinism:} re-running the map on the recorded observations reproduces every recorded
+statistic bit-for-bit, because barrier and fixing observation are deterministic --- each
+datum crosses the boundary once, as a recorded observation, and is never re-read live
+(Chapter~\ref{ch:marketdata}).
+
+\medskip\noindent\textbf{Episode --- the future (T1): a duplicate is inert; a late firing is
+identical.}
+FUT-IDX settles at recorded IDX closes $1{,}000$, $990$, $1{,}005$ (multiplier $10$);
+cumulative variation margin is $+50-100+150 = 100$ (Chapters~\ref{ch:contracts}
+and~\ref{ch:valuation}). \emph{The gate.} The day-2 settlement event is delivered twice, and
+delivered late, in a scheduler that reorders it against unrelated firings. The contract is a
+function of the record, so the late firing emits the identical \USD{100} move; the duplicate
+carries the same cause-derived identifier and commits once at the door. \emph{Design point.}
+\emph{Timeliness depends on the untrusted machines; integrity does not --- a duplicate is
+inert and a late firing identical, and both are properties the scheduler tries and fails to
+break.}
+
+\medskip\noindent\textbf{Episode --- the variance swap (T5): regenerate firing~127.}
+VS-1 accrues a sum-of-squared-returns statistic in UnitStatus, an integer at scale $10^{-8}$,
+written by each firing for the next (Chapter~\ref{ch:homes}). At the mid-life checkpoint the
+accrued statistic is $A_{126} = 1{,}805{,}000$, and the previous recorded close is fixing
+$126 = 1{,}005$. Firing~127 reads $A_{126}$ from the record, forms the return against the
+recorded closes, and writes $A_{127}$.
+
+\begin{lstlisting}
+accrue :: Close -> Close -> Accrued -> Accrued        -- named, versioned, pure
+prop_replay127 :: Property
+prop_replay127 = accrue close127 1005 1805000 === recorded A_127
+-- the recorded closes are deterministic; A_126 is a recorded integer; so any party
+-- re-running the same map on the same recorded fixings obtains the identical A_127.
+\end{lstlisting}
+
+Firing~127 is not trusted to have been right because it ran; it is verified by
+recomputation, and the recomputation is exact because its every input --- the accrued
+integer, the recorded closes --- is on the record. \emph{Economic verification is re-running
+the map on recorded inputs and comparing; determinism is what makes the comparison
+bit-exact.}
+
+\paragraph{(iii) The temporal residual: a safety and liveness model.}
+The move algebra owns what is true \emph{within} a transaction --- conservation, coverage,
+atomicity, all checked at the door. It does not own the ordering \emph{across} transactions:
+which interleavings of independent firings are reachable, and whether an open obligation is
+eventually discharged, are temporal questions the algebra cannot answer. The one-touch knock
+while pledged is where the residual bites, and it carries an explicit model.
+
+\medskip\noindent\textbf{Episode --- the one-touch (T2): the knock--revalue--call--discharge
+model.}
+W-ALPHA owns OT-1 (payout \USD{1{,}000{,}000}, marked \USD{400{,}000} pre-knock), pledged
+under security-interest agreement~G to counterparty~B at a $50\%$ valuation percentage:
+collateral value \USD{200{,}000} against exposure \USD{150{,}000}. OMEGA's official close
+prints $79.00$, at or below the barrier $80.00$ (Chapter~\ref{ch:collateral}). Four steps
+then interleave: the Monitor emits the knock; OT-1's contract triggers the unit and mints the
+conditional payment obligation; the pricing layer, reading the triggered state, marks OT-1 at
+$0$, so G's valuation watch opens a margin call for \USD{150{,}000}; the payment obligation
+discharges \USD{1{,}000{,}000} (\USD{850{,}000} free, \USD{150{,}000} posted to~B), and the
+pledge closes only after the marker returns --- an ordering the coverage invariant forces.
+These steps are separate admitted transactions, and their interleaving is the temporal
+residual. The model is a state machine over the reachable states, with two invariants held
+always and one obligation held eventually:
+
+\begin{lstlisting}
+Coverage(s)      == \A (w,u): postedMass(w,u) =< Max(owned(w,u), 0)  -- mass; the door's invariant
+NoDoubleCount(s) == (status = "triggered") => price(OT1) = 0         -- the payout is counted once
+Safety   == [] ( Coverage /\ NoDoubleCount )                        -- at every committed state
+Liveness == (call = "open") ~> (call = "discharged" \/ call = "closed_out")
+-- Sufficiency (collateral value >= exposure) is NOT a [] invariant: it is lawfully false
+-- on the interval [trigger, discharge); only Liveness constrains it. Asserting it as an
+-- invariant would be a false theorem, and would forbid a lawful state.
+\end{lstlisting}
+
+\emph{Safety} says no reachable committed state double-counts value or violates coverage.
+Double-counting is excluded because a triggered OT-1 prices at $0$: no committed state shows
+both the option's positive mark and the \USD{1{,}000{,}000} cash it resolves into. Coverage
+is excluded because it is checked at the door on every one of the interleaved transactions,
+and the marker-before-extinguishment ordering of the final step is coverage refusing to
+strip owned while posted mass remains. \emph{Liveness} says the margin call opened at the
+revalue is eventually discharged or closed out --- the obligation-liveness requirement of the
+Event Monitor made a temporal proof obligation (\S 14.1, Chapter~\ref{ch:requirements}),
+under the fairness that the Events Executor eventually delivers each armed firing. The
+central discipline is what the model \emph{refuses} to assert: between trigger and discharge
+the book is lawfully under-collateralised, so sufficiency appears only under
+$\rightsquigarrow$, never under $\square$. Coverage --- the mass guard --- and sufficiency ---
+the value guard --- are the two guards of Chapter~\ref{ch:collateral}, and here the temporal
+model is exactly where their difference is proved: one is a safety invariant, the other a
+liveness obligation, and a model that confused them would be unsound in the direction that
+either fabricates breaches or hides them.
+
+\subsection{What an auditor checks}
+
+A candidate implementation satisfies this chapter when the checks above run green over the
+generator universe: the structural invariants of Chapter~\ref{ch:invariants} hold as
+invariants and no adversarial history reaches a forbidden state; the economic oracle
+reproduces every recorded transaction from its recorded event, and a seeded divergence is
+repaired only by a compensating transaction; the four product-graph properties confirm that
+watches, state schema, and actions never disagree; moves are shown to be the sole balance
+mutator; a duplicate firing is inert and a late firing identical; firing~127 recomputes
+bit-for-bit; and the knock--revalue--call--discharge model holds its two safety invariants
+always and its liveness obligation eventually, with sufficiency asserted only as the latter.
+Each is mechanical, each is replayable from a seed, and each fails closed. A property that
+cannot be checked this way is redesigned until it can be: property-based testing is a
+construction principle here, not a phase at the end.
