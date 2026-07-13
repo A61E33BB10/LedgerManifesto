@@ -136,13 +136,14 @@ close does not edit day~2: it is recorded at its own valid-time index~$k=2$, the
 that index forward is re-derived, and the earlier as-known-at view survives beside it.
 Theorem~\ref{thm:timetravel} states this over the pair of axes and proves both facts.
 
-The constitution names one axis. \S 12 reconstructs a historical state ``by replaying the
-immutable transaction log up to the desired timestamp'' --- one timestamp, one axis --- yet
-a back-dated observation forces the two just drawn. This is a genuine conflict between a
-single-axis guarantee and a system that has needed both axes since the market-data boundary
-of Chapter~\ref{ch:marketdata}. It is parked, with the exact proposed amendment text, as
-entry PARK-2 of the parking index (Chapter~\ref{ch:scope}); the machinery this section
-states is what that amendment names.
+The constitution names both answers and delegates their indexing here. C-12.1 (v1.2) fixes
+the standing duty as computing both honest answers --- what the book said then, and the
+numbers with a later correction in force --- each a deterministic replay of the one log, and
+leaves \emph{how the two views are indexed} to this specification. The log prefix and the
+knowledge horizon are that indexing: the prefix fixes what was known, the horizon which
+recorded observations are in force. The single-axis reading once parked as entry PARK-2 is
+discharged by the owner's \S 12 ruling (Chapter~\ref{ch:scope}); the machinery this section
+states is the indexing the constitution now delegates.
 
 \subsection{Data, functions, and machines}
 
@@ -249,7 +250,7 @@ disagree. Second, replay re-reads transactions and never re-executes contracts
 to the map, never the accounting record: contracts transform them into proposed
 transactions, and the Transaction Executor admits or refuses. Correcting the record is
 neither reinterpretation nor an edit, and the two axes of Section~\ref{sec:bitemporal} say
-why: a wrong interpretation is repaired by a compensating transaction in the open
+why: a wrong interpretation is repaired forward by an authorised compensating transaction in the open
 (Chapter~15), and a corrected observation --- a close that arrives late or is later restated
 --- is a new recorded observation at its own valid-time index, appended on the
 transaction-time axis rather than written over the old one. The as-known-at view over any

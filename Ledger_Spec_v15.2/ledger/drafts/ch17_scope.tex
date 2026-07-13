@@ -86,7 +86,7 @@ closure holds precisely because it does not absorb them.
   scope (the anchor of Chapter~\ref{ch:requirements}, V1).
 \end{itemize}
 
-Four companion documents are named in the Exclusions Register as out-of-scope
+Five companion documents are named in the Exclusions Register as out-of-scope
 deliverables --- expansions the specification points to but does not contain, and not
 functions the ledger performs: the \emph{Worked-Examples Volume} (register lines E71 and
 E72), holding the dividend-forecast, special-dividend, spin-off, and elective-merger
@@ -94,10 +94,15 @@ worked examples; the \emph{SBL Operations Companion} (register line E73), holdin
 securities-lending operational lifecycle --- locates, buy-ins, SFTR and CSDR discipline,
 cascade recalls; the \emph{Track B graphs-interpreter companion} (register line E74),
 holding the generic term-sheet interpreter, the CDM round-trip, and term-sheet rendering;
-and the \emph{Managed-Account Companion} (register line E75), holding managed-account fee
+the \emph{Managed-Account Companion} (register line E75), holding managed-account fee
 accrual and NAV attribution --- the consequences Constitution \S6 delegates to the detailed
-specification for managed accounts. Each is named so its absence from this specification is
-deliberate and auditable, never silent.
+specification for managed accounts; and the \emph{Simulation Companion} (register line
+E76), holding the stochastic models, probability measures, calibration procedures, and
+variance-reduction techniques that drive simulated paths --- the model content the
+constitution places outside the fold. What is \emph{in} this specification is the boundary
+that companion plugs into, not the models it holds: branch construction, seed discipline,
+and result provenance (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}). Each is
+named so its absence from this specification is deliberate and auditable, never silent.
 
 \subsection{The open-problems index and the constitutional-parking rule}
 
@@ -125,9 +130,20 @@ settlement-obligation unit} --- a partial settlement leaves some quantity settle
 residual failed, which the single \texttt{instructed}/\texttt{settled}/\texttt{failed} node
 cannot yet split into a settled leg and a failed-residual leg. Named further: the correction
 algebra beyond the single compensating transaction; inter-ledger federation and
-eliminations; and the remaining items of the companion register. Naming is the whole
-obligation; each is stated in the open at the chapter it touches, so none is a gap hidden
-inside what the specification does claim.
+eliminations; \textbf{behavioural-event generation} --- pricing and stress paths driven only
+by generated prices never exercise the events that are \emph{decisions}: a default, an
+elective exercise, an election on a merger; a generator that reaches these states must model
+the deciding party's behaviour, not just the market, and that model is not yet designed;
+\textbf{corporate-action generation} --- a simulated corporate action is not a generated
+price but a generated \emph{terms version}: the split, spin-off, or merger a path invents
+must cross as a notice and drive the term-adjustment operator (Chapter~\ref{ch:marketdata})
+exactly as a real one does, and the generator that produces well-typed terms versions is
+open; \textbf{nested simulation} --- a simulated path that itself branches a simulated
+ledger, as an XVA computation branches a pricing path off each exposure state; the seed
+discipline and result provenance must compose across levels, and that composition is named
+here so it cannot be improvised; and the remaining items of the companion register. Naming
+is the whole obligation; each is stated in the open at the chapter it touches, so none is a
+gap hidden inside what the specification does claim.
 
 \paragraph{The constitutional-parking rule.} The second register governs conflict with
 Constitution v1.2 itself.
@@ -142,50 +158,52 @@ constitution. Parking makes the conflict visible and hands the owner a precise, 
 choice.
 \end{principle}
 
-\emph{Current status: two entries ratified, three still parked.} Adversarial review found
-five points where this specification departs from Constitution v1.2, each recorded here with
-the exact clause it touches and the exact amendment text in the companion register. On
-2026-07-13 the owner \textbf{ratified} two --- PARK-4 (deposit-neutrality at fair value) and a
-clarifying amendment to C-4.8 (the observation-recording discipline) --- which now await
-adoption into the authoritative manifesto, the owner's sole act; the structural entry and two
-substantive entries stand parked. None was ever fudged, and no chapter amends the
-constitution: each handed the owner a precise, decidable choice, and the owner has now decided
-two of them.
+\emph{Current status: every entry closed; the emptied index is evidenced, not suspicious.}
+Adversarial review found five points where this specification departed from Constitution
+v1.1, each parked here with the exact clause it touched and the exact amendment text in the
+companion register --- the mechanism exercised, never bypassed. On 2026-07-13 the owner
+ratified and adopted Constitution v1.2, which resolves all five. Each closure is recorded
+with its resolution, because an index that empties without a trace would be
+indistinguishable from an index that was never used:
 
 \begin{itemize}
-\item \textbf{PARK-1 (structural).} The constitution's normative content is addressed only by
-  section, so ``this chapter discharges \S N'' cannot be checked while a section runs to
-  eleven paragraphs. The parked amendment numbers every normative clause
-  $\mathrm{C}\text{-}\langle\text{sec}\rangle.\langle n\rangle$, changing not one word of prose;
+\item \textbf{PARK-1 (structural) --- CLOSED in v1.2.} The constitution's normative content
+  was addressed only by section, so ``this chapter discharges \S N'' could not be checked.
+  Resolution: v1.2 embeds the clause identifiers
+  $\mathrm{C}\text{-}\langle\text{sec}\rangle.\langle n\rangle$ in the manifesto's margin,
+  append-only and never renumbered; the separate clause-addressed rendering is retired, and
   every chapter here opens with the clause identifiers it discharges.
-\item \textbf{PARK-2 (Constitution \S12).} Section~12 reconstructs history by replaying the log
-  ``up to the desired timestamp'' --- one axis --- but the system has required two since
-  Chapter~\ref{ch:marketdata}: a transaction-time prefix (what was known) and a valid-time
-  horizon (which recorded observations are in force). The parked amendment names both axes.
-  Stated openly at Chapter~\ref{ch:picture} and Theorem~\ref{thm:timetravel}.
-\item \textbf{PARK-3 (Constitution \S4).} Section~4's coordinate vector carries a single
-  \emph{posted} axis, on which posting under one agreement and receiving under another net to
-  zero and both encumbrances vanish. The parked amendment indexes the coordinate by
-  (coordinate, agreement), with conservation per (unit, coordinate, agreement). Stated openly
-  at Section~\ref{sec:coordinate-vector} and Theorem~\ref{thm:conservation}.
-\item \textbf{PARK-4 (Constitution \S8) --- RATIFIED 2026-07-13.} Section~8 asserted
+\item \textbf{PARK-2 (Constitution \S12) --- CLOSED in v1.2.} Section~12 once named a single
+  timestamp, while the system has required two axes since Chapter~\ref{ch:marketdata}: a
+  transaction-time prefix (what was known) and a valid-time horizon (which recorded
+  observations are in force). Resolution: the owner's \S 12 ruling restates C-12.1 to name
+  both honest answers and \emph{delegate their indexing to this specification}; the two-axis
+  machinery is retained, unchanged, as that indexing. Stated at Chapter~\ref{ch:picture} and
+  Theorem~\ref{thm:timetravel}.
+\item \textbf{PARK-3 (Constitution \S4) --- CLOSED in v1.2.} Section~4 once fixed the
+  coordinate schema, and a single \emph{posted} axis lets two encumbrances under two
+  agreements net to nothing. Resolution: the owner's \S 4 ruling restates C-4.10 to fix
+  ownership first and three admission tests, delegating the schema to this specification;
+  Section~\ref{sec:coordinate-vector} declares the (coordinate, agreement) schema and
+  demonstrates it compliant, with conservation at the finest declared grain held as
+  Theorem~\ref{thm:conservation}.
+\item \textbf{PARK-4 (Constitution \S8) --- CLOSED in v1.2.} Section~8 asserted
   deposit-neutrality unconditionally, yet financing received at an off-market rate moves net
-  owned value at receipt by a day-one financing basis. The amendment makes the guarantee
-  conditional on fair-value measurement (C-8.7); the owner has ratified it, and it awaits
-  adoption into the authoritative manifesto. Stated openly at Chapter~\ref{ch:valuation}.
-\item \textbf{C-4.8 clarification (Constitution \S1/\S4/\S5) --- RATIFIED 2026-07-13.} The
-  observation stream once entered through a second door with no invariant of its own. The
-  ratified amendment states that every guaranteed observation enters the record only as a
-  moveless observation-recording transaction through the one Transaction Executor --- the
-  record is the log --- so the single canonical record and the single writer reach every
-  observation. It clarifies rather than narrows, and awaits adoption into the manifesto.
-  Stated openly at Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:invariants}.
+  owned value at receipt by a day-one financing basis. Resolution: C-8.7 as adopted makes the
+  guarantee conditional on fair-value measurement, the day-one difference recognised as
+  financing basis; Chapter~\ref{ch:valuation} discharges the adopted clause.
+\item \textbf{C-4.8 clarification --- CLOSED in v1.2.} The observation stream once entered
+  through a second door with no invariant of its own. Resolution: C-4.8 as adopted states
+  that every guaranteed observation enters the record only as a moveless
+  observation-recording transaction through the one Transaction Executor --- the record is
+  the log --- so the single canonical record and the single writer reach every observation.
+  Stated at Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:invariants}.
 \end{itemize}
 
-\noindent The index is non-empty and live: PARK-1, PARK-2, and PARK-3 stand parked, and two
-entries are ratified but not yet adopted into the manifesto. An empty index across a
-specification this size would signal that the mechanism had never been exercised, not that no
-conflict exists.
+\noindent The index is empty of open conflicts and live in its history: five conflicts were
+parked with exact amendment text, five were decided by the owner, and the resolutions above
+are the evidence. An empty index with no history would signal a mechanism never exercised;
+this one records each exercise. A future conflict parks here the same way.
 
 \subsection{Authority}
 

@@ -36,20 +36,51 @@ what was recorded.
 -- the economic oracle: re-run the map on the recorded event and compare
 prop_recompute :: Recorded (Event, Transaction) -> Property
 prop_recompute (e, txRecorded) = contract e (ledgerBefore e) === txRecorded
--- a mismatch is a defect of the CONTRACT, not the ledger; it is repaired by a
--- compensating transaction through the same door -- never by an edit to history.
+-- a mismatch is a defect of the CONTRACT, not the ledger; it is repaired FORWARD by an
+-- authorised compensating transaction through the same door -- never by an edit to history.
 \end{lstlisting}
 
 Purity is what makes this oracle exist at all: a contract reads only the event and the
 record (Chapter~\ref{ch:contracts}), so its recomputation is exact and unconditional. A
-mismatch is a defect of the contract, never of the ledger, and it is repaired the way every
-change is made --- by a compensating transaction through the same door. The regime-bit
-repair of Chapter~\ref{ch:collateral} (a new terms version \emph{plus} the compensating
+mismatch is a defect of the contract, never of the ledger, and it is repaired forward the way every
+money change is made --- by an authorised compensating transaction through the same door
+(the forward-repair discipline below). The regime-bit
+repair of Chapter~\ref{ch:collateral} (a new terms version \emph{plus} the authorised compensating
 rebooking of the affected interval) is the worked instance; the valuations of
 Chapter~\ref{ch:valuation} are recomputable under the same discipline. The two layers
 divide the labour exactly and neither substitutes for the other: structure is proved once
 and tested negatively, economics is re-derived per recorded event and tested by comparison,
 and a structurally valid transaction can still be economically wrong.
+
+\paragraph{Forward repair: the correction event and the authorisation gate.}
+A wrong recorded event --- a wrong price, a wrong payoff --- is repaired forward, never
+edited (constitution C-12.4). The discovery is itself a recorded \emph{correction event}
+that names the wrong event's identifier, admitted through the one door like any event. It
+mints a visible, deadline-bearing \emph{open item} --- a deadline, a discharge predicate,
+and a fallback, the obligation pattern of Chapter~\ref{ch:invariants} --- so the discrepancy
+stands on the record until repaired. Two things then part company. A \emph{view} recomputes
+automatically: the as-known-at projection stands, the as-of projection recomputes over the
+corrected prefix (Theorem~\ref{thm:timetravel}), and recomputing a view costs nothing and
+waits for nothing. \emph{Money} does not. Because money already moved cannot be unsent, a
+compensating transaction that repairs a balance is agreed with the counterparty and
+authorised by a person before it fires. The authorisation is itself a recorded observation;
+the compensating transaction carries a reference to both the correction event and its
+authorisation, and the door refuses a compensating transaction that lacks the authorisation
+reference. In phase~0 no correction fires without human intervention.
+
+\begin{lstlisting}
+data Correction    = Correction    { wrongEventId :: EventId,  reason   :: Text }
+-- the discovery: a moveless recorded event, through the one door, naming the wrong event.
+data Authorisation = Authorisation { corrects     :: EventId,  approver :: PersonId }
+-- a recorded approval: agreed with the counterparty, signed by a person.
+compensating :: CorrectionId -> AuthorisationId -> [Move] -> Transaction
+-- a money repair references BOTH the correction and its authorisation, or the door refuses:
+prop_noRepairWithoutAuth :: Transaction -> Property
+prop_noRepairWithoutAuth tx = isCompensating tx ==> hasAuthorisationRef tx
+\end{lstlisting}
+
+A view is free because it stores nothing and settles nothing; a compensating transaction
+moves owned mass, so it passes the same human gate every real move passes.
 
 \subsection{The generator universe and the adversarial scheduler}
 
@@ -529,7 +560,7 @@ order for VS-1's fixings is the recorded fixing sequence, so an out-of-order or 
 is inserted at its position~$k$ and the accrual tail $A_{k},A_{k+1},\dots$ recomputed from
 $k$ forward, bit-for-bit, while the downstream daily CCP-cash figures at positions after~$k$
 --- the future's variation margin on the same recorded closes --- are corrected by
-compensating transactions, not left as posted. Firing~127 is not trusted to have been right
+authorised compensating transactions (the forward-repair discipline above), not left as posted. Firing~127 is not trusted to have been right
 because it ran; it is verified by recomputation, and the recomputation is exact because its
 every input --- the accrued integer, the recorded closes --- is on the record.
 \emph{Economic verification is re-running the map on recorded inputs and comparing;
@@ -578,8 +609,8 @@ generated'' into a \emph{failed} run rather than a silent green. The witnessed f
 asserted at $\ge 1\%$ of generated histories. On every history that clears the precondition,
 BITEMP-1 fires and finds the as-known-at view unchanged by the later correction, and BITEMP-2
 fires and finds the as-of view recomputed bit-for-bit --- the two axes exercised, not merely
-asserted. \S 12 names one timestamp where these properties need two axes; the conflict is
-parked as entry PARK-2 of the parking index (Chapter~\ref{ch:scope}).
+asserted. C-12.1 (v1.2) names both answers and delegates their indexing here; BITEMP-1 and BITEMP-2
+exercise that indexing, and entry PARK-2 is closed (Chapter~\ref{ch:scope}).
 
 \paragraph{(iii) The temporal residual: a safety and liveness model.}
 The move algebra owns what is true \emph{within} a transaction --- conservation, coverage,
@@ -863,7 +894,7 @@ A candidate implementation satisfies this chapter when the checks above run gree
 generator universe: the structural invariants of Chapter~\ref{ch:invariants} hold as
 invariants and no adversarial history reaches a forbidden state; the economic oracle
 reproduces every recorded transaction from its recorded event, and a seeded divergence is
-repaired only by a compensating transaction; the four product-graph properties confirm that
+repaired only by an authorised compensating transaction, never by an edit; the four product-graph properties confirm that
 watches, state schema, and actions never disagree; the term-adjustment property holds ---
 across a generated split of a referenced underlying the derivative's payoff is invariant and
 no stale-barrier knock fires --- witnessed on at least $1\%$ of histories; moves are shown to

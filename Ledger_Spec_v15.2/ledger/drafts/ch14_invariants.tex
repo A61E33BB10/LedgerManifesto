@@ -1,7 +1,7 @@
 % Chapter 14 — The Invariant Catalogue (NOETHER). Budget 6 pp. Discharges §11 and §12.
 \section{The Invariant Catalogue}\label{ch:invariants}
 
-This chapter discharges constitution clauses C-11.1--C-11.5 (the structural invariants) and C-12.1--C-12.3 (time travel, replay, and idempotence).
+This chapter discharges constitution clauses C-11.1--C-11.5 (the structural invariants) and C-12.1--C-12.5 (time travel and both honest answers, replay, idempotence, forward repair, and the authorised fork).
 
 The chapters before this one \emph{use} invariants; this chapter states each one
 once, as an executable property, and discloses the inner ground for it --- the
@@ -178,8 +178,10 @@ idempotent   :: Tx  -> Ledger -> Bool   -- re-applying a seen txid is a no-op
   exists at which $20{,}000$ shares stand beside pre-split terms
   (Chapter~\ref{ch:objects}).
 \item \textbf{Append-only and hash-chained.} An admitted transaction is never
-  edited or removed; a mistake is repaired by a compensating transaction that
-  names what it supersedes. Each entry carries the hash of its predecessor, so
+  edited or removed; a mistake is repaired forward by a compensating transaction that
+  names what it supersedes and carries a recorded human authorisation before it fires
+  (constitution C-12.4; the forward-repair discipline of Chapter~\ref{ch:testability}).
+  Each entry carries the hash of its predecessor, so
   any alteration of history breaks the chain and is detectable
   (Chapter~\ref{ch:objects}).
 \item \textbf{Determinism of every arrow.} Each of the three arrows --- watch,
@@ -278,9 +280,10 @@ the condition under which replay reproduces the homes exactly.
 
 \subsection{Time travel and replay}
 
-Section \S 12's guarantees are theorems of the fold --- but the fold runs along two axes,
-not one, and the gap between the two axes and the constitution's single timestamp is a
-parked conflict, named at the close of this subsection.
+Section \S 12's guarantees are theorems of the fold, and the fold runs along two axes, not
+one. C-12.1 (v1.2) names both honest answers and delegates their indexing to this
+specification; the two axes are that indexing, and the discharge is stated at the close of
+this subsection.
 
 \begin{theorem}[Time travel]\label{thm:timetravel}
 Every historical state of the ledger is the fold of the log along two axes: a
@@ -322,8 +325,8 @@ log order --- is folded at valid-time index $k$, re-sequencing the tail $A_k,\do
 forward. The two folds traverse the same observations in two different orders, and each is
 a deterministic function of the prefix; a party recomputes either one and obtains the same
 bits. Confusing them --- folding a back-dated close in log order, or asserting the log-order
-replay already carries the as-of answer --- is exactly the single-axis error parked
-below.
+replay already carries the as-of answer --- is exactly the single-axis error the discharge
+below closes.
 
 \begin{theorem}[Replay determinism]\label{thm:replay}
 Discarding the ledger and the three homes and re-folding a log prefix reproduces
@@ -349,15 +352,41 @@ the recorded fixings and comparing, and inserting a back-dated observation to
 witness that the as-known-at view holds while the as-of view recomputes --- and
 this catalogue does not restate the test.
 
-\emph{The parked conflict.} Constitution \S 12 reconstructs a historical state ``by
-replaying the immutable transaction log up to the desired timestamp'': one timestamp, one
-axis. Theorem~\ref{thm:timetravel} needs two --- a transaction-time prefix and a valid-time
-horizon --- because a back-dated observation makes the as-known-at and as-of views two
-distinct, both-correct answers. This is a genuine conflict between the single-axis guarantee
-and a system that has required both axes since the market-data boundary
-(Chapter~\ref{ch:marketdata}, failure mode W2). It is parked, with the exact proposed amendment
-text, as entry PARK-2 of the parking index (Chapter~\ref{ch:scope}); no chapter amends the
-constitution, which is the owner's alone.
+\emph{The discharge.} Constitution C-12.1 (v1.2) names both answers --- what the book said
+then, never rewritten by later arrivals, and the numbers with a later correction in force ---
+as deterministic replays of the one log, and delegates their indexing to this specification.
+Theorem~\ref{thm:timetravel} is that discharge: the transaction-time prefix and valid-time
+horizon are the indexing the constitution now leaves here, and the two both-correct answers
+are its two clauses. The single-axis reading once carried as entry PARK-2 is closed by the
+owner's \S 12 ruling (history in Chapter~\ref{ch:scope}).
+
+\subsection{The authorised fork}
+
+The forward repair of Chapter~\ref{ch:testability} corrects a wrong \emph{event}. It does not
+answer a corrupted \emph{record} --- a log damaged by systemic failure, where the bytes
+themselves are no longer trustworthy. The remedy for that is the \textbf{authorised fork}
+(constitution C-12.5): replay to a chosen point, and rebuild forward on a new \emph{lineage}
+that names its parent point. This is the rollback of a bad delivery, not a rewrite of history;
+the abandoned lineage is retained, never erased, so the log is append-only \emph{across}
+lineages as well as within one.
+
+The fork is a recorded, authorised fact. The new lineage names its parent point and carries a
+human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability}, raised from a
+single move to a whole lineage --- and both are on the record. Which lineage is authoritative
+is therefore itself a recorded fact, and exactly one is authoritative at any position.
+
+One primitive is shared with the virtual ledger of Chapter~\ref{ch:virtual}: replay to a point
+and build forward on a fresh lineage. The readings differ only in authority. A simulated
+ledger branches to \emph{explore} --- its lineage is never authoritative and nothing settles
+on it (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}); a fork branches to
+\emph{repair} --- its lineage becomes authoritative by the recorded authorisation. One
+mechanism, two readings.
+
+\begin{invariant}[Lineage append-only]\label{inv:lineage}
+No committed transaction of any lineage is ever destroyed. A fork adds a lineage and an
+authorisation and removes no byte; exactly one lineage is authoritative at any position, and
+which one is itself a recorded fact.
+\end{invariant}
 
 \subsection{The record is the log}\label{sec:record-is-log}
 
