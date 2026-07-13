@@ -1,7 +1,7 @@
 % Chapter 3 — The Objects (KLEPPMANN). Budget 8.5 pp (7 objects + 1.5 Term Sheets as Graphs).
 \section{The Objects}\label{ch:objects}
 
-This chapter discharges constitution clauses C-4.1--C-4.11 --- the objects, the immutable log, and the signed coordinate vector C-4.10 and mass-never-value clause C-4.11 as amended in v1.2 (C-4.10 and C-4.11 jointly with Chapter~\ref{ch:collateral}).
+This chapter discharges constitution clauses C-4.1--C-4.11 --- the objects, the immutable log, and the coordinate discipline of C-4.10--C-4.11: ownership first and alone value-bearing, further coordinates mass-only under a named agreement, and the three admission tests, against which \S\ref{sec:coordinate-vector} demonstrates the declared schema compliant (jointly with Chapter~\ref{ch:collateral}).
 
 At the highest level a ledger is three things and a record: units --- what can be held;
 wallets --- where it is held; balances --- how much of each unit each wallet holds; and
@@ -220,39 +220,48 @@ encumbrance; it hides it.
 
 So the coordinate is not the whole index. \textbf{The balance is a signed vector indexed
 by (coordinate, agreement)}: write $\mathrm{bal}_{c,G}(w,u)$ for the signed quantity of
-unit~$u$ that wallet~$w$ holds on coordinate~$c$ under agreement~$G$. The coordinates are
-the constitution's three --- \textbf{owned, lent, posted} --- and the five constitutional
-names are the rays: \emph{lent out} and \emph{borrowed} are the two signs of lent,
-\emph{posted as collateral} and \emph{received as collateral} the two signs of posted.
+unit~$u$ that wallet~$w$ holds on coordinate~$c$ under agreement~$G$. The constitution no
+longer legislates the schema; it fixes what any schema must satisfy --- ownership first
+and alone value-bearing, every further coordinate mass-only under a named agreement, and
+three admission tests (C-4.10) --- and delegates the schema itself to this specification,
+on the specialists' advice. The schema declared here is three coordinates ---
+\textbf{owned, lent, posted} --- with the rays \emph{lent out} and \emph{borrowed} the
+two signs of lent, \emph{posted as collateral} and \emph{received as collateral} the two
+signs of posted; the rest of this section demonstrates that it passes the three tests.
 Ownership is unqualified --- owned is the coordinate the move machinery acts on directly
 and carries no agreement (Chapter~\ref{ch:collateral}) --- so $G$ ranges over agreements
 only on the non-owned coordinates, where every quantity sits under exactly one collateral
 or margin agreement and reaches the plane only through a reference to it. In the failure
 above, $\mathrm{bal}_{\text{posted},G_1}(W,\text{USD})=+100$ and
 $\mathrm{bal}_{\text{posted},G_2}(W,\text{USD})=-100$ are two distinct coordinates of the
-vector, and neither vanishes. A quantity earns a coordinate only when a distinct
-real-world action can change it independently of ownership --- lending changes possession
+vector, and neither vanishes. The first test admits a coordinate only where a distinct
+real-world action can change it independently of ownership: lending changes possession
 without changing ownership, pledging encumbers without transferring, and nothing else in
-scope passes the test, so there is no fourth coordinate --- and it earns its agreement
-index for the same kind of reason: two postings under two agreements are two facts,
-valued, discharged, defaulted, and returned separately, so the agreement is part of what
-the coordinate \emph{is}, not a label on it.
+scope passes the test, so there is no fourth coordinate. The second test demands a grain
+fine enough that two distinct real-world facts can never net to nothing, and the
+$G_1$/$G_2$ failure above is its witness: two postings under two agreements are two
+facts, valued, discharged, defaulted, and returned separately, so the agreement is part
+of what the coordinate \emph{is}, not a label on it --- an encumbrance is never hidden by
+an offsetting one.
 
 A move writes exactly one $(c,G)$ coordinate of one unit, paired legs as always, so
-conservation holds per (unit, coordinate, agreement) --- the finest grain, and the
-primitive (Chapter~\ref{ch:invariants}, Theorem~\ref{thm:conservation}). The
-three-coordinate vector \textbf{(owned, lent, posted)} the constitution names is the
-\textbf{aggregate projection} of this finer object, summing over agreements:
+conservation holds per (unit, coordinate, agreement) --- the finest declared grain, and
+the primitive (Chapter~\ref{ch:invariants}, Theorem~\ref{thm:conservation}); that is the
+third test, discharged as a theorem. The three-coordinate vector \textbf{(owned, lent,
+posted)} is the \textbf{aggregate projection} of this finer object, summing over
+agreements:
 \[
 \mathrm{bal}_c(w,u)\ =\ \sum_{G}\ \mathrm{bal}_{c,G}(w,u).
 \]
 It is a projection, not the primitive: it is exactly the sum the failure above shows loses
 information --- a fully encumbered wallet and a wholly unencumbered one share the
-image~$0$. Constitution \S4 states the balance as the single (owned, lent, posted) vector;
-that vector is this aggregate, and the (coordinate, agreement) refinement --- needed so
-that two encumbrances under two agreements cannot cancel --- is stated here as primitive
-and parked, with the exact amendment text, as entry PARK-3 of the parking index
-(Chapter~\ref{ch:scope}). No chapter amends the constitution, which is the owner's alone.
+image~$0$, which is what the second admission test exists to forbid at the primitive
+grain. The (coordinate, agreement) schema therefore stands as this specification's
+declared schema, compliant with all three tests of C-4.10: the distinct-action test and
+the grain test demonstrated above, and conservation at the finest declared grain held as
+Theorem~\ref{thm:conservation}. The earlier conflict with v1.1's fixed schema, parked as
+PARK-3, is closed by the owner's ruling in v1.2; the closure and its history are recorded
+in Chapter~\ref{ch:scope}.
 
 Only the owned coordinate carries economic value and drives profit and loss. The remaining
 coordinates carry mass, never value: they record possession and encumbrance under the
