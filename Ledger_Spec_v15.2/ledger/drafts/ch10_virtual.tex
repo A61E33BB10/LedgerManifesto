@@ -192,3 +192,67 @@ recorded observation reproduces the identical \USD{200{,}000}.
 \emph{The design point.} \emph{The reset moves cash in the true ledger, and the
 strategy that produced the number never touched it: the only thing that crossed
 the settlement boundary was a stamped observation, and a move never can.}
+
+\subsection{The simulated ledger}\label{sec:simulated}
+
+Concrete case first. At the close of a recorded trading day the true ledger stands in a
+definite state: its log has a last position. Take that position as a \textbf{branch point},
+copy the log up to it, keep every contract and every machine, and continue it --- not with
+the day's real events, but with a generated stream of clock ticks and boundary observations.
+The result is a \textbf{simulated ledger}: a virtual ledger (this chapter) whose log extends
+a recorded prefix of another ledger's log, driven onward by generated events. Branch
+\texttt{V-SIM} at that close and drive OT-1 --- the one-touch on OMEGA struck at barrier
+$80.00$ (Chapter~\ref{ch:objects}) --- down $1{,}000$ generated OMEGA paths. Each path is a
+sequence of generated official-close observations admitted through the observation door
+(Chapter~\ref{ch:marketdata}); on each, OT-1's contract fires unchanged, and a path whose
+close touches $80.00$ pays the declared \USD{1{,}000{,}000} while one that never does pays
+nothing. The price estimate is the mean payout across the thousand paths. No new machinery
+produced it: the same door, the same contract, a generated stream in place of the real one.
+
+\emph{The generator is outside the ledger.} The stream of ticks and observations is produced
+by a \textbf{generator} --- a model, and a model lives outside the fold (the wall between
+models and the ledger, Chapter~16). The generator's one
+non-record input is the \textbf{seed}. The seed is recorded, so a \textbf{path} is a
+deterministic function of the branch point, the generator version, and the seed: fix those
+three and the path replays bit for bit. Nothing else enters. This is the confinement the
+constitution's simulability commitment demands (C-2.8) --- one non-record input, recorded,
+so every path replays exactly.
+
+\emph{No simulation-only variant exists.} This is the section's discipline, and it is
+absolute. There is no simulation build of any contract, and none of the Event Monitor, the
+Events Executor, or the Transaction Executor. The generated stream is admitted through the
+one door that admits real events and folded by the same contracts into the same three homes
+(Chapter~\ref{ch:homes}). A contract that behaved one way in production and another under
+simulation would be an untested second implementation --- the exact divergence the
+one-record architecture abolishes. The simulated ledger is held to the same eight
+commitments as any ledger; it differs from the true ledger in one respect only, that its
+driving events were generated rather than observed.
+
+\emph{Results cross back as observations.} A simulated ledger settles nothing, exactly as
+any virtual ledger. A number computed on it --- the price of OT-1, a stress loss, a
+sensitivity --- re-enters the true ledger only as an observation with provenance, through
+the observation door of Chapter~\ref{ch:marketdata}, by the same moveless
+observation-recording transaction that admits any stamped level. The provenance a simulated
+result carries names its branch point, the generator version, the seeds, and the path count,
+so the figure is reproducible from the record --- and no move ever crosses from the
+simulated ledger to the true one.
+
+\emph{One engine, two measures.} Chapter~\ref{ch:testability}'s generator regime is this same
+engine. Its generated products, events, and histories are simulated paths branched from
+recorded states and folded by the same contracts and the same door; only their purpose
+differs. A path driven to price OT-1 runs to ask what the instrument is worth; a path driven
+by the adversarial scheduler runs to ask whether an invariant can be broken. The machinery
+is identical --- one generator universe, one door, one fold --- and the two uses are two
+measures over the same paths. Refutation and pricing are one computation aimed at different
+questions.
+
+\begin{lstlisting}
+-- a branch point is a recorded prefix of a ledger's log:
+branch        :: Ledger -> LogPrefix -> BranchPoint
+-- a path is a deterministic function of (branch point, generator version, seed),
+-- run through the same contracts and the same door as production:
+simulate      :: BranchPoint -> GeneratorVersion -> Seed -> Path
+-- a number computed on a path re-enters the true ledger only as a stamped
+-- observation with provenance -- never as a move (Chapter 8):
+observeResult :: Path -> Observation Money
+\end{lstlisting}

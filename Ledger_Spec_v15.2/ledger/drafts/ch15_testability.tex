@@ -76,6 +76,10 @@ genHistory :: Gen [Transaction]         -- interleaved admitted walks of many pr
 -- and every counterexample is replayable from its seed (a defect is a reproduction).
 \end{lstlisting}
 
+This generator regime is the simulated ledger of Chapter~\ref{ch:virtual}
+(Section~\ref{sec:simulated}) run under the test measure: the same branch-point,
+seed, and one-door discipline, aimed at refutation rather than pricing.
+
 Generation is adversarial by design, because the test environment must be harder than
 production. The Event Monitor and the Events Executor are outside the trust boundary and may
 duplicate, delay, and reorder firings; integrity owes them nothing
