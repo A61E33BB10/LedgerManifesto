@@ -1,0 +1,263 @@
+% Chapter 2 — The Picture: Map, Then Fold. Author: KLEPPMANN. Budget 5 pp.
+\section{The Picture: Map, Then Fold}\label{ch:picture}
+
+This chapter discharges constitution clauses C-3.1--C-3.11 (the map-then-fold picture, the three arrows, and the proposal-versus-authority split).
+
+Everything this framework does is a \emph{map} followed by a \emph{fold}. The
+constitution defines both words and draws the whole picture (C-3.1); this chapter does
+not re-derive them --- it instantiates the picture on the six threads. In one line: the
+world presents a list of events, $E = [e]$; a map carries it to a list of transactions,
+$T = [tx]$; a fold reduces that list to the ledger; and every number the ledger reports
+--- a balance, a valuation, a profit and loss, a report --- is a further fold of that
+same one list. Four terms recur, each defined in Chapter~\ref{ch:objects} and used here
+only at a gloss: a \textbf{unit} is anything that can be held or owed; a \textbf{wallet}
+is where units are held; a \textbf{transaction} is the atomic bundle of changes the
+ledger records; and a \textbf{projection} is any view computed from the record.
+
+\subsection{The cast: six threads}\label{sec:cast}
+
+Six instruments recur through this specification as threads. This section is their cast:
+their terms, parties, and quantities are fixed here once and never vary, so a number met in
+one chapter is the same number met in another. Every later episode opens with a pointer back
+to this table and states only what that episode adds; a standing term is referred to here,
+never re-established. This chapter follows one of them --- the one-touch OT-1 --- through the
+whole pipeline; the rest are worked where they bite.
+
+\medskip
+{\small
+\noindent\begin{tabular}{@{}lp{4.1cm}p{9.4cm}@{}}
+\toprule
+ & Instrument, kind, parties & Fixed terms and headline numbers \\
+\midrule
+T1 & FUT-IDX --- cash-settled future on IDX; W-ALPHA / the CCP & multiplier 10, USD,
+  settled-to-market; buy 1 at 995.00; settlement prints 1{,}000.00 / 990.00 /
+  1{,}005.00; cumulative VM \USD{100} $=$ PnL \\
+T2 & OT-1 --- one-touch on stock OMEGA; W-BANK writes, W-ALPHA holds & barrier
+  breached when OMEGA's official close is at or below 80.00 --- a discretely-monitored
+  (closing-price) one-touch; payout \USD{1{,}000{,}000}; spot 95.00 at inception; marked
+  \USD{400{,}000} while live; knock at close 79.00 \\
+T3 & ACME --- cash dividend; issuer / W-ALPHA & 1.50 per share; W-ALPHA holds 10{,}000
+  shares; entitlement \USD{15{,}000} \\
+T4 & ACME --- 2-for-1 split; issuer / W-ALPHA & 10{,}000 $\to$ 20{,}000 shares; price
+  frame 100.00 $\to$ 50.00; declared dividend figure 1.50 $\to$ 0.75 \\
+T5 & VS-1 --- OTC variance swap on IDX; bilateral & one year, 252 fixings, strike 400
+  variance points, \USD{1{,}000} per point; realised variance 441; settlement
+  \USD{41{,}000} \\
+T6 & TRS-1 --- total return swap; reference W-QIS in virtual ledger V-1 (strategy S-QIS) &
+  notional \USD{10{,}000{,}000}; financing 4\% p.a., quarterly; first reset NAV
+  10{,}300{,}000; net move \USD{200{,}000} \\
+\bottomrule
+\end{tabular}
+}
+\medskip
+
+\subsection{The world presents events}
+
+The world presents the system with a list of events. Some arrive from outside: trades
+executed in the market, corporate-action notices, fixings and other observations,
+captured and recorded at the boundary. Others are not received but noticed. Every unit
+declares, from its terms, the conditions its life requires watching --- its
+\textbf{watches} (Chapter~\ref{ch:objects}) --- and the Event Monitor evaluates those
+watches against the clock and the recorded observations, emitting an event onto the
+record the moment a condition is met. The future FUT-IDX declares such watches at
+registration: one for each daily settlement print, one for its expiry; the one-touch OT-1
+declares one, its underlying's recorded close against the barrier. A coupon date
+arriving, an expiry falling due, a close printing below a barrier --- each becomes an
+event the same way a trade does, and once emitted the two kinds are indistinguishable:
+both are on the record.
+
+\subsection{The map: each event becomes a transaction}
+
+Each event is mapped to a transaction, and the responsibility for the map divides in two.
+The \textbf{smart contracts} are the mapping functions: each is a stateless piece of code
+that, given one event and the current state of the ledger, computes the transaction the
+event requires (Chapter~\ref{ch:contracts}). The \textbf{Events Executor} applies the map
+over the list, $E=[e] \to T=[tx]$: for each event it fires the responsible contract,
+hands it the event together with the current projection of the ledger, and collects the
+proposed transaction. Many contracts, one Events Executor; the contracts carry all the
+product knowledge, the Events Executor carries none (Chapter~\ref{ch:machines}).
+
+The map is not blind to state. To turn a dividend event into cash moves, the contract
+must read who holds the stock at that moment --- the fold of everything admitted so far.
+Map and fold therefore advance together, one event at a time, in a single total order:
+the transaction for event $e$ is computed against the ledger that the transactions for
+all earlier events have already built.
+
+\subsection{The fold: the transactions become the ledger}
+
+The resulting list of transactions is folded --- reduced, one transaction at a time ---
+into the state of the system: balances, and the three homes of unit and position state
+(Chapter~6, \emph{State: The Three Homes}). The \textbf{Transaction Executor} performs the
+fold, $T=[tx] \to \mathrm{Ledger}$: it serialises, validates, and applies each
+transaction, and the immutable log is precisely the list being folded. Nothing else
+writes. And because the log is one list, every other view is a further fold of it: a
+balance sums the moves that touch a wallet, a valuation folds the composition against a
+price vector (Chapter~\ref{ch:valuation}), a report folds it into a presentation
+(Chapter~\ref{ch:reporting}). One record, and many folds of it --- never many records.
+
+\subsection{Two axes of time: what was known, and what is in force}\label{sec:bitemporal}
+
+A correction arrives late. IDX's official close for day~2 is $990.00$, but the print
+reaches the boundary only on day~4 --- after day~3 has already settled against the
+prints then on the record. The system now holds two honest questions with different
+answers. \emph{As the book stood at the close of day~3}, day~2's variation margin was
+computed without the $990.00$: that is what was reported, and no later arrival may rewrite
+it. \emph{As the book stands once the correction is in}, day~2's margin is recomputed with
+the $990.00$ in force and the tail from day~2 forward re-derived. Both answers are correct.
+They answer different questions.
+
+Two coordinates, not one, therefore fix a historical view. The first is the \emph{log
+prefix}: how far down the immutable log the reconstruction reads --- what had been recorded
+by a chosen point. This is \emph{transaction time}, the axis of what was known. The second
+is the \emph{knowledge horizon}: which of the recorded observations are treated as in
+force. This is \emph{valid time}, the axis of what a recorded observation says about the
+world, apart from when it was recorded. A back-dated observation --- day~2's close, arriving
+on day~4 --- sits at valid-time index $k=2$ on the second axis while it sits late on the
+first. The projection reads both:
+
+\begin{lstlisting}
+project :: LogPrefix -> KnowledgeHorizon -> View
+-- LogPrefix        : how far down the immutable log to read   (transaction time)
+-- KnowledgeHorizon : which recorded observations are in force (valid time)
+\end{lstlisting}
+
+Fix both coordinates and the view is a deterministic fold, computed the same by any party.
+Two facts follow, and they are the whole of bitemporality. First, the \emph{as-known-at}
+view --- the projection over a fixed prefix --- is never rewritten by a later correction: a
+correction is a new recorded observation appended further down the log, so it lies outside
+the fixed prefix and cannot reach into it. Second, the \emph{as-of} view --- the projection
+over the prefix that already includes the correction --- recomputes bit-exactly from that
+prefix, because the fold reads only recorded observations and is deterministic. The late
+close does not edit day~2: it is recorded at its own valid-time index~$k=2$, the fold from
+that index forward is re-derived, and the earlier as-known-at view survives beside it.
+Theorem~\ref{thm:timetravel} states this over the pair of axes and proves both facts.
+
+The constitution names one axis. \S 12 reconstructs a historical state ``by replaying the
+immutable transaction log up to the desired timestamp'' --- one timestamp, one axis --- yet
+a back-dated observation forces the two just drawn. This is a genuine conflict between a
+single-axis guarantee and a system that has needed both axes since the market-data boundary
+of Chapter~\ref{ch:marketdata}. It is parked, with the exact proposed amendment text, as
+entry PARK-2 of the parking index (Chapter~\ref{ch:scope}); the machinery this section
+states is what that amendment names.
+
+\subsection{Data, functions, and machines}
+
+Three kinds of thing appear in this picture, and they are never confused: data,
+functions, and machines. The data kinds are Event, Transaction, and Ledger. The functions are
+the arrows between the data. The machines are what evaluate the arrows --- one machine per
+arrow, and they are the subject of Chapter~\ref{ch:machines}. Typed:
+
+\begin{lstlisting}
+watch    : (Record, Clock)       -> [Event]      -- the Event Monitor
+contract : (Event, Ledger)       -> Transaction  -- the Events Executor
+apply    : (Transaction, Ledger) -> Ledger       -- the Transaction Executor
+
+step (ledger, e) = apply (contract (e, ledger), ledger)  -- map, then fold
+final ledger     = fold step over E = [e]
+\end{lstlisting}
+
+The three arrows differ in what they read. \texttt{watch} reads the Record and the clock
+and yields events; \texttt{contract} and \texttt{apply} consume the Ledger --- the folded
+state --- and never the clock. One \texttt{step} is a map (fire the contract) immediately
+followed by a fold (apply the result), and the whole run is that step folded over
+$E=[e]$. Map, then fold: the phrase is the architecture, not a metaphor for it.
+
+An observation is not outside this picture. It enters as a moveless
+\texttt{Transaction} through \texttt{apply} --- a transaction with an empty move list
+that folds the observation into a home (Chapter~\ref{ch:marketdata}) --- so the Record
+the \texttt{watch} arrow reads and the Ledger \texttt{contract} and \texttt{apply}
+consume are two views of one log, never two stores. The observations a \texttt{contract}
+reads are therefore home facts already folded into the Ledger, and the single writer of
+\texttt{apply} is the only writer of any observation.
+
+\subsection{The clock, and proposal versus authority}
+
+Two properties of the picture carry most of its weight.
+
+\emph{The clock is the single input that is not on the record}, and the Event Monitor is
+the single place it is consulted. The event the Monitor emits is itself recorded, so
+everything downstream of the emission is a function of the record alone --- which is
+exactly why a late firing produces the identical transaction, and why, given the record
+and the clock, any party can recompute which events should have been emitted, and when
+(Chapter~\ref{ch:machines}).
+
+\emph{The map is proposed; the fold is authoritative.} A contract's output is a proposal,
+not a fact: a transaction joins the list only when the Transaction Executor admits it. The
+smart contracts, the Event Monitor, and the Events Executor sit outside the trust boundary
+and may only propose; the one Transaction Executor writes. Either arrow may refuse --- a
+contract may find nothing due; the door rejects a malformed transaction and writes nothing
+--- and a refusal is a returned value, never a half-applied state. Because both the events
+and the transactions are on the record, economic correctness is checkable after the fact:
+re-run the map on the recorded event and compare the result against the recorded
+transaction (Chapter~15, \emph{Testability and the Executable-Check Regime}). Verification
+lives with the events; authority lives with the transactions.
+
+\subsection{One instrument walks the pipeline}
+
+OT-1 (Cast, \S\ref{sec:cast}) walks the pipeline whole. Its standing terms are fixed above;
+this section adds only the walk across the three arrows. At registration its terms declared
+one watch: OMEGA's recorded official closes against the barrier.
+
+\textbf{Trigger (watch).} OMEGA's official close of 79.00 is recorded. The declared
+condition is met, and the Event Monitor emits the touch event
+onto the record. No ledger state has changed: the Monitor emits events, and an event is an
+input to the map, not a write.
+
+\textbf{Contract (map).} The Events Executor fires OT-1's contract, handing it the touch
+event and the current projection of the ledger. The contract reads the terms, the holder
+(\mbox{W-ALPHA}), and the unit's state (\emph{live}), and
+returns one transaction:
+
+\begin{center}
+\begin{tabular}{@{}rll@{}}
+\toprule
+ & Kind & Content \\
+\midrule
+1 & unit-state change & OT-1: UnitStatus \emph{live} $\to$ \emph{triggered} \\
+2 & move & owned(USD) 1{,}000{,}000: W-BANK $\to$ W-ALPHA \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Apply (fold).} The Transaction Executor admits it --- the move's paired legs leave
+conservation undisturbed, the cause-derived identifier names the touch event, and the
+writer is OT-1's own contract --- and the fold advances: the ledger now shows the cash with
+\mbox{W-ALPHA} and the option \emph{triggered}. Where OT-1 stands encumbered under a
+collateral agreement the payment leg routes differently, and Chapter~\ref{ch:collateral}
+works that same knock start to finish; the pipeline is the one drawn here either way.
+
+\emph{One list of events, one map, one fold: the option's whole knock is a single event
+carried across the three arrows, and nothing off the record ever touches it.}
+
+\subsection{Not event sourcing}
+
+The resemblance to event sourcing is real, and the difference matters. The Ledger is
+event-driven because finance is: trades execute, prices print, coupons mature, and
+barriers are touched whether or not the software cares, so events are recorded because
+reality presents them, not because a pattern was chosen. The difference is where authority
+sits. In event sourcing the event stream is the canonical history, state is whatever the
+current code derives from it, and reinterpreting history through new code is a feature.
+Here the admitted transaction log alone is the canonical history, and two properties set it
+apart. First, there is a single total order, not a set of per-aggregate streams stitched
+back together: every view is a projection of that one log, and two projections of it cannot
+disagree. Second, replay re-reads transactions and never re-executes contracts
+(Chapter~\ref{ch:machines}), so history cannot be silently reinterpreted. Events are inputs
+to the map, never the accounting record: contracts transform them into proposed
+transactions, and the Transaction Executor admits or refuses. Correcting the record is
+neither reinterpretation nor an edit, and the two axes of Section~\ref{sec:bitemporal} say
+why: a wrong interpretation is repaired by a compensating transaction in the open
+(Chapter~15), and a corrected observation --- a close that arrives late or is later restated
+--- is a new recorded observation at its own valid-time index, appended on the
+transaction-time axis rather than written over the old one. The as-known-at view over any
+earlier prefix is therefore preserved, and the as-of view recomputes from the prefix that
+carries the correction; neither overwrites the other. The events stay on the record for one
+purpose --- so the map can be re-run and verified.
+
+\begin{secondtelling}
+A fold with a fixed step is a \emph{catamorphism}: the unique map out of the list $E=[e]$
+determined by one rule for the empty list and one rule for prepending an element --- here
+\texttt{step}. Because the step is fixed and the list carries its own order, the ledger is
+that unique image, and every projection --- balance, valuation, report --- is another
+catamorphism over the same list. ``Map, then fold'' names the composite; that the fold is
+a catamorphism is why one record admits many views and no two of them can disagree.
+\end{secondtelling}

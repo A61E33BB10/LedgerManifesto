@@ -1,0 +1,191 @@
+\section{Alignment with the Common Domain Model}\label{ch:cdm}
+
+This chapter discharges constitution clause C-6.5 (every right or obligation a unit, jointly with Chapters~\ref{ch:contracts} and~\ref{ch:collateral}) and the Clarity commitment C-2.6 (behaviour carried as declared data), by demonstration against the Common Domain Model. It discharges them by a
+single demonstration: the industry's Common Domain Model (FINOS CDM, version
+6.0.0) maps onto the ledger's declared-data vocabulary. The direction of
+authority is the constitution's and does not turn. The ledger's objects are
+derived from first principles; the CDM is exhibited \emph{against} them, never
+consulted as their source. Where the two models disagree, the disagreement is a
+finding about the mapping --- recorded, and carried by a lineage convention ---
+and never a reason to alter a ledger primitive.
+
+\subsection{Unit maps to product; a bespoke instrument maps to the trade}
+
+A ledger unit's declared terms map to a CDM product. The counterparty-agnostic
+template --- the CDM \texttt{NonTransferableProduct}, whose \texttt{EconomicTerms}
+carry the \texttt{Payout} legs, the effective and termination dates, and the
+notional --- is the image of the unit's product-graph terms (Chapter~3). For a
+listed, fungible instrument this template is the whole image: the same terms
+serve every holder.
+
+For a bespoke bilateral instrument the faithful image is not the template but
+the CDM \texttt{Trade}. The reason is economic individuation. In CDM the
+collateral terms live on \texttt{Trade.collateral}, whose type
+\texttt{Collateral} carries the \texttt{CollateralProvisions}; so two executions
+sharing one \texttt{NonTransferableProduct} but differing in their collateral
+terms are distinct \texttt{Trade}s. The ledger reaches the same conclusion from
+the other direction and for the same reason: collateral eligibility and the
+governing regime are declared terms of a distinct agreement unit
+(Chapter~9), and a unit whose economics are inseparable from those terms is a
+distinct unit. Unit identity therefore corresponds to the CDM \texttt{Trade}
+layer, not to the \texttt{NonTransferableProduct} template --- collateral terms
+individuate a trade economically in both models. The individuation is not the
+identifier: a CDM trade's identity is carried by its \texttt{TradeIdentifier},
+and collateral terms individuate the economics that identifier then names. The
+one structural difference is placement: CDM co-locates the collateral terms ---
+\texttt{Trade.collateral}, a \texttt{Collateral} carrying the
+\texttt{CollateralProvisions} --- inside the \texttt{Trade}, whereas the ledger
+factors the same terms into a separate agreement unit and relates the two by
+projection. That is a finding about the mapping, carried by the
+agreement-reference lineage of Chapter~9; it changes no primitive.
+
+\subsection{Business event maps to transaction}
+
+The CDM \texttt{BusinessEvent} --- a before-state, a set of
+\texttt{PrimitiveInstruction}s, and the resulting \texttt{TradeState} --- maps to
+the ledger's recorded \emph{transaction}, the atomic bundle that advances the
+fold. The correspondence is structural on both sides. CDM composes a
+\texttt{BusinessEvent} from primitive instructions (quantity change,
+termination, transfer, reset, observation, and their siblings); the ledger
+composes a transaction from its four kinds of change (moves, unit-state changes,
+position-state changes, terms changes). The map from ledger transactions to CDM
+business events has the shape the constitution already requires of the ledger's
+own arrows, and it inherits their properties:
+
+\begin{itemize}[nosep,leftmargin=1.4em]
+  \item \textbf{total} --- every recorded transaction has a CDM image, because
+        every transaction is one of the four declared kinds of change and each
+        maps to a primitive instruction or a qualified composition of them;
+  \item \textbf{deterministic} --- the image is a function of the record alone;
+  \item \textbf{composing} --- a transaction's four change-kinds map
+        component-wise to the event's primitive instructions, so composition of
+        changes is composition of instructions;
+  \item \textbf{conserving} --- the ledger's transaction conserves value per
+        (unit, coordinate) by construction; the CDM event does not carry this
+        law, and the ledger supplies it;
+  \item \textbf{idempotent under the cause-derived transaction identifier} --- each
+        transaction commits exactly once, keyed by its
+        $\mathit{txid}=H(\mathit{causeEventId},\mathit{contractId},\mathit{unitId},\mathit{seq})$
+        (Chapter~\ref{ch:machines}); CDM has no native idempotence key, and the
+        ledger's key is the lineage carried across the map. A retry of one leg
+        collapses to its own $\mathit{txid}$, while the distinct legs of one cascade
+        carry distinct identifiers and all commit.
+\end{itemize}
+
+The division of labour is exact and worth naming: \emph{the ledger keeps the
+economic substance, the CDM carries the business meaning}. The conserved moves
+and the state written into the three homes are the substance, guaranteed by the
+Transaction Executor; the CDM qualification --- that this event \emph{is} a
+partial termination, a reset, a variance fixing --- is the meaning, layered on
+top of substance the ledger has already made unforgeable.
+
+\paragraph{Variance swap.} Unit VS-1 (one-year OTC variance swap on IDX, 252
+fixings, strike 400 variance points, 1{,}000 USD per point) maps to a product
+whose \texttt{EconomicTerms} carry one \texttt{PerformancePayout}; its underlier
+is the index IDX as an \texttt{Observable}, and the variance computation sits in
+the payout's \texttt{returnTerms} as \texttt{VarianceReturnTerms} --- the field on
+which the CDM equity-variance qualification depends. Each of the 252 fixings is a daily log-return $r_i = \ln(C_i/C_{i-1})$ over two
+consecutive recorded IDX official closes, so the 252-fixing series reads 253
+closes --- the effective-date reference close $C_0$ fixed at inception, then
+closes $C_1,\dots,C_{252}$, one per fixing date. Each recorded close is a CDM
+\texttt{Observation}, an observed value on the record; the ledger's accrual firing, which writes the accrued
+sum-of-squared-returns statistic into UnitStatus for the next firing to find,
+maps to a \texttt{BusinessEvent} whose \texttt{Reset} lands in the trade's
+\texttt{resetHistory}. The two models agree: each recorded close is a CDM observation, each accrual a
+recorded business event. Final realised variance 441 points settles $1{,}000 \times (441-400) =
+\USD{41{,}000}$ to the realised-variance receiver: one CDM transfer primitive,
+one ledger owned-cash move, one conserved fact.
+
+\paragraph{Total return swap.} Unit TRS-1 (notional \USD{10{,}000{,}000},
+financing 4\% quarterly) maps to a two-legged product: a
+\texttt{PerformancePayout} for the reference leg, whose underlier is the NAV of
+wallet W-QIS as an \texttt{Observable}, and an \texttt{InterestRatePayout} for the
+financing leg. The first reset is a CDM \texttt{BusinessEvent} carrying a
+\texttt{Reset} (reset value: the stamped NAV observation \USD{10{,}300{,}000})
+and a transfer; the ledger records it as one transaction with a single net move
+of \USD{200{,}000}, payer to receiver. The alignment makes a reporting point the
+netting would otherwise erase: the report derives from the \emph{retained
+business event} --- total-return leg \USD{300{,}000} against financing leg
+\USD{100{,}000}, both recoverable by recomputation from the recorded reset and
+NAV observation --- never from the \USD{200{,}000} net move alone. Substance is
+the net move on the record; meaning is the gross legs the business event retains.
+
+\subsection{Eligibility as declared data restates the CDM collateral model}
+
+The ratified collateral ruling makes eligibility and haircuts declared terms of
+the collateral-agreement unit, checked at the single door and never encoded in a
+type. This is the CDM collateral model restated in the ledger's primitives. CDM
+carries eligibility as an \texttt{EligibleCollateral} schedule --- asset class,
+currency, and a per-line valuation percentage after the shape of CSA
+Paragraph~13 --- read as data, not as a subtype hierarchy of collateral kinds.
+The ledger's line-level valuation default (Chapter~9) is the same choice:
+collateral value is the sum of per-line market value times the declared
+percentage, package-level valuation admissible only where an agreement declares
+it. That the two models, derived independently, land on \emph{eligibility as
+declared data valued line by line} is the alignment this section exhibits; it is
+shown, not borrowed.
+
+\subsection{Closed enumerations and the product graph}
+
+Two further alignments serve later chapters. First, the generator universe of
+Chapter~15 rests only on the enumerations that are genuinely closed. The CDM
+\texttt{Payout} is not one of them: its components \emph{compose} rather than
+exclude. A product's \texttt{EconomicTerms} co-populate one payout component per
+leg --- \texttt{EconomicTerms.payout} has cardinality \texttt{(1..*)}, so an
+interest-rate swap carries two interest-rate legs and a total return swap an
+interest-rate leg alongside a performance leg --- and a product is therefore a
+composition of payout components, not a choice of one from a fixed arity. The
+closed enumerations that do seed the generator universe are the day-count
+fraction, the option type (call or put), and the primitive-instruction set,
+together with the ledger's own closed sets: the regimes \{title-transfer,
+pledge, STM/CTM\}, the coordinate planes \{owned, lent, posted\}, the trigger and
+event kinds, and the product-graph node and edge sets closed at registration
+(Chapter~3). These enumerations seed the generator universe of Chapter~15, so
+that the property tests range over the industry's own catalogue of product and
+event shapes together with the ledger's, not an invented one.
+
+Second, the product graph of Chapter~3 --- nodes the closed lifecycle states,
+edges the guarded transitions that emit transaction templates --- is the natural
+translation target for CDM lifecycle representation. A CDM \texttt{BusinessEvent}
+is an edge traversal: the before-\texttt{TradeState} is the source node, the
+after-\texttt{TradeState} the target, the primitive instructions the edge's
+action. The CDM lifecycle and the ledger graph are the same object described
+twice; the graph is where a CDM event round-trips without loss.
+
+\subsection{Gaps}
+
+Where CDM 6.0.0 has no native form for a situation the ledger must represent,
+the mapping states the gap and names the lineage convention the ledger carries
+instead. None is a defect in the ledger; each is a place the industry model has
+not yet reached, recorded so that a later CDM version can be met without
+surprise.
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.30\linewidth}p{0.28\linewidth}p{0.34\linewidth}@{}}
+\toprule
+\textbf{Situation} & \textbf{CDM 6.0.0 native form} & \textbf{Lineage convention carried} \\
+\midrule
+Securities-lending recall & None --- SL lifecycle events are not primitive
+  instructions & Lent-plane transaction keyed to the loan agreement unit
+  (Chapter~9): open $\to$ recall $\to$ return \\
+Locate-style pre-trade confirmation & None --- CDM is a post-trade model & The
+  locate is a declared obligation on the agreement unit, with deadline and
+  discharge predicate; the pre-trade act itself is out of ledger scope \\
+Collateral re-use / rehypothecation event & Collateral is modelled; re-use is
+  not a first-class event & Posting of mass on the received ray with a
+  mandatory source-agreement reference, from which per-agreement re-use projects \\
+The coordinated cascade (one cause, many units) & None --- events are
+  per-trade & The legs share one $\mathit{causeEventId}$ --- the lineage that ties
+  the cascade together --- yet differ in $(\mathit{contractId},\mathit{unitId},\mathit{seq})$,
+  so each carries a distinct cause-derived identifier (Chapter~\ref{ch:machines}):
+  every leg commits, and each exactly once \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+No gap adds a mechanism: the recall rides the lent plane, the locate rides the
+obligation-liveness discipline, re-use rides the source-agreement reference, and
+the cascade rides the cause-derived identifier. The mapping is total on the
+ledger's side precisely because the residue is absorbed by primitives the design
+already carries.

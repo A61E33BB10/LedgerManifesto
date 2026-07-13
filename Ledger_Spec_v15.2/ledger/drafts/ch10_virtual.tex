@@ -1,0 +1,194 @@
+\section{Virtual Ledgers, Strategies, and the Total Return Swap}
+\label{ch:virtual}
+
+This chapter discharges constitution clauses C-10.1--C-10.5 (the virtual ledger, the strategy contract, the two disciplines, exact slippage, and the total return swap).
+
+Nothing in this architecture is specific to real holdings. The machine of
+Chapters~2 through~7 --- units, wallets, balances, an immutable log, and the
+three machines that map events into transactions and fold transactions into
+state --- makes no reference to whether the positions it records will ever
+settle. A \emph{virtual ledger} is a complete instance of that same machine
+whose holdings are notional: it settles nothing, and none of its wallets ever
+reaches a settlement instruction or the balance sheet. Everything else is
+identical. It has its own units and wallets, its own append-only hash-chained
+log, its own Event Monitor, Events Executor, and Transaction Executor, and it is
+subject to the same eight commitments as a true ledger --- above all to full
+reproducibility, so that any party holding the record recomputes its every
+number to the minor unit, and to time travel, so that every past state is
+reconstructible from that record alone.
+
+The word \emph{virtual} carries exactly one meaning throughout this
+specification, and no other: on the far side of the settlement boundary. A
+virtual ledger is not an approximation, a draft, or a lower grade of record. It
+is held to the identical standard of correctness; it differs from a true ledger
+in one respect only --- its balances are claims about a hypothetical world, so
+no move it records is ever projected into a payment. This is the same boundary
+the settlement interface draws for a true ledger, read from the other side: the
+true ledger says what settles, the virtual ledger says what nothing settles.
+
+\subsection{The strategy as a smart contract}
+
+The motivating case is a quantitative investment strategy: a rulebook that,
+reading market observations, decides a hypothetical portfolio and rebalances it
+on a schedule. The architecture already has the parts to record this without a
+new primitive.
+
+A deterministic strategy is a smart contract, and its rulebook is the declared
+terms of a \emph{strategy unit} --- a non-valued unit (Chapter~3), whose price is
+undefined, not zero, because pricing the governance shell beside the portfolio it
+governs would count one economic reality twice. The hypothetical portfolio the
+rulebook manages is an ordinary wallet in a virtual ledger. Each rebalancing is a
+recorded transaction: the rebalancing date is a declared watch on the strategy
+unit; the Event Monitor emits the event; the strategy contract fires, reads the
+stamped market observations and the portfolio as the virtual ledger then stands,
+and proposes the moves the rules require; the Transaction Executor admits them
+onto the virtual log. The contract never waits and never remembers --- whatever
+it must carry from one rebalancing to the next it writes into the three homes,
+exactly as every other contract does.
+
+The strategy's \emph{level} is that wallet's Net Asset Value: the same NAV
+projection of Chapter~7, the same fold of the same log against a price vector,
+computed on demand and never stored. Because the strategy ledger is replayable
+and the rebalancing contract is a pure function of recorded rules and recorded
+observations, any party holding the recorded rulebook and the recorded
+observations recomputes the level exactly --- which is the whole content of the
+claim that the level is well defined. There is no privileged copy of it inside
+the strategy provider.
+
+An index restatement follows the auditability commitment without exception. When
+the level of a published index is corrected --- a late-arriving observation, a
+provider's amended fixing --- the virtual ledger does not rewrite its log. It
+records a compensating entry that names the transaction it supersedes, so that
+both the original computation and its correction survive on the record. A
+restatement is an entry, never a rewrite; the historical level as first published
+and the historical level as corrected are both reconstructible, and which one a
+consumer read on which date is itself a fact of the record.
+
+\subsection{Two disciplines}
+
+Two disciplines make the arrangement safe, and both are checkable.
+
+\emph{The bridge between ledgers is an observation, never a move.} A move
+transfers a positive quantity within one ledger; conservation is stated per
+ledger, per unit, per coordinate, and it is closed by the virtual wallets that
+represent every outside party (Chapter~3). No move therefore spans two ledgers,
+and none can: a move from a wallet of \texttt{V-1} to a wallet of the true ledger
+has no paired leg that conserves in either, so the Transaction Executor of
+neither can admit it. The only thing that ever crosses is a number --- a stamped
+level, admitted into the receiving ledger through the observation door of
+Chapter~8, with its provenance recorded like any other observation. The two
+ledgers touch at exactly one point, and at that point mass does not flow; a fact
+is copied.
+
+\emph{The wall between models and the ledger holds level by level.} A ledger
+records the outputs of its models and never runs one (Chapter~16); the true
+ledger does not execute the strategy, it consumes the level as an observation.
+This is not a property of the top ledger alone. Virtual ledgers may nest --- a
+strategy over strategies --- and at each level the same wall stands: each ledger
+relates to the one it references only through stamped observations admitted at
+its boundary, never by reaching inside to run the other's machinery. Because the
+wall is re-erected at every level, no amount of nesting lets a model's execution
+leak into an accounting record; each ledger remains a pure fold of its own log.
+
+A short type sketch makes both disciplines mechanical:
+
+\begin{lstlisting}
+-- a virtual ledger has the very same type as a true one;
+-- only the settlement projection distinguishes them.
+type VirtualLedger = Ledger
+
+-- the sole thing that crosses the boundary is a stamped level:
+observeLevel :: VirtualLedger -> Wallet -> Observation Money
+
+-- a move lives inside one ledger and has no cross-ledger form;
+-- none can be given a conserving type, so none can be written.
+\end{lstlisting}
+
+\subsection{Real execution: orders, benchmark, and slippage}
+
+When the strategy's trades are meant to be real, the strategy's output toward the
+world is an \emph{order} --- an instruction, not a fact. An order records an
+intention to trade; it changes no balance, because nothing has happened yet. What
+happens is external: the market fills the order, wholly, partly, or not at all,
+at a price the strategy did not set. Those fills return as external events,
+captured at the boundary, mapped by the responsible contracts, and folded into a
+real wallet of the true ledger --- the ordinary path of any executed trade.
+
+The virtual ledger now becomes the benchmark. It holds what the rules say the
+portfolio should be; the real wallet holds what execution achieved. Both are NAV
+projections, each a fold of its own log against the same prices. Their difference
+is the slippage:
+\[
+  \text{slippage} \;=\; \mathrm{NAV}(\text{benchmark wallet in } V) \;-\;
+                        \mathrm{NAV}(\text{real wallet in the true ledger}).
+\]
+It is the exact difference of two folds, computed from two records, never an
+estimate --- every cost that separates the idealised portfolio from the realised
+one is captured here in full, because both sides are recorded to the minor unit
+and neither is a model output.
+
+\subsection{The total return swap}
+
+A total return swap (TRS) is then one definition and no new machinery: its
+reference leg is the NAV of a designated wallet or virtual ledger. The swap
+itself is an ordinary unit of the \emph{true} ledger. Its two counterparties hold
+wallets there; its smart contract, at each reset, reads the stamped NAV
+observation and emits the reset and financing moves. The reference NAV is not
+computed by the TRS --- it enters through the door of Chapter~8, exactly as the
+strategy level does, and the wall between the two ledgers is the discipline above.
+
+\paragraph{Episode TRS-1.} \textsc{Trs-1} has notional \USD{10{,}000{,}000}. Its
+reference leg is the NAV of wallet \texttt{W-QIS} in virtual ledger \texttt{V-1},
+managed by the declared rulebook of the non-valued strategy unit \texttt{S-QIS}.
+Its financing leg is fixed at 4\% per annum, reset quarterly ($\Delta t = 0.25$).
+At inception the reference NAV observation is \USD{10{,}000{,}000}, and the
+reference level is set to that figure.
+
+\emph{The trigger.} The first quarterly reset date arrives. \texttt{V-1} has been
+running: \texttt{S-QIS}'s rebalancings are recorded transactions on its log, and
+its level is the replayable NAV of \texttt{W-QIS}. On the reset date that level is
+stamped --- \USD{10{,}300{,}000} --- and admitted into the true ledger as an
+observation with provenance (Chapter~8). The Event Monitor emits the reset event
+for \textsc{Trs-1}.
+
+\emph{The contract that catches it.} The Events Executor fires \textsc{Trs-1}'s
+smart contract, handing it the reset event and the current projection of the true
+ledger. The contract reads the stamped reference NAV and the reference level
+carried since inception, and computes one net move.
+
+\emph{The transaction it produces.}
+
+\begin{center}
+\begin{tabular}{clr}
+\toprule
+\# & Component & Quantity (USD) \\
+\midrule
+1 & Total-return leg: stamped NAV $10{,}300{,}000 - $ reference $10{,}000{,}000$ & $300{,}000$ \\
+2 & Financing leg: $10{,}000{,}000 \times 4\% \times 0.25$                       & $100{,}000$ \\
+3 & Net move --- \texttt{owned(USD)}, payer $\rightarrow$ receiver               & $200{,}000$ \\
+4 & Reference level reset (UnitStatus): $10{,}000{,}000 \rightarrow 10{,}300{,}000$ & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The total-return leg is the appreciation of the reference over the period,
+\USD{300{,}000}; the financing leg accrues on the period's opening reference,
+\USD{100{,}000}; their difference nets to a single move of \USD{200{,}000} of
+\texttt{owned(USD)} from the payer's wallet to the receiver's wallet. In the same
+transaction the contract writes the new reference level, \USD{10{,}300{,}000},
+into the swap's UnitStatus, arming the next period against it. One reset, one net
+move, one state change.
+
+\emph{What the door checks.} The Transaction Executor admits the transaction on
+its structure alone. The \USD{200{,}000} move is a paired-leg
+\texttt{owned(USD)} transfer, so conservation holds by construction. The
+reference-level write has a single legal writer --- the swap's UnitStatus --- and
+lands in its one home. The proposal carries a cause-derived identifier keyed to
+the reset observation, so a retried or duplicated reset commits once and no
+second time. The stamped NAV that the contract read is itself on the record, with
+its provenance, so the whole reset is reproducible: re-running the map on the
+recorded observation reproduces the identical \USD{200{,}000}.
+
+\emph{The design point.} \emph{The reset moves cash in the true ledger, and the
+strategy that produced the number never touched it: the only thing that crossed
+the settlement boundary was a stamped observation, and a move never can.}
