@@ -60,13 +60,12 @@ mints a visible, deadline-bearing \emph{open item} --- a deadline, a discharge p
 and a fallback, the obligation pattern of Chapter~\ref{ch:invariants} --- so the discrepancy
 stands on the record until repaired. Two things then part company. A \emph{view} recomputes
 automatically: the as-known-at projection stands, the as-of projection recomputes over the
-corrected prefix (Theorem~\ref{thm:timetravel}), and recomputing a view costs nothing and
-waits for nothing. \emph{Money} does not. Because money already moved cannot be unsent, a
-compensating transaction that repairs a balance is agreed with the counterparty and
-authorised by a person before it fires. The authorisation is itself a recorded observation;
-the compensating transaction carries a reference to both the correction event and its
-authorisation, and the door refuses a compensating transaction that lacks the authorisation
-reference. In phase~0 no correction fires without human intervention.
+corrected prefix (Theorem~\ref{thm:timetravel}). \emph{Money} does not: because money already
+moved cannot be unsent, a compensating transaction that repairs a balance is agreed with the
+counterparty and authorised by a person before it fires. The authorisation is a recorded
+observation; the compensating transaction references both the correction event and its
+authorisation, or the door refuses it. In phase~0 no correction fires without human
+intervention.
 
 \begin{lstlisting}
 data Correction    = Correction    { wrongEventId :: EventId,  reason   :: Text }
@@ -122,6 +121,10 @@ below. One discipline guards the generators against vacuity: a property whose pr
 is never generated passes without witnessing anything. A generated history that never knocks
 a pledged note, never re-posts received collateral, never delivers a duplicate is not
 evidence; the generators are measured by the states they reach, not the cases they cover.
+Throughout this chapter each property's firing witness asserts its branch at $\ge 1\%$ of
+generated histories under \texttt{checkCoverage}; an unwitnessed branch is a \emph{failed}
+run, not a silent green, by \S 2's zero-firings rule. This standing gate is not restated per
+property.
 
 \subsection{The test surface: the invariant catalogue and the product graph}
 
@@ -170,11 +173,8 @@ prop_netting_fires =                     -- the firing witness, asserted, not ho
 
 The netting branch is a genuine precondition, not a tautology: a generator that never posts
 and receives the same unit under two agreements would satisfy \texttt{prop\_encumbranceGross}
-without ever witnessing the collapse it exists to catch, and \S 2's zero-firings rule makes
-that a defect, not a pass. \texttt{genCrossAgreement} therefore constructs the branch by
-construction with rate $r$, set well above the floor, and \texttt{checkCoverage} turns ``the
-netting branch was never generated'' into a \emph{failed} run rather than a silent green; the
-witnessed firing rate is asserted at $\ge 1\%$ of generated histories. On every history that
+without ever witnessing the collapse it exists to catch. \texttt{genCrossAgreement} constructs
+the branch by construction, and its firing witness asserts it (\S 2). On every history that
 clears the precondition, \texttt{prop\_conservation} fires on each of $G_1$ and $G_2$ and
 finds each coordinate conserved, and \texttt{prop\_encumbranceGross} fires and finds the
 reported encumbrance $100$ where a net-reading report would show $0$ --- the single-axis
@@ -210,17 +210,11 @@ prop_coverageSign_fires =                 -- the refusal witness, asserted, not 
 \end{lstlisting}
 
 When the re-post-flag fires the generator constructs the over-re-post by construction
---- owned $0$, received $100$, re-post attempt $200$ --- so the refusal branch is
-reached with probability~$r$; setting $r$ well above the floor and wrapping the suite
-in \texttt{checkCoverage} turns ``a zero-owned over-re-post was never generated'' into
-a \emph{failed} run rather than a silent green, and \S 2's zero-firings rule makes that
-a defect, not a pass. The witnessed refusal rate is asserted at $\ge 1\%$ of generated
-histories. On every history that clears the precondition the attempted admission is
-refused, because $+100 > 0$; flip the convention to received-positive and the net reads
-$-100 \le 0$, the admission passes, and \texttt{prop\_coverageSignConvention} reports
-the inversion the invariant exists to forbid --- while the lawful chain worked under
-Invariant~\ref{inv:coverage}, received $100$ and re-post $60$, nets to $-40 \le 0$ and
-is admitted.
+--- owned $0$, received $100$, re-post attempt $200$ --- and its refusal witness asserts
+the branch (\S 2). Flip the convention to received-positive and the refused net $+100$ reads
+$-100 \le 0$ and admits: \texttt{prop\_coverageSignConvention} reports exactly that
+inversion, while the lawful chain of Invariant~\ref{inv:coverage} --- received $100$,
+re-post $60$, net $-40 \le 0$ --- stays admitted.
 
 Carried onto this surface are the four properties of the product-graph consistency invariant
 (Invariant~\ref{inv:graph-consistency}, defined in Chapter~\ref{ch:objects}), stated here as
@@ -273,19 +267,13 @@ prop_termAdj_fires =                      -- the firing witness, asserted, not h
     "split on a referenced underlying, next close in the phantom gap" genDerivWithCA
 \end{lstlisting}
 
-When the CA-flag fires the generator constructs the split on the referenced underlying by
-construction and prints the next close in the gap between the adjusted barrier $40.00$ and the
-stale $80.00$, so the corrective branch --- and the phantom it would be without the edge --- is
-reached with probability~$r$; setting $r$ well above the floor and wrapping the suite in
-\texttt{checkCoverage} turns ``a split on a referenced underlying was never generated'' into a
-\emph{failed} run rather than a silent green, and \S 2's zero-firings rule makes that a defect,
-not a pass. The witnessed firing rate is asserted at $\ge 1\%$ of generated histories. On every
-history that clears the precondition, the payoff on the appended terms equals the payoff on the
-pre-event terms, and the stale-barrier knock --- $47.50 \le 80.00$, a payout on a stock that
-never fell --- does not fire, because the live edge reads the adjusted barrier $40.00$ and
-$47.50 > 40.00$. The property fails exactly on the dropped-edge design: strip the
-corporate-action edge and the barrier stays $80.00$, the knock fires, and
-\texttt{prop\_termAdjustmentInvariance} reports the phantom the edge exists to refuse.
+When the CA-flag fires the generator constructs the split and prints the next close in the
+phantom gap, and its firing witness asserts the branch (\S 2). On every history that clears
+the precondition the payoff is invariant across the appended terms and the stale-barrier
+knock --- $47.50 \le 80.00$, a payout on a stock that never fell --- does not fire, because
+the live edge reads the adjusted $40.00$ and $47.50 > 40.00$. Strip the corporate-action edge
+and the barrier stays $80.00$, the knock fires, and \texttt{prop\_termAdjustmentInvariance}
+reports the phantom the edge exists to refuse.
 
 \paragraph{The settlement-obligation graph, and the fail branch it must walk.} The
 settlement-obligation unit (Chapter~\ref{ch:settlement}) is a product graph like any
@@ -324,11 +312,8 @@ prop_mirrorClaim_fires =                     -- the fourth-quadrant firing witne
 When the fail-flag fires the generator walks the unit to its \texttt{failed} node by
 construction, so \texttt{prop\_firedMatchesOneEdge} confirms the fail event lands it there
 and \texttt{prop\_actionEqualsRecorded} confirms the emitted transaction is the edge's
-declared action --- the fails-cascade obligation, never a reversal of history. Setting $r$
-above the floor and wrapping the suite in \texttt{checkCoverage} turns ``the fail branch was
-never generated'' into a \emph{failed} run, and the witnessed rate is asserted at $\ge 1\%$
-of generated histories, so \S 2's zero-firings rule makes an unexercised fail branch a
-defect, not a pass.
+declared action --- the fails-cascade obligation, never a reversal of history. The firing
+witness asserts the fail branch (\S 2).
 
 The fourth quadrant needs its own witness. A generator that only ever leaves an ex trade
 unsettled at the record date --- the coherent-calendar case --- raises no mirror leg and
@@ -336,8 +321,7 @@ never exercises the ex-settled corner. Branch~4 settles an ex trade before the r
 by construction, so the record-date firing reads the buyer as registered holder against an
 ex entitlement and raises the mirror market-claim leg from buyer to seller
 (Chapter~\ref{ch:settlement}); \texttt{prop\_mirrorClaim\_fires} asserts
-\texttt{raisesMirrorClaim} at $\ge 1\%$ of generated histories, so \S 2's zero-firings rule
-makes an unexercised fourth quadrant a blocking defect, not a silent green. The branch
+\texttt{raisesMirrorClaim} (\S 2). The branch
 models the lawful due-bills regime, where an ex trade can settle before the record date, and
 the property confirms the distribution routes to the entitled seller on the record, not to
 the registered buyer --- the reflection, across the settlement node, of the cum-unsettled
@@ -369,11 +353,8 @@ prop_twoInFlight_fires =                    -- the firing witness, asserted, not
 \end{lstlisting}
 
 When the flag fires the generator overlaps the two dividends by construction ($r_1<r_2<p_1<p_2$),
-so between $p_1$ and $p_2$ exactly one entitlement is live; setting $r$ above the floor and
-wrapping the suite in \texttt{checkCoverage} turns ``two dividends in flight was never
-generated'' into a \emph{failed} run rather than a silent green, and \S 2's zero-firings rule
-makes an unexercised two-in-flight branch a defect. The witnessed firing rate is asserted at
-$\ge 1\%$ of generated histories. On every history that clears the precondition, both
+so between $p_1$ and $p_2$ exactly one entitlement is live, and its firing witness asserts the
+branch (\S 2). On every history that clears the precondition, both
 entitlements are keyed distinctly and live together, paying the first retires its entry alone,
 and the second discharges on its own payment date. The property fails on any design that keeps
 one slot per pair: the second record-date firing would overwrite the first, and the collection
@@ -410,30 +391,24 @@ prop_cascadeIdempotence_fires =            -- the firing witness, asserted, not 
 \end{lstlisting}
 
 When the cascade-flag fires the generator builds an $m\ge 2$-leg cascade and delivers
-it a second time in permuted order, so the twice-delivered branch is reached with
-probability~$r$; setting $r$ well above the floor and wrapping the suite in
-\texttt{checkCoverage} turns ``a multi-leg cascade delivered twice was never
-generated'' into a \emph{failed} run rather than a silent green, and \S 2's
-zero-firings rule makes that a defect, not a pass. The witnessed firing rate is
-asserted at $\ge 1\%$ of generated histories. On every history that clears the
+it a second time in permuted order, and its firing witness asserts the branch (\S 2). On
+every history that clears the
 precondition, the committed identifiers are exactly the cascade's $n$ distinct
 $\mathit{txid}$s --- \emph{all $n$ commit}, because the legs differ in
-$(\mathit{unitId},\mathit{seq})$, and \emph{each exactly once}, because the second,
-reordered delivery recomputes identifiers already on the log. The property fails on
-both broken designs: key idempotence on $\mathit{causeEventId}$ alone and the second
-through $n$th legs never commit (a leg dropped); drop the retry check and the second
-delivery double-commits every leg (a leg duplicated).
+$(\mathit{unitId},\mathit{seq})$, and \emph{each exactly once}, because the reordered
+second delivery recomputes identifiers already on the log. Key idempotence on
+$\mathit{causeEventId}$ alone and legs drop; drop the retry check and every leg
+double-commits --- the property fails on both broken designs.
 
 \paragraph{Independent transactions commute; dependent ones do not.}
 Two adjacent admitted transactions with disjoint footprints swap to bit-identical state;
 two that share a footprint element may not (Proposition~\ref{prop:independent-commute}).
-The pair is tested both ways, and the second half is what keeps the first honest: without
-a witnessed non-commuting case, ``swapping preserves state'' could pass on a generator that
-only ever draws independent pairs, and the harmlessness precondition C-2.7 forces would be
-vacuous. The first property swaps a disjoint pair and asserts the full state --- balances
-and all three homes --- is identical; the second swaps a buy against a record-date event on
-the \emph{same} stock and wallet and asserts the two orders reach \emph{different} state,
-because the entitlement differs.
+The pair is tested both ways, and the second half keeps the first honest: without a
+witnessed non-commuting case, ``swapping preserves state'' could pass on a generator that
+only ever draws independent pairs. The first property swaps a disjoint pair and asserts the
+full state is identical; the second swaps a buy against a record-date event on the
+\emph{same} stock and wallet and asserts the two orders differ, because the entitlement
+differs.
 
 \begin{lstlisting}
 prop_independentSwapInvariant :: History -> Property  -- Prop. 14 (independent commutation)
@@ -469,13 +444,12 @@ Both preconditions are genuine, not tautologies, and the two guard against oppos
 failures. \texttt{genDisjointPair} constructs disjointness by drawing two different units,
 wallets, and agreements, so every generated pair shares no footprint element and the swap
 is provably harmless; a generator that never produced such a pair would let
-\texttt{prop\_independentSwapInvariant} pass without witnessing a single lawful swap, and
-\S 2's zero-firings rule makes that a defect. \texttt{genBuyRecordDate} constructs the
+\texttt{prop\_independentSwapInvariant} pass without witnessing a single lawful swap.
+\texttt{genBuyRecordDate} constructs the
 opposite --- a buy and a record-date event on one stock in one wallet --- so the shared
 footprint makes the entitlement order-dependent; its oracle, \texttt{entitlement . fold},
 is computed independently on each order rather than compared to itself, so a green run means
-the two orders genuinely diverged. The rates $r$ are set well above the floor, and
-\texttt{checkCoverage} asserts each firing at $\ge 1\%$ of generated histories. Together the
+the two orders genuinely diverged. Each firing witness asserts its branch (\S 2). Together the
 pair pins C-2.7 executably: the harmless swap is bit-identical, the dependent swap is not,
 and neither branch is vacuous.
 
@@ -590,7 +564,7 @@ Both share one non-vacuous precondition: the history must contain a \emph{back-d
 observation --- one recorded at a transaction-time position after its valid-time index~$k$,
 with $k$ strictly inside the existing sequence ($k < \text{end}$). A generator that only ever
 appended fixings at the tail would satisfy both properties without ever witnessing a
-correction, and \S 2's zero-firings rule makes that a defect, not a pass. The generator is
+correction. The generator is
 therefore built to reach the branch and to prove it did:
 
 \begin{lstlisting}
@@ -602,11 +576,8 @@ prop_bitemp_fires =                      -- the firing witness, asserted, not ho
   checkCoverage $ cover 1.0 isBackDated "corrective insertion (k < end)" (genBackDated fs)
 \end{lstlisting}
 
-When the late-flag fires the generator constructs $k<\text{end}$ by construction, so the
-corrective-insertion branch is reached with probability~$r$; setting $r$ well above the floor
-and wrapping the suite in \texttt{checkCoverage} turns ``the back-dated branch was never
-generated'' into a \emph{failed} run rather than a silent green. The witnessed firing rate is
-asserted at $\ge 1\%$ of generated histories. On every history that clears the precondition,
+When the late-flag fires the generator constructs $k<\text{end}$ by construction, and its
+firing witness asserts the branch (\S 2). On every history that clears the precondition,
 BITEMP-1 fires and finds the as-known-at view unchanged by the later correction, and BITEMP-2
 fires and finds the as-of view recomputed bit-for-bit --- the two axes exercised, not merely
 asserted. C-12.1 (v1.2) names both answers and delegates their indexing here; BITEMP-1 and BITEMP-2
@@ -713,25 +684,22 @@ prop_noDoubleCount_fires = forAll genMixedHistory $ \h ->  -- witnesses each kin
 
 \texttt{genMixedHistory} interleaves three constructions: a knock that triggers a one-touch, a
 full variation-margin day applied to a future whose declared regime is settled-to-market, and
-the same day applied to a future whose declared regime is collateralised-to-market. Each rate is
-set well above the floor, and \texttt{checkCoverage} turns ``the STM-future branch was never
-generated'' into a \emph{failed} run rather than a silent green. The witnessed firing rate of
-each of the three labels is asserted at $\ge 1\%$ of generated histories, so
+the same day applied to a future whose declared regime is collateralised-to-market. Each of the
+three labels carries its own firing witness (\S 2), so
 \texttt{prop\_noDoubleCount} is exercised on \emph{both} extinguishing kinds --- the OT-1 trigger
 and the settled-to-market future's settlement --- and the collateralised-to-market future is
 exercised as a non-extinguished unit that must price at its last settled level, never at $0$.
-Zero firings on any of the three labels fails the suite. Because \texttt{extinguished} is an
+Because \texttt{extinguished} is an
 extensible predicate rather than a property that holds by construction, each new extinguishing
 lifecycle event-kind must extend \emph{both} the pricing rule (Definition~7.1,
 \S\ref{sec:pricing-state}) \emph{and} the \texttt{extinguished} predicate together, or
 \texttt{prop\_noDoubleCount} silently under-quantifies and stops witnessing the new kind.
 
 \paragraph{Available free mass is non-negative for every wallet, shorts included.}
-The report's available-mass figure is $\max(\mathrm{bal}_{\text{owned}},0)-\sum_G
-\mathrm{bal}_{\text{posted},G}$ (Chapter~\ref{ch:reporting}), the same $\max(\cdot,0)$ the
-coverage invariant carries. Written without the $\max$ it goes negative for a negative-owned
-wallet --- a plain short, or an issuer wallet conservation creates --- contradicting
-Chapter~\ref{ch:invariants}. The property asserts non-negativity on exactly those wallets.
+The report's available-mass figure (Chapter~\ref{ch:reporting}) carries the same
+$\max(\cdot,0)$ as the coverage invariant; without it the figure goes negative for a
+negative-owned wallet --- a plain short, or an issuer wallet conservation creates. The
+property asserts non-negativity on exactly those wallets.
 
 \begin{lstlisting}
 prop_availabilityNonNegative :: History -> Wallet -> Unit -> Property
@@ -753,8 +721,8 @@ prop_availability_fires =        -- the firing witness, asserted, not hoped
 \end{lstlisting}
 
 The negative-owned branch is a genuine precondition: a generator that only ever built long wallets
-would pass \texttt{prop\_availabilityNonNegative} without ever testing the $\max$, and \S 2's
-zero-firings rule makes that a defect. The property reads the Chapter~\ref{ch:reporting} availability
+would pass \texttt{prop\_availabilityNonNegative} without ever testing the $\max$; its firing
+witness asserts the branch (\S 2). The property reads the Chapter~\ref{ch:reporting} availability
 figure itself, not a re-derivation of it: on every negative-owned wallet that figure is zero, never
 negative, and a report that dropped the $\max$ --- shipping $\mathrm{bal}_{\text{owned}}-\sum_G
 \mathrm{bal}_{\text{posted},G}$ --- returns a negative number and fails the property, exactly where
@@ -762,11 +730,10 @@ negative, and a report that dropped the $\max$ --- shipping $\mathrm{bal}_{\text
 point: the door bound and the report figure are two statements, and this test pins the report.
 
 \paragraph{The fail transition has exactly one writer, and no orphan.}
-The walk \texttt{instructed}$\to$\texttt{failed} is written by the settlement-obligation unit's own
-contract --- the one legal writer of its lifecycle node (Chapter~\ref{ch:homes},
-Invariant~\ref{inv:one-writer}) --- on one of two recorded triggers: an external fail notice
-admitted as a moveless observation, or the due-date watch finding no settlement-confirmation
-observation by the deadline. The property asserts the writer and forbids an orphan failed node.
+The walk \texttt{instructed}$\to$\texttt{failed} is written by the settlement-obligation unit's
+own contract, on one of the two recorded triggers of Chapter~\ref{ch:settlement}
+(Invariant~\ref{inv:one-writer}). The property asserts the writer and forbids an orphan
+failed node.
 
 \begin{lstlisting}
 prop_failWriterAttribution :: History -> Property
@@ -789,11 +756,10 @@ node written by any other machine, or with no trigger, fails the property --- th
 one-writer rule forbids.
 
 \paragraph{Venue is a custody wallet, not a coordinate: the mark-to-market fold.}
-Sub-custody across venues is the ordinary partition of a position across wallets, not a new axis
-(Chapter~\ref{ch:valuation}). The mark-to-market NAV is a fold over custody wallets, each priced at
-its venue's official close; the property asserts it equals that per-wallet sum and that the total
-holding is the sum of the custody-wallet balances --- no venue dimension was added to diverge from
-it. It bites when two or more custody wallets hold the same unit at different closes.
+Sub-custody is a wallet partition (Chapter~\ref{ch:valuation}); the mark-to-market NAV is a
+fold over custody wallets, each priced at its venue's official close. The property asserts
+that fold and the absence of any venue axis, and it bites when two or more custody wallets
+hold the same unit at different closes.
 
 \begin{lstlisting}
 prop_navMkFoldsOverCustodyWallets :: History -> Unit -> Property
@@ -813,20 +779,17 @@ prop_navMk_fires =            -- the firing witness, asserted, not hoped
 \end{lstlisting}
 
 When the flag fires the holding is split across custody wallets at differing closes by construction,
-so the cross-venue basis is non-zero and the fold is exercised; the $\ge 1\%$ floor is asserted and
-\S 2's zero-firings rule makes an unexercised multi-venue branch a defect. The property fails on the
+so the cross-venue basis is non-zero and the fold is exercised; its firing witness asserts the
+branch (\S 2). The property fails on the
 design that adds a venue coordinate: the position could then diverge from the wallet-partition sum,
 and \texttt{prop\_navMkFoldsOverCustodyWallets} reports the divergence the single position record
 forbids.
 
 \paragraph{Variance fixings read one-plus-closes, and the off-by-one it refuses.}
-A realised-variance fold over $N$ daily log-returns reads $N+1$ official closes:
-the effective-date reference close $C_0$ plus one close per fixing date
-$C_1,\dots,C_{N}$, with fixing $i$ the return $\ln(C_i/C_{i-1})$. The property
-asserts the count relation directly, that $C_0$ is on the record before fixing 1
-(no return references a missing close), and that the fold sums exactly $N$ squared
-returns. The precondition --- a generated variance swap --- is genuine, and every
-variance-swap history witnesses it.
+A realised-variance fold over $N$ daily log-returns reads $N+1$ official closes ---
+$C_0$ at the effective date, then $C_1,\dots,C_{N}$ (Chapter~\ref{ch:cdm}). The property
+asserts the count relation, that $C_0$ is on the record before fixing 1, and that the fold
+sums exactly $N$ squared returns; every generated variance swap witnesses it.
 
 \begin{lstlisting}
 prop_varianceFixingsReadOnePlusCloses :: History -> Property
@@ -850,20 +813,19 @@ prop_varFixings_fires =                     -- the firing witness, asserted, not
 
 Because $C_0$ is drawn at the effective date and $C_1,\dots,C_N$ one per fixing
 date, every generated variance-swap history clears the precondition by construction,
-so the $\ge 1\%$ floor is met and \S 2's zero-firings rule turns an unwitnessed run
-into a defect. The property fails exactly on the off-by-one design: read $N$ closes
+and its firing witness asserts the branch (\S 2). The property fails exactly on the off-by-one
+design: read $N$ closes
 instead of $N+1$ and $C_0$ goes unnamed, the fold produces $N-1$ returns, and
 \texttt{prop\_varianceFixingsReadOnePlusCloses} reports the missing close the
 reference exists to supply. For $N = 252$ the fold reads $253$ closes and sums $252$
 squared returns.
 
 \paragraph{The record is the log: replay reconstructs every observation.}
-Because every observation enters the log as a moveless observation-recording transaction
-(Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:machines}), re-folding a log prefix
-reconstructs not only balances and the three homes but every recorded observation --- there is no
-second store. The property discards everything but the log and rebuilds the whole record,
-observations included, and compares. A generator that recorded observations outside the log --- a
-second door --- would fail it at once.
+Every observation enters the log as a moveless observation-recording transaction
+(Chapter~\ref{ch:marketdata}), so re-folding a log prefix reconstructs every recorded
+observation --- there is no second store. The property discards everything but the log,
+rebuilds the whole record, and compares; a generator recording observations outside the log
+--- a second door --- fails it at once.
 
 \begin{lstlisting}
 prop_replayReconstructsRecord :: History -> Property
@@ -883,35 +845,31 @@ prop_replayRecord_fires =              -- the firing witness, asserted, not hope
 \end{lstlisting}
 
 Every generated history records at least one observation through the one door, so the precondition
-clears by construction and the $\ge 1\%$ floor is met; \S 2's zero-firings rule turns an unwitnessed
-run into a defect. The property fails exactly on the second-door design: record an observation
+clears by construction and its firing witness asserts the branch (\S 2). The property fails exactly
+on the second-door design: record an observation
 anywhere but the log and \texttt{replayFromLog} cannot rebuild it, and
 \texttt{prop\_replayReconstructsRecord} reports the store the one-door discipline exists to abolish.
 
 \subsection{What an auditor checks}
 
 A candidate implementation satisfies this chapter when the checks above run green over the
-generator universe: the structural invariants of Chapter~\ref{ch:invariants} hold as
+generator universe, each firing witness clearing the $\ge 1\%$ floor (\S 2): the structural
+invariants of Chapter~\ref{ch:invariants} hold as
 invariants and no adversarial history reaches a forbidden state; the economic oracle
 reproduces every recorded transaction from its recorded event, and a seeded divergence is
 repaired only by an authorised compensating transaction, never by an edit; the four product-graph properties confirm that
-watches, state schema, and actions never disagree; the term-adjustment property holds ---
-across a generated split of a referenced underlying the derivative's payoff is invariant and
-no stale-barrier knock fires --- witnessed on at least $1\%$ of histories; moves are shown to
-be the sole balance mutator; a duplicate firing is inert and a late firing folds in at its observation index ---
-identical when reordered against unrelated events, its tail recomputed when reordered within
-its unit's own sequence; firing~127 recomputes bit-for-bit; conservation holds per (unit,
+watches, state schema, and actions never disagree; across a generated split of a referenced
+underlying the derivative's payoff is invariant and no stale-barrier knock fires; moves are the
+sole balance mutator; a duplicate firing is inert and a late firing folds in at its observation
+index --- identical when reordered against unrelated events, its tail recomputed when reordered
+within its unit's own sequence; firing~127 recomputes bit-for-bit; conservation holds per (unit,
 coordinate, agreement) and the cross-agreement netting branch --- post under $G_1$, receive
-under $G_2$, aggregate posted axis zero --- is witnessed on at least $1\%$ of histories, the
-gross-encumbrance read reporting the wallet encumbered where a net read would show zero; two
-dividends in flight are both live in the position-state collection and each retires on its own
-payment date --- witnessed on at least $1\%$ of histories; a coordinated cascade delivered
-twice commits each of its $n$ legs exactly once and all $n$ --- witnessed on at least $1\%$ of
-histories; the
-bitemporal pair BITEMP-1 and BITEMP-2 hold with the back-dated-observation branch
-($k<\text{end}$) witnessed on at least $1\%$ of histories; and the
-knock--revalue--call--discharge model holds its two safety
-invariants
+under $G_2$, aggregate posted axis zero --- reads the wallet encumbered where a net read would
+show zero; two dividends in flight are both live in the position-state collection and each
+retires on its own payment date; a coordinated cascade delivered twice commits each of its $n$
+legs exactly once and all $n$; the bitemporal pair BITEMP-1 and BITEMP-2 hold with the
+back-dated-observation branch ($k<\text{end}$) exercised; and the
+knock--revalue--call--discharge model holds its two safety invariants
 always and its liveness obligation eventually, with sufficiency asserted only as the latter.
 Each is mechanical, each is replayable from a seed, and each fails closed. A property that
 cannot be checked this way is redesigned until it can be: property-based testing is a

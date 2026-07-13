@@ -105,18 +105,15 @@ entitled; meet the record date before buying and the holder is not, so the two o
 reach different state (Chapter~\ref{ch:picture}).
 \end{proposition}
 
-The proof is the disjointness. The fold step is a function of exactly the state cells it
-reads and writes --- its footprint --- and of nothing else. On disjoint footprints $t_1$
-writes only cells $t_2$ neither reads nor writes and conversely, so each step sees the
-same inputs in either order and writes the same outputs; the two compositions agree cell
-by cell. This discharges C-2.7's obligation: the constitution refuses to reorder anything
-unless harmlessness is proved, and disjoint footprints are that proof --- the only case in
-which a swap is harmless. The shared-footprint case is not an exception to be handled but
-a reorder that stays forbidden, and the record-date pair is its witness. Conservation is
-the corollary read on the balance plane alone: independent moves share no balance cell, so
-every coordinate sum survives their swap, each being a sum of paired-leg contributions
-that commute. Permutation invariance and the vanishing coordinate sum are one fact seen
-twice; the first is itself a checkable (metamorphic) property.
+The proof is the disjointness: the fold step is a function of exactly the cells it reads
+and writes, so on disjoint footprints each step sees the same inputs in either order and
+writes the same outputs, and the two compositions agree cell by cell. This discharges
+C-2.7's obligation --- reorder nothing unless harmlessness is proved --- because disjoint
+footprints are that proof, and the shared-footprint case stays forbidden, the record-date
+pair its witness. Conservation is the corollary on the balance plane: independent moves
+share no balance cell, so every coordinate sum survives their swap. Permutation invariance
+and the vanishing coordinate sum are one fact seen twice; the first is itself a checkable
+(metamorphic) property.
 
 \medskip\noindent\textbf{Episode --- the future (T1): variation margin is
 conservation, not a check.}
@@ -370,17 +367,14 @@ that names its parent point. This is the rollback of a bad delivery, not a rewri
 the abandoned lineage is retained, never erased, so the log is append-only \emph{across}
 lineages as well as within one.
 
-The fork is a recorded, authorised fact. The new lineage names its parent point and carries a
-human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability}, raised from a
-single move to a whole lineage --- and both are on the record. Which lineage is authoritative
-is therefore itself a recorded fact, and exactly one is authoritative at any position.
-
-One primitive is shared with the virtual ledger of Chapter~\ref{ch:virtual}: replay to a point
-and build forward on a fresh lineage. The readings differ only in authority. A simulated
-ledger branches to \emph{explore} --- its lineage is never authoritative and nothing settles
-on it (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}); a fork branches to
-\emph{repair} --- its lineage becomes authoritative by the recorded authorisation. One
-mechanism, two readings.
+The fork is a recorded, authorised fact: the new lineage names its parent point and carries
+a human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability}, raised
+from a single move to a whole lineage --- so which lineage is authoritative is itself a
+recorded fact, and exactly one is authoritative at any position. The primitive is shared
+with the simulated ledger (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}): replay
+to a point, build forward on a fresh lineage. A simulated ledger branches to \emph{explore}
+--- never authoritative, nothing settles; a fork branches to \emph{repair} --- authoritative
+by the recorded authorisation. One mechanism, two readings.
 
 \begin{invariant}[Lineage append-only]\label{inv:lineage}
 No committed transaction of any lineage is ever destroyed. A fork adds a lineage and an

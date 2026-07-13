@@ -96,14 +96,11 @@ encumbered position is instead the claim held under the financing agreement.
 Available mass --- the quantity the wallet can still deliver --- is a different
 question, answered by the coverage net $\max(\mathrm{bal}_{\text{owned}},0)-\sum_G
 \mathrm{bal}_{\text{posted},G}$ (Chapter~\ref{ch:invariants}), the same
-$\max(\cdot,0)$ the coverage invariant carries. It is non-negative for
-\emph{every} wallet, because that invariant bounds the signed posted sum by
-$\max(\mathrm{bal}_{\text{owned}},0)$: a negative-owned wallet --- a plain short,
-or an issuer wallet conservation itself creates --- has zero available free mass,
-never a negative figure, and the report cannot show negative free assets because
-the door refused the state that would produce one. Writing $\mathrm{bal}_{\text{owned}}$
-without the $\max$ would make the figure negative for exactly those wallets, contradicting
-Chapter~\ref{ch:invariants}; the $\max$ is what keeps the two chapters one statement.
+$\max(\cdot,0)$ the coverage invariant carries, and non-negative for \emph{every}
+wallet because that invariant bounds the signed posted sum: a negative-owned wallet ---
+a plain short, or an issuer wallet conservation itself creates --- has zero available
+free mass, never a negative figure. Written without the $\max$ the figure would go
+negative for exactly those wallets; the $\max$ keeps the two chapters one statement.
 Encumbrance sums gross, availability nets --- the two are never one figure.
 
 \emph{Re-use, receiver side.} Mass held on the received-as-collateral ray is

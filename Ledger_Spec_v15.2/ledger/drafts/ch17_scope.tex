@@ -130,18 +130,16 @@ settlement-obligation unit} --- a partial settlement leaves some quantity settle
 residual failed, which the single \texttt{instructed}/\texttt{settled}/\texttt{failed} node
 cannot yet split into a settled leg and a failed-residual leg. Named further: the correction
 algebra beyond the single compensating transaction; inter-ledger federation and
-eliminations; \textbf{behavioural-event generation} --- pricing and stress paths driven only
-by generated prices never exercise the events that are \emph{decisions}: a default, an
-elective exercise, an election on a merger; a generator that reaches these states must model
-the deciding party's behaviour, not just the market, and that model is not yet designed;
-\textbf{corporate-action generation} --- a simulated corporate action is not a generated
-price but a generated \emph{terms version}: the split, spin-off, or merger a path invents
-must cross as a notice and drive the term-adjustment operator (Chapter~\ref{ch:marketdata})
-exactly as a real one does, and the generator that produces well-typed terms versions is
-open; \textbf{nested simulation} --- a simulated path that itself branches a simulated
-ledger, as an XVA computation branches a pricing path off each exposure state; the seed
-discipline and result provenance must compose across levels, and that composition is named
-here so it cannot be improvised; and the remaining items of the companion register. Naming
+eliminations; \textbf{behavioural-event generation} --- a generator that reaches the events
+that are \emph{decisions} (a default, an elective exercise, an election on a merger) must
+model the deciding party's behaviour, not just the market, and that model is not yet designed;
+\textbf{corporate-action generation} --- a simulated corporate action is a generated
+\emph{terms version} that must cross as a notice and drive the term-adjustment operator
+(Chapter~\ref{ch:marketdata}) exactly as a real one does, and the generator of well-typed
+terms versions is open; \textbf{nested simulation} --- a simulated path that itself branches
+a simulated ledger (an XVA computation off each exposure state); seed discipline and result
+provenance must compose across levels, named here so it cannot be improvised; and the
+remaining items of the companion register. Naming
 is the whole obligation; each is stated in the open at the chapter it touches, so none is a
 gap hidden inside what the specification does claim.
 
@@ -200,10 +198,9 @@ indistinguishable from an index that was never used:
   Stated at Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:invariants}.
 \end{itemize}
 
-\noindent The index is empty of open conflicts and live in its history: five conflicts were
-parked with exact amendment text, five were decided by the owner, and the resolutions above
-are the evidence. An empty index with no history would signal a mechanism never exercised;
-this one records each exercise. A future conflict parks here the same way.
+\noindent The index is empty of open conflicts and live in its history: five were parked with
+exact amendment text, five decided by the owner, the resolutions above the evidence. A future
+conflict parks here the same way.
 
 \subsection{Authority}
 
