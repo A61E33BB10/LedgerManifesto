@@ -142,7 +142,9 @@ data Trigger
 \end{lstlisting}
 
 The class decides which watch the Monitor evaluates and which inputs the firing
-reads; the signature above is unchanged across all of them. A future exercises
+reads; the signature above is unchanged across all of them. For an \texttt{External}
+observation, which contract fires is not improvised: it is the routing the data-kind
+registry declares for that event's kind (Chapter~\ref{ch:marketdata}). A future exercises
 two of the classes on one instrument.
 
 \subsection{The future: settlement prints and the expiry unwind}

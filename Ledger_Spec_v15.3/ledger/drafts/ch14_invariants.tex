@@ -393,19 +393,15 @@ which one is itself a recorded fact.
 
 \subsection{The record is the log}\label{sec:record-is-log}
 
-Replay reconstructs more than balances and the three homes. Because every observation
-whose reproduction the framework guarantees enters the log as a moveless
-observation-recording transaction (Chapters~\ref{ch:objects} and~\ref{ch:marketdata}),
-re-folding a log prefix reconstructs every recorded observation as well --- the record
-\emph{is} the log, with no second store to reconcile against. The single-writer
-discipline (Invariant~\ref{inv:writer}) therefore covers every observation, not only
-every move, and the ``two views of one log'' of Chapter~\ref{ch:picture} is exact: the
-Record the \texttt{watch} arrow reads and the Ledger the \texttt{contract} and
-\texttt{apply} arrows consume are the same folded log. Chapter~\ref{ch:testability}
-exercises this as \texttt{prop\_replayReconstructsRecord}, which regenerates the whole
-record --- observations included --- from the log alone and compares. The observation
-stream is therefore no second half of the record with a door of its own: there is one door,
-and it is the Transaction Executor.
+Replay reconstructs more than balances and the three homes. Every guaranteed observation
+enters the log as a moveless observation-recording transaction
+(Chapter~\ref{ch:marketdata}), so re-folding a prefix reconstructs every recorded
+observation as well --- the record \emph{is} the log, no second store, and the
+single-writer discipline (Invariant~\ref{inv:writer}) covers every observation.
+Chapter~\ref{ch:testability} exercises this as
+\texttt{prop\_replayReconstructsRecord}, rebuilding the whole record from the log alone.
+The observation stream is no second half of the record with a door of its own: there is
+one door, and it is the Transaction Executor.
 
 \subsection{The coverage invariant and the two-guard contrast}
 

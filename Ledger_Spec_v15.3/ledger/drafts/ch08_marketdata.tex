@@ -52,19 +52,16 @@ throughout this chapter:
 \subsection{The observation door is the one door}\label{sec:obs-door}
 
 No data enters the ledger as a bare read, and no data enters through a door of its own.
-All data crosses as a recorded \textbf{observation} carrying its provenance: the source
-that published it, the time it was observed, and the basis frame it was observed in.
-Crossing is not a second admission path beside the transaction door. An untrusted
-ingestion contract \emph{proposes} a moveless \textbf{observation-recording transaction}
---- a transaction with an empty move list whose effect is to fold the observation into a
-home (Chapter~\ref{ch:homes}) --- and the one Transaction Executor
-(Chapter~\ref{ch:machines}) admits or refuses it, exactly as it admits or refuses any
-transaction. \emph{The record is the log}: there is no separate observation store, and the
-single-writer discipline of \S5 therefore reaches every observation, not only every move.
-This is the door Chapters~\ref{ch:valuation} and~\ref{ch:virtual} refer to when a mark or
-a stamped level ``enters through the observation door.'' A read against a live feed leaves
-no record and is therefore unreproducible; a recorded observation is a fact of the log, so
-every downstream number is a function of the record alone (\S 12).
+All data crosses as a recorded \textbf{observation} carrying its provenance --- source,
+observation time, basis frame. An untrusted ingestion contract \emph{proposes} a moveless
+\textbf{observation-recording transaction} --- empty move list, folding the observation
+into a home (Chapter~\ref{ch:homes}) --- and the one Transaction Executor admits or
+refuses it like any transaction. \emph{The record is the log}: no separate observation
+store, and the single-writer discipline of \S5 reaches every observation. This is the door
+Chapters~\ref{ch:valuation} and~\ref{ch:virtual} name when a mark ``enters through the
+observation door.'' A bare read against a live feed leaves no record and is unreproducible;
+a recorded observation is a fact of the log, so every downstream number is a function of
+the record alone (\S 12).
 
 \begin{lstlisting}
 data Provenance  = Provenance { source :: SourceId, observed :: Time, basis :: BasisRef }
@@ -125,12 +122,28 @@ A kind is registered once, before any data of that kind crosses, with a componen
 declaration: each component's dimension --- price-in-basis, proportional, or quantity ---
 and the quotation convention it renders. Registration is immutable: a correction is a new
 kind plus a retirement of the old, never an edit, so no data ever changes dimension under
-a reader's feet. Data whose kind is not registered is refused at the door.
+a reader's feet. Data of an unregistered kind is not silently framed: the arrival is
+quarantined, its processing refused (W4, Section~\ref{sec:failures}), never dropped.
+
+The registry has a second column under the same immutable discipline: the \textbf{event
+kind} --- the kind of thing that fires a contract: a split, a fixing, a fill, an external
+fail notice. The kinds of event the system can process form a finite, closed, declared set
+(constitution C-4.12, ratified 2026-07-14); a kind is registered, on the record, before any
+event of it crosses, and registration names its \textbf{routing} --- the contract or
+contracts that must fire on it, total at registration: a kind cannot register without a
+router. ``Fires the responsible contract'' (Chapter~\ref{ch:machines}) is thereby a
+declared fact, not an assumption. One cause may route to many units --- one ACME dividend,
+one firing per referencing unit --- separated by the cause-derived identifier. Closed and
+declared, the event-kind set is the alphabet of the paths that could have occurred: what
+makes the generated-event universe and the simulation sample space well defined (C-2.8).
 
 \begin{lstlisting}
 data Dim      = Price | Proportional | Quantity          -- component dimensions
 data Reading  = Reading { kind :: KindId, comps :: [(Dim, Integer)] }  -- exact minor units
 data IngestError = UnknownUnit | UndeclaredConvention | UnregisteredKind
+data Routing  = Routing { eventKind :: EventKind, fires :: NonEmpty ContractId }
+-- second column: every registered event kind names the contract(s) that must fire;
+-- a kind cannot register without a router --- routing is total at registration.
 -- the market data operator acts on Price components; Proportional stands; Quantity is
 -- walled off to the move plane (Chapter 3) and is never carried on the value frame.
 \end{lstlisting}
@@ -178,8 +191,9 @@ The first mechanism is that this declaration is \emph{total}.
 For every registered data kind and every event kind the boundary admits, an operator is
 declared --- the identity operator where a kind is genuinely unaffected, but declared, not
 assumed. There is no (data kind, event kind) pair for which a read finds the adjustment
-undefined. A corporate action whose pairing has no declared operator does not cross: it is
-refused at the door, never silently treated as identity.
+undefined. A corporate action whose pairing has no declared operator is not processed: the
+arrival is recorded as a quarantined event and its adjustment refused (W4), never silently
+treated as identity.
 \end{principle}
 
 Totality is what turns ``never improvised at read'' into a checkable property. An
@@ -452,8 +466,9 @@ W2 & late data & recorded at its observation-time coordinate; values derived ove
 W3 & contradictory sources & sources diverging beyond the declared threshold yield a \\
    &                       & flagged ``aggregation failed'' observation, never a silent \\
    &                       & pick; sources and threshold are recorded \\
-W4 & unmappable event & a pairing with no declared operator, or data of an \\
-   &                  & unregistered kind, is refused at the door (Principle~\ref{prin:sched-total}) \\
+W4 & unroutable or & the arrival is recorded as a \textbf{quarantined event}, a \\
+   & unmappable event & moveless provenance-carrying fact, and its \emph{processing} \\
+   &                  & is refused --- the refusal on the record; fail-closed, nothing lost \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -485,7 +500,20 @@ threshold is a governance parameter, recorded and calibrated, not a silent const
 correlated stress --- every venue diverging at once --- it defers valuation book-wide rather
 than choose a number, an intended fail-closed whose calibration is a governance matter, not a
 hidden behaviour. W4 is
-adjustment-schedule totality enforced: the undeclared pairing cannot cross.
+totality enforced without loss. An event of an undeclared kind, an unresolvable reference,
+or a pairing with no declared operator (Principle~\ref{prin:sched-total}) is neither
+silently dropped nor silently guessed: it crosses the one door as a quarantined event ---
+a moveless recorded fact carrying its provenance --- and its \emph{processing} is refused,
+the refusal itself a fact of the record. The system still stops rather than improvises
+(\S2); it no longer forgets what it stopped on. The quarantined event mints a visible,
+deadline-bearing open item and stands until its kind is registered or a person disposes of
+it (C-12.4 phase-0, constitution C-4.12).
+
+When the kind is later registered, or a person disposes, the arrival is processed then: the
+processing transaction's cause is the recorded quarantined event --- idempotent under the
+cause-derived identifier, carrying the quarantined event's own valid-time coordinate (W2
+above). The registry is versioned declared data read in force at each log position, so
+replay across its evolution is deterministic: every reader computes one answer.
 
 \subsection{The boundary-convention slot}\label{sec:slot}
 
@@ -521,7 +549,7 @@ chapter's duty is discharged by declaring the slot and its totality obligation.
 
 \subsection{What an auditor checks}
 
-A candidate implementation satisfies this chapter when six things hold, each mechanically
+A candidate implementation satisfies this chapter when seven things hold, each mechanically
 checkable over generated data and histories: all data on the record carries provenance,
 and no valuation reads data that does not (Section~\ref{sec:obs-door}); every data kind
 is registered with component dimensions before it crosses, and an unregistered kind is
@@ -531,8 +559,10 @@ event kind) pair, and an undeclared pairing is refused, not defaulted to identit
 recomputed at read from the original under the declared operators
 (Sections~\ref{sec:menu}--\ref{sec:recompose}); the invariance witness holds across every
 generated corporate action, and a stale-frame or wrong-side-of-ex read is refused
-(Section~\ref{sec:witness}); and each of W1--W4 produces its determined disposition on
-replay (Section~\ref{sec:failures}). These restate as minima in
+(Section~\ref{sec:witness}); each of W1--W4 produces its determined disposition on
+replay (Section~\ref{sec:failures}); and every unroutable or unmappable arrival is recorded
+as a quarantined event, never dropped, and re-processes deterministically once its kind is
+registered (Sections~\ref{sec:registry},~\ref{sec:failures}). These restate as minima in
 Chapter~\ref{ch:requirements}. The boundary is then closed: what crosses it is recorded,
 framed, and replayable, and the conservation the rest of the specification proves rests on
 solid ground.

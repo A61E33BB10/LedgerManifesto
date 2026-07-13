@@ -155,16 +155,12 @@ least of all.
 
 \paragraph{Conservation at agreement grain, and the netting collapse it catches.}
 Conservation is checked at the finest grain the coordinate vector has --- per (unit,
-coordinate, agreement), Theorem~\ref{thm:conservation} --- not at the aggregate (unit,
-coordinate) grain. The distinction has teeth precisely on the cross-agreement history it
-catches: a wallet posts 100 of a unit under agreement $G_1$ and receives 100 of the
-same unit under a different agreement $G_2$, so the aggregate posted coordinate nets to
-zero. Both the aggregate law and the finer law hold on that history --- each per-agreement
-coordinate is conserved across wallets, and so is their sum --- but a report or property
-that reads only the aggregate posted axis sees zero and passes \emph{vacuously}, reporting
-a fully encumbered wallet as unencumbered (Chapter~\ref{ch:reporting}). The finer law keeps
-$\mathrm{bal}_{\text{posted},G_1}=+100$ and $\mathrm{bal}_{\text{posted},G_2}=-100$ as two
-coordinates, and the gross-encumbrance property reads them as $100$, not $0$.
+coordinate, agreement), Theorem~\ref{thm:conservation}. The teeth are the cross-agreement
+history: post 100 under $G_1$, receive 100 under $G_2$, aggregate posted axis zero. A
+property reading only the aggregate sees zero and passes \emph{vacuously}, reporting a
+fully encumbered wallet as unencumbered (Chapter~\ref{ch:reporting}); the finer law keeps
+$+100$ and $-100$ as two coordinates, and the gross-encumbrance property reads them as
+$100$, not $0$.
 
 \begin{lstlisting}
 prop_conservation :: History -> Unit -> Coord -> Agreement -> Property  -- Theorem 14.1
@@ -251,15 +247,13 @@ object; these four properties are the statement, made executable, that its three
 never disagree.
 
 \paragraph{Term adjustment on a corporate action, and the phantom knock it refuses.}
-One out-edge every referencing unit declares is the corporate-action edge
-(Chapter~\ref{ch:objects}, Section~\ref{sec:termsheet-graphs}): across a split of a referenced
-underlying, its action appends a new ProductTerms version carrying each referencing term
-through the term-adjustment operator (Chapter~\ref{ch:marketdata}). The edge carries its own
-executable witness --- the derivative reading of the invariance witness
-(Invariant~\ref{inv:consistency}): the derivative's payoff read on the appended terms equals
-its payoff read on the pre-event terms, and no guard fires that the pre-event terms would not
-have fired. The precondition --- a generated derivative \emph{and} a generated corporate action
-on the unit its terms reference --- is a genuine one, not a tautology.
+Across a split of a referenced underlying, the corporate-action edge
+(Section~\ref{sec:termsheet-graphs}) appends a new ProductTerms version through the
+term-adjustment operator (Chapter~\ref{ch:marketdata}), and it carries its own executable
+witness (Invariant~\ref{inv:consistency}): the payoff read on the appended terms equals the
+payoff on the pre-event terms, and no guard fires that the pre-event terms would not have
+fired. The precondition --- a generated derivative \emph{and} a generated corporate action
+on its referenced underlying --- is genuine, not a tautology.
 
 \begin{lstlisting}
 prop_termAdjustmentInvariance :: History -> Property
@@ -289,16 +283,11 @@ reports the phantom the edge exists to refuse.
 
 \paragraph{The settlement-obligation graph, and the fail branch it must walk.} The
 settlement-obligation unit (Chapter~\ref{ch:settlement}) is a product graph like any
-other: its nodes are \texttt{instructed}, \texttt{settled}, and \texttt{failed}, and the
-four properties above (Invariant~\ref{inv:graph-consistency}) test its three interpreters
-for agreement --- no new machinery. What the generator must not leave unwitnessed is the
-off-happy-path walk: the \texttt{instructed}$\to$\texttt{failed} edge, on which the same
-unit \emph{becomes} the fails-cascade obligation (Chapter~\ref{ch:collateral}, \S9.3); the
-\texttt{instructed}-node record-date branch on which a cum trade raises the market-claim
-leg; and the \texttt{settled}-node record-date branch on which an ex trade raises the
-mirror market-claim leg --- the fourth quadrant. A generator that only ever settles, or
-only ever leaves an ex trade unsettled, would satisfy the four properties without
-exercising these.
+other, tested by the four properties above (Invariant~\ref{inv:graph-consistency}) --- no
+new machinery. What the generator must not leave unwitnessed is the off-happy-path walk:
+the fail edge, the cum record-date branch, and the fourth-quadrant mirror branch, each
+constructed below; a generator that only ever settles would satisfy the four properties
+without exercising any of them.
 
 \begin{lstlisting}
 genSettlementHistory :: Gen History
@@ -340,12 +329,11 @@ the registered buyer --- the reflection, across the settlement node, of the cum-
 market claim.
 
 \paragraph{The position-state collection: two entitlements in flight, each retiring alone.}
-PositionState holds not one fact per (wallet, unit) pair but a collection keyed by the
-cause-derived identifier (Chapter~\ref{ch:homes}). The guarantee that makes the key
-load-bearing is that two entitlements can be live on one pair at once and each retires exactly
-when its own obligation discharges --- never early, never on the other's discharge. A generator
-that declares only one dividend at a time would satisfy every balance property without ever
-placing two facts in one slot.
+PositionState holds a collection keyed by the cause-derived identifier
+(Chapter~\ref{ch:homes}): two entitlements can be live on one (wallet, unit) pair at once,
+each retiring exactly when its own obligation discharges. A generator that declares only one
+dividend at a time would satisfy every balance property without ever placing two facts in
+one slot.
 
 \begin{lstlisting}
 prop_twoEntitlementsRetireIndependently :: History -> Property
@@ -373,14 +361,10 @@ one slot per pair: the second record-date firing would overwrite the first, and 
 could never hold the two the routine Tuesday puts in flight.
 
 \paragraph{The coordinated cascade: delivered twice, each leg once, all $n$ committed.}
-One cause can move many units. A single corporate action fires the contract once per
-affected unit and proposes one transaction per unit --- a cascade of $n$ legs tied
-together by their shared $\mathit{causeEventId}$, yet each carrying its own identifier
-$\mathit{txid}=H(\mathit{causeEventId},\mathit{contractId},\mathit{unitId},\mathit{seq})$
-(Chapter~\ref{ch:machines}). Idempotence keyed on the event would suppress every leg
-but the first; idempotence keyed on the $\mathit{txid}$ commits all $n$ and each
-exactly once. The property asserts both directions --- no leg dropped, no leg
-duplicated --- by delivering the whole cascade twice, reordered.
+One cause can move many units: a cascade of $n$ legs sharing one $\mathit{causeEventId}$,
+each with its own $\mathit{txid}$ (the derivation rule of Chapter~\ref{ch:machines}).
+The property asserts both directions --- no leg dropped, no leg duplicated --- by
+delivering the whole cascade twice, reordered.
 
 \begin{lstlisting}
 prop_cascadeIdempotence :: History -> Property
@@ -664,16 +648,13 @@ the other a liveness obligation asserted eventually, and a model that confused t
 unsound in the direction that either fabricates breaches or hides them.
 
 \paragraph{NoDoubleCount fires over every extinguishing event.}
-\texttt{NoDoubleCount} quantifies over units, not over one instrument, so it must be witnessed
-on every kind of lifecycle event that extinguishes an exposure --- and a property whose
-precondition is never generated passes without seeing anything. Two kinds extinguish. OT-1's
-barrier touch is one: a triggered one-touch prices at $0$. The day's settlement of a
-settled-to-market future is the other: once the variation margin is owned cash the future's
-exposure is gone, so it prices at $0$ too, and marking it against the futures level would count
-the day's move a second time --- exactly the double-count \S\ref{sec:pricing-state} forbids. A
-collateralised-to-market future is the contrast that keeps the predicate honest: its return
-obligation survives the settlement, so it is \emph{not} extinguished, and it prices against the
-last settled level; the generator must produce it, and the property must not zero it. The
+\texttt{NoDoubleCount} quantifies over units, so it must be witnessed on every extinguishing
+kind. Two kinds extinguish: OT-1's barrier touch (a triggered one-touch prices at $0$) and
+the settled-to-market future's daily settlement (the exposure is owned cash; marking against
+the futures level would double-count, \S\ref{sec:pricing-state}). The
+collateralised-to-market future is the honest contrast: its return obligation survives, it
+is \emph{not} extinguished, and it prices at the last settled level --- the generator must
+produce it and the property must not zero it. The
 signatures below are Haskell illustration --- the executable form of \texttt{NoDoubleCount} and
 its firing regime, kept separate from the TLA\textsuperscript{+}-style model above so the two
 notations do not run together in one block:
@@ -864,6 +845,53 @@ on the second-door design: record an observation
 anywhere but the log and \texttt{replayFromLog} cannot rebuild it, and
 \texttt{prop\_replayReconstructsRecord} reports the store the one-door discipline exists to abolish.
 
+\paragraph{The event door: one registry, mandatory routing, and the quarantine that never drops.}
+Every arriving external event is recorded, or its refusal recorded; a kind registers only with
+routing defined for it, and an event of an unregistered kind is parked as a \emph{quarantined
+event} --- never dropped, never a bare value (C-4.12). Four properties pin the door.
+
+\begin{lstlisting}
+prop_registryTotality :: Registration -> Registry -> Property
+prop_registryTotality r reg =
+      lacksRouter r ==> refusedAtDoor r                                -- router-less: refused
+  .&&. conjoin [ isJust (routerFor reg k) | k <- registeredKinds reg ] -- admitted: routing total
+  -- the refusal is the DOOR's, not the constructor's (not x===x).
+genRegistration :: Gen Registration  -- draw a router-flag rate r: when it fires OMIT the router.
+prop_registryTotality_fires =
+  checkCoverage $ cover 1.0 lacksRouter "registration without a router -> refused" genRegistration
+prop_routingDeterminism :: History -> Property
+prop_routingDeterminism h = hasCapturedEvents h ==>
+  routeAll (replayFromLog (logOf h)) === recordedRouting h
+  -- replay-vs-recorded routing: an independent oracle (not x===x).
+genCapturedHistory :: Gen History  -- capture >=1 event of a REGISTERED kind; replay the prefix twice.
+prop_routingDeterminism_fires =
+  checkCoverage $ cover 1.0 hasCapturedEvents "a captured event routed on replay" genCapturedHistory
+prop_quarantineNeverDrop :: History -> Property
+prop_quarantineNeverDrop h =
+      length (arrivals h) === length (recordedOrQuarantined h)         -- nothing dropped
+  .&&. all (\q -> hasProvenance q && hasOpenItem q) (quarantined h)    -- each visible, deadline-bearing
+  -- arrivals h is the generator's INDEPENDENT delivered-count, never read back from the log.
+genUnregisteredArrivals :: Gen History  -- unregistered-kind flag rate r: deliver an off-registry kind.
+prop_quarantineNeverDrop_fires =
+  checkCoverage $ cover 1.0 hasUnregisteredArrival
+    "unregistered-kind event delivered -> recorded as a quarantined event" genUnregisteredArrivals
+prop_lateRegistrationReplay :: History -> Property
+prop_lateRegistrationReplay h = registersAfterQuarantine h ==>
+      fullState (replayFromLog (logOf h)) === fullState (fold h)       -- replay bit-identical
+  .&&. asKnownAt (beforeRegistration h) h === showsQuarantined h       -- pre-reg view still parks it
+  -- replay-vs-fold (not x===x); parked processing keyed on the quarantined event's cause.
+genLateRegistration :: Gen History  -- late-reg flag rate r: quarantine an off-registry event,
+  -- THEN register its kind+router, THEN process the parked event (cause = the quarantined
+  -- event), delivered TWICE (idempotence).
+prop_lateRegistrationReplay_fires =
+  checkCoverage $ cover 1.0 registersAfterQuarantine
+    "kind registered after quarantine -> parked event processed once, replay bit-identical" genLateRegistration
+\end{lstlisting}
+
+Each firing witness asserts its branch (\S 2): drop the routing-total conjunct and a
+router-less kind admits; drop the arrival count and a silent drop passes; key the parked
+processing on arrival rather than the quarantined event's cause and replay diverges.
+
 \subsection{What an auditor checks}
 
 A candidate implementation satisfies this chapter when the checks above run green over the
@@ -882,7 +910,11 @@ under $G_2$, aggregate posted axis zero --- reads the wallet encumbered where a 
 show zero; two dividends in flight are both live in the position-state collection and each
 retires on its own payment date; a coordinated cascade delivered twice commits each of its $n$
 legs exactly once and all $n$; the bitemporal pair BITEMP-1 and BITEMP-2 hold with the
-back-dated-observation branch ($k<\text{end}$) exercised; and the
+back-dated-observation branch ($k<\text{end}$) exercised; every arriving external event is
+recorded or refused, no event kind registers without routing defined for it, an event of an
+unregistered kind is parked as a quarantined event with provenance and an open item rather than
+dropped, and a kind registered after quarantine processes its parked event once with replay
+bit-identical; and the
 knock--revalue--call--discharge model holds its two safety invariants
 always and its liveness obligation eventually, with sufficiency asserted only as the latter.
 Each is mechanical, each is replayable from a seed, and each fails closed. A property that

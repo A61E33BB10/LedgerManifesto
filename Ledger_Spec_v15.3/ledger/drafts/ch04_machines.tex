@@ -83,11 +83,18 @@ it captures the events arriving from outside --- trades executed in the market,
 corporate-action notices, fixings and other observations --- and \emph{proposes}
 their recording: an observation crosses as a moveless observation-recording
 transaction (Chapter~\ref{ch:marketdata}), which the Transaction Executor admits
-or refuses like any other. Second, for each event, arrived or emitted, it fires the
-responsible smart contract, handing it the event together with the current
-projection of the ledger, and collects the proposed transaction. Many
+or refuses like any other. Second, for each event, arrived or emitted, it fires the contracts the registry's
+routing names for that event's kind (Chapter~\ref{ch:marketdata}), handing each the event
+together with the current projection of the ledger, and collects the proposed transaction.
+The Executor never decides routing; it reads it from the registry, and \emph{responsible}
+is a defined word --- the contract or contracts the registration names. Many
 contracts, one Events Executor: the contracts carry all the product knowledge;
 the Events Executor carries none.
+
+A captured arrival whose event kind is registered routes as above. One whose kind is
+undeclared, or whose reference the record cannot resolve, is still recorded --- as a
+\textbf{quarantined event}, the record-then-refuse-processing discipline of failure mode
+W4 (Chapter~\ref{ch:marketdata}): never routed, never lost.
 
 A trigger carries timing, not data: the firing says \emph{when}, and everything
 the event means is read from the record. The Events Executor runs the

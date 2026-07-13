@@ -105,18 +105,13 @@ Encumbrance sums gross, availability nets --- the two are never one figure.
 
 \emph{Re-use, receiver side.} Mass held on the received-as-collateral ray is
 available for re-use \emph{where the governing agreement grants a right of use}.
-Actual re-use is read from re-pledge moves, each of which
-carries a source-agreement reference beside its governing reference
-(Chapter~9); the source is an observable fact of the custody instruction, so
-nothing fictitious is stored, and received, re-used, and available project as
-per-(unit, agreement) actuals. Collateral received under a security interest
-\emph{without} right of use (Constitution~C-8.8, segregated cash included) must
-not be re-used, and the current coverage net does not yet gate re-use by the
-right-of-use term --- it bounds re-posting by possession alone, so it would
-\emph{admit} a re-post of segregated mass. That gap between C-8.8 and the coverage
-net is a named open problem (Chapter~\ref{ch:scope}), stated here in the open rather
-than papered over; until the right-of-use gate is built, an implementation of this
-specification must not enable collateral re-use --- the constraint is live and
+Actual re-use is read from re-pledge moves, each carrying a source-agreement reference
+beside its governing reference (Chapter~9), so received, re-used, and available project as
+per-(unit, agreement) actuals. Collateral received \emph{without} right of use
+(Constitution~C-8.8, segregated included) must not be re-used, and the coverage net does
+not yet gate re-use by the right-of-use term --- it would admit a re-post of segregated
+mass. That gap is a named open problem (Chapter~\ref{ch:scope}), stated in the open;
+until the gate is built, an implementation must not enable collateral re-use --- live and
 blocking, not a label.
 
 \emph{Fungible received mass.} Title-transfer received cash and securities land

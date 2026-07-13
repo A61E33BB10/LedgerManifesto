@@ -372,8 +372,9 @@ and the market claim is not withdrawn. The walk has exactly one writer, and it i
 named: the settlement-obligation unit's own smart contract, the one legal writer of
 that unit's lifecycle node (Chapter~\ref{ch:homes}, Invariant~\ref{inv:one-writer}).
 It proposes the transition on one of two recorded triggers --- an external fail
-notice, admitted through the one door as a moveless observation-recording transaction
-(Chapter~\ref{ch:marketdata}), or the due-date watch firing and finding the cumulative
+notice, a registered event kind whose routing names this settlement-obligation unit's
+contract (Chapter~\ref{ch:marketdata}), admitted through the one door as a moveless
+observation-recording transaction, or the due-date watch firing and finding the cumulative
 confirmed settled quantity short of the instructed quantity by the deadline. The
 second trigger reads quantity, not mere presence, so a partial settlement --- some
 delivered, a residual failed --- fires it on the unmet residual rather than passing
