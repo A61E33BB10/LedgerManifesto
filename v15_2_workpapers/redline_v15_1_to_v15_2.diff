@@ -516,7 +516,7 @@
  
  \emph{Re-use, receiver side.} Mass held on the received-as-collateral ray is
 --- Ledger_Spec_v15.1/ledger/drafts/ch14_invariants.tex	2026-07-13 07:51:12.401874418 +0100
-+++ Ledger_Spec_v15.2/ledger/drafts/ch14_invariants.tex	2026-07-13 23:28:18.983738966 +0100
++++ Ledger_Spec_v15.2/ledger/drafts/ch14_invariants.tex	2026-07-13 23:37:55.247412154 +0100
 @@ -1,7 +1,7 @@
  % Chapter 14 — The Invariant Catalogue (NOETHER). Budget 6 pp. Discharges §11 and §12.
  \section{The Invariant Catalogue}\label{ch:invariants}
@@ -542,7 +542,7 @@
  
  \begin{proof}
  Induction on the log. \emph{Base:} the empty log gives every $(u,c,G)$ coordinate a sum of
-@@ -86,11 +87,33 @@
+@@ -86,11 +87,40 @@
  \end{lstlisting}
  
  The word \emph{conservation} is exact: the vanishing sum is the quantity a
@@ -552,18 +552,25 @@
 -Permutation invariance of independent moves and the vanishing coordinate sum are
 -one fact seen twice; the first is itself a checkable (metamorphic) property.
 +symmetry of the log preserves. That symmetry is stronger than conservation alone. A
-+transaction's \emph{footprint} is everything its fold step reads or writes across the
-+four kinds of change it may bundle: the (wallet, unit, coordinate, agreement) balance
-+cells its moves touch, and the UnitStatus, PositionState, and ProductTerms targets its
-+unit-state, position-state, and terms changes touch. Two adjacent admitted transactions
-+whose footprints are disjoint do not merely leave every coordinate sum unchanged when
-+swapped --- they leave the whole state bit-identical.
++transaction's \emph{footprint} is everything its fold step --- the door's admission
++checks included --- reads or writes: it writes the (wallet, unit, coordinate, agreement)
++balance cells its moves touch and the three homes' targets its other changes touch, and
++it reads more --- a marker move at $(w,u)$ is admitted against the coverage net over
++\emph{all} agreements (Invariant~\ref{inv:coverage}), so its read-set takes the whole
++$(w,u)$ posted and lent fibres with $(w,u)$ owned, and an owned reduction symmetrically
++reads the marker fibres it must not breach. Two moves on one $(w,u)$ under different
++agreements therefore never have disjoint footprints, though their cells differ --- the
++rehypothecation chain is order-sensitive for exactly this reason. Two adjacent admitted
++transactions whose footprints --- reads and writes alike --- are disjoint leave the
++folded state bit-identical when swapped, not merely every coordinate sum unchanged.
 +
 +\begin{proposition}[Independent commutation]\label{prop:independent-commute}
 +Let $t_1$ and $t_2$ be adjacent admitted transactions with disjoint footprints ---
-+disjoint balance cells, and disjoint UnitStatus, PositionState, and ProductTerms
-+targets. Then applying $t_1$ then $t_2$ and applying $t_2$ then $t_1$ yield
-+bit-identical resulting state. Transactions that share any footprint element may not be
++disjoint read-sets and write-sets, at fibre grain on the guarded coordinates as defined
++above. Then applying $t_1$ then $t_2$ and applying $t_2$ then $t_1$ yield the
++bit-identical \emph{folded state} --- balances and the three homes; the log's byte-image
++differs under the swap, because the hash chain is position-dependent, and is no part of
++the claim. Transactions that share any footprint element may not be
 +presumed to commute: buy shares before a dividend's record date and the holder is
 +entitled; meet the record date before buying and the holder is not, so the two orders
 +reach different state (Chapter~\ref{ch:picture}).
@@ -581,20 +588,21 @@
  
  \medskip\noindent\textbf{Episode --- the future (T1): variation margin is
  conservation, not a check.}
-@@ -152,8 +175,10 @@
+@@ -152,8 +182,11 @@
    exists at which $20{,}000$ shares stand beside pre-split terms
    (Chapter~\ref{ch:objects}).
  \item \textbf{Append-only and hash-chained.} An admitted transaction is never
 -  edited or removed; a mistake is repaired by a compensating transaction that
 -  names what it supersedes. Each entry carries the hash of its predecessor, so
 +  edited or removed; a mistake is repaired forward by a compensating transaction that
-+  names what it supersedes and carries a recorded human authorisation before it fires
++  names what it supersedes and is agreed with the counterparty and carries a recorded human
++  authorisation before it fires
 +  (constitution C-12.4; the forward-repair discipline of Chapter~\ref{ch:testability}).
 +  Each entry carries the hash of its predecessor, so
    any alteration of history breaks the chain and is detectable
    (Chapter~\ref{ch:objects}).
  \item \textbf{Determinism of every arrow.} Each of the three arrows --- watch,
-@@ -252,9 +277,10 @@
+@@ -252,9 +285,10 @@
  
  \subsection{Time travel and replay}
  
@@ -608,7 +616,7 @@
  
  \begin{theorem}[Time travel]\label{thm:timetravel}
  Every historical state of the ledger is the fold of the log along two axes: a
-@@ -296,8 +322,8 @@
+@@ -296,8 +330,8 @@
  forward. The two folds traverse the same observations in two different orders, and each is
  a deterministic function of the prefix; a party recomputes either one and obtains the same
  bits. Confusing them --- folding a back-dated close in log order, or asserting the log-order
@@ -619,7 +627,7 @@
  
  \begin{theorem}[Replay determinism]\label{thm:replay}
  Discarding the ledger and the three homes and re-folding a log prefix reproduces
-@@ -323,15 +349,38 @@
+@@ -323,15 +357,39 @@
  witness that the as-known-at view holds while the as-of view recomputes --- and
  this catalogue does not restate the test.
  
@@ -651,7 +659,8 @@
 +lineages as well as within one.
 +
 +The fork is a recorded, authorised fact: the new lineage names its parent point and carries
-+a human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability}, raised
++a recorded human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability},
++counterparty agreement and personal authorisation alike, raised
 +from a single move to a whole lineage --- so which lineage is authoritative is itself a
 +recorded fact, and exactly one is authoritative at any position. The primitive is shared
 +with the simulated ledger (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}): replay
@@ -668,7 +677,7 @@
  \subsection{The record is the log}\label{sec:record-is-log}
  
 --- Ledger_Spec_v15.1/ledger/drafts/ch15_testability.tex	2026-07-13 07:53:03.301257124 +0100
-+++ Ledger_Spec_v15.2/ledger/drafts/ch15_testability.tex	2026-07-13 23:29:14.374227756 +0100
++++ Ledger_Spec_v15.2/ledger/drafts/ch15_testability.tex	2026-07-13 23:37:55.247412154 +0100
 @@ -1,5 +1,5 @@
  % Chapter 15 — Testability and the Executable-Check Regime (WILSON). Budget 5.5 pp.
 -% Discharges Constitution v1.1 §13 (two layers of correctness) and the §2 Testability commitment.
@@ -676,7 +685,7 @@
  \section{Testability and the Executable-Check Regime}\label{ch:testability}
  
  This chapter discharges constitution clauses C-13.1--C-13.3 (the two layers of correctness) and the Testability commitment C-2.5 (jointly with Chapter~\ref{ch:objective}). The claim it makes good is the constitution's: the
-@@ -36,21 +36,51 @@
+@@ -36,21 +36,63 @@
  -- the economic oracle: re-run the map on the recorded event and compare
  prop_recompute :: Recorded (Event, Transaction) -> Property
  prop_recompute (e, txRecorded) = contract e (ledgerBefore e) === txRecorded
@@ -719,12 +728,24 @@
 +\begin{lstlisting}
 +data Correction    = Correction    { wrongEventId :: EventId,  reason   :: Text }
 +-- the discovery: a moveless recorded event, through the one door, naming the wrong event.
-+data Authorisation = Authorisation { corrects     :: EventId,  approver :: PersonId }
-+-- a recorded approval: agreed with the counterparty, signed by a person.
++data Authorisation = Authorisation
++  { corrects :: EventId, approver :: PersonId, counterpartyAssent :: ObservationId }
++-- a recorded approval carrying BOTH C-12.4 conditions: agreed with the counterparty
++-- (the assent, a recorded observation) and authorised by a person (the approver).
 +compensating :: CorrectionId -> AuthorisationId -> [Move] -> Transaction
-+-- a money repair references BOTH the correction and its authorisation, or the door refuses:
++-- door-checkable definitions: isCompensating = carries a Correction (wrongEventId)
++-- reference; hasAuthorisationRef = references an Authorisation whose corrects field
++-- names that wrongEventId, carrying approver AND counterpartyAssent.
++-- the guarantee is the DOOR's, not the constructor's -- an untrusted proposer can
++-- bypass `compensating` -- so the property asserts the refusal:
 +prop_noRepairWithoutAuth :: Transaction -> Property
-+prop_noRepairWithoutAuth tx = isCompensating tx ==> hasAuthorisationRef tx
++prop_noRepairWithoutAuth tx =
++  isCompensating tx && not (hasAuthorisationRef tx) ==> refusedAtDoor tx
++genUnauthorisedRepair :: Gen Transaction  -- ADVERSARIAL: reference a correction, omit
++  -- the authorisation, bypass the constructor -- as the untrusted Executor could.
++prop_noRepairAuth_fires =                 -- the refusal witness, asserted, not hoped
++  checkCoverage $ cover 1.0 unauthorisedRepair
++    "correction-referencing repair without authorisation -> refused" genUnauthorisedRepair
 +\end{lstlisting}
 +
 +A view is free because it stores nothing and settles nothing; a compensating transaction
@@ -733,7 +754,7 @@
  \subsection{The generator universe and the adversarial scheduler}
  
  The enumerations this specification builds on are genuinely closed. On the ledger's side:
-@@ -76,6 +106,10 @@
+@@ -76,6 +118,10 @@
  -- and every counterexample is replayable from its seed (a defect is a reproduction).
  \end{lstlisting}
  
@@ -744,7 +765,7 @@
  Generation is adversarial by design, because the test environment must be harder than
  production. The Event Monitor and the Events Executor are outside the trust boundary and may
  duplicate, delay, and reorder firings; integrity owes them nothing
-@@ -87,6 +121,10 @@
+@@ -87,6 +133,10 @@
  is never generated passes without witnessing anything. A generated history that never knocks
  a pledged note, never re-posts received collateral, never delivers a duplicate is not
  evidence; the generators are measured by the states they reach, not the cases they cover.
@@ -755,7 +776,7 @@
  
  \subsection{The test surface: the invariant catalogue and the product graph}
  
-@@ -135,11 +173,8 @@
+@@ -135,11 +185,8 @@
  
  The netting branch is a genuine precondition, not a tautology: a generator that never posts
  and receives the same unit under two agreements would satisfy \texttt{prop\_encumbranceGross}
@@ -769,7 +790,7 @@
  clears the precondition, \texttt{prop\_conservation} fires on each of $G_1$ and $G_2$ and
  finds each coordinate conserved, and \texttt{prop\_encumbranceGross} fires and finds the
  reported encumbrance $100$ where a net-reading report would show $0$ --- the single-axis
-@@ -175,17 +210,11 @@
+@@ -175,17 +222,11 @@
  \end{lstlisting}
  
  When the re-post-flag fires the generator constructs the over-re-post by construction
@@ -792,7 +813,7 @@
  
  Carried onto this surface are the four properties of the product-graph consistency invariant
  (Invariant~\ref{inv:graph-consistency}, defined in Chapter~\ref{ch:objects}), stated here as
-@@ -238,19 +267,13 @@
+@@ -238,19 +279,13 @@
      "split on a referenced underlying, next close in the phantom gap" genDerivWithCA
  \end{lstlisting}
  
@@ -819,7 +840,7 @@
  
  \paragraph{The settlement-obligation graph, and the fail branch it must walk.} The
  settlement-obligation unit (Chapter~\ref{ch:settlement}) is a product graph like any
-@@ -289,11 +312,8 @@
+@@ -289,11 +324,8 @@
  When the fail-flag fires the generator walks the unit to its \texttt{failed} node by
  construction, so \texttt{prop\_firedMatchesOneEdge} confirms the fail event lands it there
  and \texttt{prop\_actionEqualsRecorded} confirms the emitted transaction is the edge's
@@ -833,7 +854,7 @@
  
  The fourth quadrant needs its own witness. A generator that only ever leaves an ex trade
  unsettled at the record date --- the coherent-calendar case --- raises no mirror leg and
-@@ -301,8 +321,7 @@
+@@ -301,8 +333,7 @@
  by construction, so the record-date firing reads the buyer as registered holder against an
  ex entitlement and raises the mirror market-claim leg from buyer to seller
  (Chapter~\ref{ch:settlement}); \texttt{prop\_mirrorClaim\_fires} asserts
@@ -843,7 +864,7 @@
  models the lawful due-bills regime, where an ex trade can settle before the record date, and
  the property confirms the distribution routes to the entitled seller on the record, not to
  the registered buyer --- the reflection, across the settlement node, of the cum-unsettled
-@@ -334,11 +353,8 @@
+@@ -334,11 +365,8 @@
  \end{lstlisting}
  
  When the flag fires the generator overlaps the two dividends by construction ($r_1<r_2<p_1<p_2$),
@@ -857,7 +878,7 @@
  entitlements are keyed distinctly and live together, paying the first retires its entry alone,
  and the second discharges on its own payment date. The property fails on any design that keeps
  one slot per pair: the second record-date firing would overwrite the first, and the collection
-@@ -375,19 +391,67 @@
+@@ -375,19 +403,69 @@
  \end{lstlisting}
  
  When the cascade-flag fires the generator builds an $m\ge 2$-leg cascade and delivers
@@ -900,9 +921,11 @@
 +  fullState (fold h) === fullState (fold (swapAdjacent h))
 +
 +genDisjointPair :: Gen History  -- draw a disjoint-pair flag with rate r; when it fires,
-+  -- build two adjacent txs whose footprints share NOTHING, by construction:
-+  -- draw two DIFFERENT units, two DIFFERENT wallets, two DIFFERENT agreements, so the
-+  -- balance cells differ AND the UnitStatus/PositionState/ProductTerms targets differ.
++  -- build two adjacent txs whose footprints share NOTHING, by construction: draw two
++  -- DIFFERENT units and two DIFFERENT wallets, so the (w,u) coverage read-fibres are
++  -- wholly disjoint (Prop. 14: the footprint includes the door's reads at fibre grain
++  -- -- different agreements on one (w,u) would NOT suffice) and the three homes' targets
++  -- differ.
 +prop_independentSwapInvariant_fires =    -- the firing witness, asserted, not hoped
 +  checkCoverage $ cover 1.0 hasDisjointAdjacentPair
 +    "adjacent pair, disjoint across all four change kinds" genDisjointPair
@@ -936,7 +959,7 @@
  
  \subsection{The three binding conditions as executable gates}
  
-@@ -470,7 +534,7 @@
+@@ -470,7 +548,7 @@
  is inserted at its position~$k$ and the accrual tail $A_{k},A_{k+1},\dots$ recomputed from
  $k$ forward, bit-for-bit, while the downstream daily CCP-cash figures at positions after~$k$
  --- the future's variation margin on the same recorded closes --- are corrected by
@@ -945,7 +968,7 @@
  because it ran; it is verified by recomputation, and the recomputation is exact because its
  every input --- the accrued integer, the recorded closes --- is on the record.
  \emph{Economic verification is re-running the map on recorded inputs and comparing;
-@@ -500,7 +564,7 @@
+@@ -500,7 +578,7 @@
  observation --- one recorded at a transaction-time position after its valid-time index~$k$,
  with $k$ strictly inside the existing sequence ($k < \text{end}$). A generator that only ever
  appended fixings at the tail would satisfy both properties without ever witnessing a
@@ -954,7 +977,7 @@
  therefore built to reach the branch and to prove it did:
  
  \begin{lstlisting}
-@@ -512,15 +576,12 @@
+@@ -512,15 +590,12 @@
    checkCoverage $ cover 1.0 isBackDated "corrective insertion (k < end)" (genBackDated fs)
  \end{lstlisting}
  
@@ -974,7 +997,7 @@
  
  \paragraph{(iii) The temporal residual: a safety and liveness model.}
  The move algebra owns what is true \emph{within} a transaction --- conservation, coverage,
-@@ -623,25 +684,22 @@
+@@ -623,25 +698,22 @@
  
  \texttt{genMixedHistory} interleaves three constructions: a knock that triggers a one-touch, a
  full variation-margin day applied to a future whose declared regime is settled-to-market, and
@@ -1007,7 +1030,7 @@
  
  \begin{lstlisting}
  prop_availabilityNonNegative :: History -> Wallet -> Unit -> Property
-@@ -663,8 +721,8 @@
+@@ -663,8 +735,8 @@
  \end{lstlisting}
  
  The negative-owned branch is a genuine precondition: a generator that only ever built long wallets
@@ -1018,7 +1041,7 @@
  figure itself, not a re-derivation of it: on every negative-owned wallet that figure is zero, never
  negative, and a report that dropped the $\max$ --- shipping $\mathrm{bal}_{\text{owned}}-\sum_G
  \mathrm{bal}_{\text{posted},G}$ --- returns a negative number and fails the property, exactly where
-@@ -672,11 +730,10 @@
+@@ -672,11 +744,10 @@
  point: the door bound and the report figure are two statements, and this test pins the report.
  
  \paragraph{The fail transition has exactly one writer, and no orphan.}
@@ -1034,7 +1057,7 @@
  
  \begin{lstlisting}
  prop_failWriterAttribution :: History -> Property
-@@ -699,11 +756,10 @@
+@@ -699,11 +770,10 @@
  one-writer rule forbids.
  
  \paragraph{Venue is a custody wallet, not a coordinate: the mark-to-market fold.}
@@ -1050,7 +1073,7 @@
  
  \begin{lstlisting}
  prop_navMkFoldsOverCustodyWallets :: History -> Unit -> Property
-@@ -723,20 +779,17 @@
+@@ -723,20 +793,17 @@
  \end{lstlisting}
  
  When the flag fires the holding is split across custody wallets at differing closes by construction,
@@ -1077,7 +1100,7 @@
  
  \begin{lstlisting}
  prop_varianceFixingsReadOnePlusCloses :: History -> Property
-@@ -760,20 +813,19 @@
+@@ -760,20 +827,19 @@
  
  Because $C_0$ is drawn at the effective date and $C_1,\dots,C_N$ one per fixing
  date, every generated variance-swap history clears the precondition by construction,
@@ -1105,7 +1128,7 @@
  
  \begin{lstlisting}
  prop_replayReconstructsRecord :: History -> Property
-@@ -793,35 +845,31 @@
+@@ -793,35 +859,31 @@
  \end{lstlisting}
  
  Every generated history records at least one observation through the one door, so the precondition
@@ -1176,14 +1199,21 @@
    the worked instance; the duty is general over every declared term.
  \end{enumerate}
 --- Ledger_Spec_v15.1/ledger/drafts/ch17_scope.tex	2026-07-13 08:02:39.993686601 +0100
-+++ Ledger_Spec_v15.2/ledger/drafts/ch17_scope.tex	2026-07-13 23:26:41.713138236 +0100
-@@ -1,5 +1,5 @@
++++ Ledger_Spec_v15.2/ledger/drafts/ch17_scope.tex	2026-07-13 23:43:15.722234171 +0100
+@@ -1,11 +1,11 @@
  % Chapter 17 — Scope. Author: KLEPPMANN. Budget 3 pp (G4: +1 pp for the open-problems index).
 -% Discharges the Constitution v1.1 "Scope" section.
 +% Discharges the Constitution v1.2 "Scope" section.
  % Hosts the open-problems index and the constitutional-parking rule (G4).
  % Target of Chapter~\ref{ch:requirements} V1 (model retention outside scope) via \label{ch:scope}.
  % No thread episodes: a scope chapter cites; it does not re-run threads.
+ \section{Scope}\label{ch:scope}
+ 
+-This chapter discharges constitution clauses C-Scope.1--C-Scope.11 (the boundary of the specification; C-Scope.9 jointly with Chapter~\ref{ch:settlement}) and the Authority clauses C-Auth.1--C-Auth.4 (C-Auth.1 and C-Auth.4 jointly with Chapter~\ref{ch:objective}).
++This chapter discharges constitution clauses C-Scope.1--C-Scope.11 (the boundary of the specification; C-Scope.9 jointly with Chapter~\ref{ch:settlement}), the Authority clauses C-Auth.1--C-Auth.4 (C-Auth.1 and C-Auth.4 jointly with Chapter~\ref{ch:objective}), and C-6.6 (managed-account consequences, delegated by its own terms to the Managed-Account Companion, register line E75).
+ 
+ Scope fixes the boundary of the specification: what the specification covers, and what it
+ reconciles against at its perimeter but never performs. The constitution states the
 @@ -86,7 +86,7 @@
    scope (the anchor of Chapter~\ref{ch:requirements}, V1).
  \end{itemize}
@@ -1238,7 +1268,7 @@
  
  \begin{principle}[Constitutional parking]
  A genuine conflict between this specification and the constitution --- discovered in
-@@ -142,50 +156,51 @@
+@@ -142,57 +156,56 @@
  choice.
  \end{principle}
  
@@ -1328,3 +1358,14 @@
  
  \subsection{Authority}
  
+ The direction of authority is one-way. This specification is rated against the
+-constitution, and against nothing else; the constitution is rated against nothing. Every
+-chapter opened by naming the sections it discharges, and this one discharges the
+-constitution's Scope section. Where a future improvement requires departing from the
+-constitution, the constitution is amended first --- through the parking rule above and the
+-owner's decision --- never the specification bent in silence to fit it, and never the
+-constitution bent to fit the specification.
++constitution, and against nothing else; the constitution is rated against nothing. Where a
++future improvement requires departing from the constitution, the constitution is amended
++first --- through the parking rule above and the owner's decision --- never the
++specification bent in silence to fit it, and never the constitution bent to fit it.

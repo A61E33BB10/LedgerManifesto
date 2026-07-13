@@ -45,8 +45,8 @@ lstlisting/theorem/proposition/invariant touched; every number and oracle-indepe
 |---|---|---|---|
 | 2(a–d) | adversarial hunter | batch telling · auto-firing money · simulation-only path · stale citations/counts | **CLEAN ×4** — transaction list is fold output everywhere; all 8 money-repair sites gated, 2 ungated sites verified out of C-12.4's reach (view-class / lifecycle unwind); no test-only door; citations v1.2 with only historical v1.1; counts=eight; retired rendering named only as retired |
 | 2(e) | conflict hunter | new conflicts with v1.2 (7 sites) | **NO PARKABLE CONFLICTS** — all 7 sites clean (schema demo satisfies C-4.10 as worded; fork invariant admissible; simulated ledger's eight-commitments claim mandated by C-10.1; "five decided by the owner" reconciles exactly against the v1.2 amendment record). 1 conform-fix APPLIED: C-12.4's dual condition (counterparty agreement + person) stated at both ch14 cross-ref sites; ch15 `Authorisation` gains `counterpartyAssent`, `prop_noRepairWithoutAuth` witnesses both conjuncts. RoU gap re-confirmed as openly-flagged, pre-existing, not v1.2-created. |
-| 3 | FORMALIS | Prop independent-commutation soundness (coverage-fibre attack), swap pair, noRepairWithoutAuth, timetravel/replay intact | PENDING |
-| 4 | CONCORDIA (absolute veto, signs last) | full clause-discharge audit C-1.1…C-Auth.4 incl. C-2.7/2.8/12.4/12.5 + global self-consistency | PENDING |
+| 3 | FORMALIS | Prop independent-commutation soundness (coverage-fibre attack), swap pair, noRepairWithoutAuth, timetravel/replay intact | **2 VETO → DISCHARGED; 3 CERTIFIED.** VETO-1a (critical, valid counterexample): footprint enumeration dropped the coverage read-fibre — repaired with FORMALIS's own fibre-grain reads∪writes definition; genDisjointPair comment corrected. VETO-1b: proposition scoped to folded state (hash chain position-dependent). VETO-3: isCompensating defined, property recast as door-refusal of adversarial constructor-bypassing repair + genUnauthorisedRepair + refusal witness. Certified: swap pair (generator's wallet+unit disjointness = whole-fibre, sound independently of the flawed prose), timetravel/replay unweakened by compression, ch02 fold telling type-correct. Repairs committed bcdcdb9, 99pp. |
+| 4 | CONCORDIA (absolute veto, signs last) | full clause-discharge audit C-1.1…C-Auth.4 incl. C-2.7/2.8/12.4/12.5 + global self-consistency | **SIGNED** — 104 clauses, two-way audit COMPLETE after one veto (C-6.6 orphan) repaired at ch17:8; four new clauses verified discharging; FORMALIS repairs confirmed landed; full sweep clean. See `concordia_signoff.md`. |
 
 ## Deliverables
 - v15.2 clean: `Ledger_Spec_v15.2/ledger/ledger_v15_2.pdf` (99pp)
@@ -57,5 +57,8 @@ lstlisting/theorem/proposition/invariant touched; every number and oracle-indepe
   +prop_noRepairWithoutAuth; standing anti-vacuity gate)
 - CONCORDIA sign-off/veto memo: to be committed beside this record.
 
-## Freeze status
-NOT SIGNED — awaiting Phase 2/3 findings, their discharge, and CONCORDIA (last).
+## Freeze status: **SIGNED — CONCORDIA certified the pass 2026-07-13.**
+Three vetoes issued and discharged across the pass (FORMALIS 1a/1b coverage-fibre + folded-state
+scope, FORMALIS 3 vacuous auth property, CONCORDIA C-6.6 orphan); hunts a-e clean; final build 99pp
+(<100), exit 0. The Event Universe pass (Phase A findings memo, owner-gated) begins from this
+certified base.
