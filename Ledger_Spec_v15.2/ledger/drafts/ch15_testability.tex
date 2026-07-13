@@ -70,12 +70,24 @@ intervention.
 \begin{lstlisting}
 data Correction    = Correction    { wrongEventId :: EventId,  reason   :: Text }
 -- the discovery: a moveless recorded event, through the one door, naming the wrong event.
-data Authorisation = Authorisation { corrects     :: EventId,  approver :: PersonId }
--- a recorded approval: agreed with the counterparty, signed by a person.
+data Authorisation = Authorisation
+  { corrects :: EventId, approver :: PersonId, counterpartyAssent :: ObservationId }
+-- a recorded approval carrying BOTH C-12.4 conditions: agreed with the counterparty
+-- (the assent, a recorded observation) and authorised by a person (the approver).
 compensating :: CorrectionId -> AuthorisationId -> [Move] -> Transaction
--- a money repair references BOTH the correction and its authorisation, or the door refuses:
+-- door-checkable definitions: isCompensating = carries a Correction (wrongEventId)
+-- reference; hasAuthorisationRef = references an Authorisation whose corrects field
+-- names that wrongEventId, carrying approver AND counterpartyAssent.
+-- the guarantee is the DOOR's, not the constructor's -- an untrusted proposer can
+-- bypass `compensating` -- so the property asserts the refusal:
 prop_noRepairWithoutAuth :: Transaction -> Property
-prop_noRepairWithoutAuth tx = isCompensating tx ==> hasAuthorisationRef tx
+prop_noRepairWithoutAuth tx =
+  isCompensating tx && not (hasAuthorisationRef tx) ==> refusedAtDoor tx
+genUnauthorisedRepair :: Gen Transaction  -- ADVERSARIAL: reference a correction, omit
+  -- the authorisation, bypass the constructor -- as the untrusted Executor could.
+prop_noRepairAuth_fires =                 -- the refusal witness, asserted, not hoped
+  checkCoverage $ cover 1.0 unauthorisedRepair
+    "correction-referencing repair without authorisation -> refused" genUnauthorisedRepair
 \end{lstlisting}
 
 A view is free because it stores nothing and settles nothing; a compensating transaction
@@ -419,9 +431,11 @@ prop_independentSwapInvariant h = hasDisjointAdjacentPair h ==>
   fullState (fold h) === fullState (fold (swapAdjacent h))
 
 genDisjointPair :: Gen History  -- draw a disjoint-pair flag with rate r; when it fires,
-  -- build two adjacent txs whose footprints share NOTHING, by construction:
-  -- draw two DIFFERENT units, two DIFFERENT wallets, two DIFFERENT agreements, so the
-  -- balance cells differ AND the UnitStatus/PositionState/ProductTerms targets differ.
+  -- build two adjacent txs whose footprints share NOTHING, by construction: draw two
+  -- DIFFERENT units and two DIFFERENT wallets, so the (w,u) coverage read-fibres are
+  -- wholly disjoint (Prop. 14: the footprint includes the door's reads at fibre grain
+  -- -- different agreements on one (w,u) would NOT suffice) and the three homes' targets
+  -- differ.
 prop_independentSwapInvariant_fires =    -- the firing witness, asserted, not hoped
   checkCoverage $ cover 1.0 hasDisjointAdjacentPair
     "adjacent pair, disjoint across all four change kinds" genDisjointPair

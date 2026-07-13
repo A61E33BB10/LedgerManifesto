@@ -88,18 +88,25 @@ conserved l u c g = sum [ balance c g w u (fold l) | w <- wallets l ] == 0
 
 The word \emph{conservation} is exact: the vanishing sum is the quantity a
 symmetry of the log preserves. That symmetry is stronger than conservation alone. A
-transaction's \emph{footprint} is everything its fold step reads or writes across the
-four kinds of change it may bundle: the (wallet, unit, coordinate, agreement) balance
-cells its moves touch, and the UnitStatus, PositionState, and ProductTerms targets its
-unit-state, position-state, and terms changes touch. Two adjacent admitted transactions
-whose footprints are disjoint do not merely leave every coordinate sum unchanged when
-swapped --- they leave the whole state bit-identical.
+transaction's \emph{footprint} is everything its fold step --- the door's admission
+checks included --- reads or writes: it writes the (wallet, unit, coordinate, agreement)
+balance cells its moves touch and the three homes' targets its other changes touch, and
+it reads more --- a marker move at $(w,u)$ is admitted against the coverage net over
+\emph{all} agreements (Invariant~\ref{inv:coverage}), so its read-set takes the whole
+$(w,u)$ posted and lent fibres with $(w,u)$ owned, and an owned reduction symmetrically
+reads the marker fibres it must not breach. Two moves on one $(w,u)$ under different
+agreements therefore never have disjoint footprints, though their cells differ --- the
+rehypothecation chain is order-sensitive for exactly this reason. Two adjacent admitted
+transactions whose footprints --- reads and writes alike --- are disjoint leave the
+folded state bit-identical when swapped, not merely every coordinate sum unchanged.
 
 \begin{proposition}[Independent commutation]\label{prop:independent-commute}
 Let $t_1$ and $t_2$ be adjacent admitted transactions with disjoint footprints ---
-disjoint balance cells, and disjoint UnitStatus, PositionState, and ProductTerms
-targets. Then applying $t_1$ then $t_2$ and applying $t_2$ then $t_1$ yield
-bit-identical resulting state. Transactions that share any footprint element may not be
+disjoint read-sets and write-sets, at fibre grain on the guarded coordinates as defined
+above. Then applying $t_1$ then $t_2$ and applying $t_2$ then $t_1$ yield the
+bit-identical \emph{folded state} --- balances and the three homes; the log's byte-image
+differs under the swap, because the hash chain is position-dependent, and is no part of
+the claim. Transactions that share any footprint element may not be
 presumed to commute: buy shares before a dividend's record date and the holder is
 entitled; meet the record date before buying and the holder is not, so the two orders
 reach different state (Chapter~\ref{ch:picture}).
@@ -176,7 +183,8 @@ idempotent   :: Tx  -> Ledger -> Bool   -- re-applying a seen txid is a no-op
   (Chapter~\ref{ch:objects}).
 \item \textbf{Append-only and hash-chained.} An admitted transaction is never
   edited or removed; a mistake is repaired forward by a compensating transaction that
-  names what it supersedes and carries a recorded human authorisation before it fires
+  names what it supersedes and is agreed with the counterparty and carries a recorded human
+  authorisation before it fires
   (constitution C-12.4; the forward-repair discipline of Chapter~\ref{ch:testability}).
   Each entry carries the hash of its predecessor, so
   any alteration of history breaks the chain and is detectable
@@ -368,7 +376,8 @@ the abandoned lineage is retained, never erased, so the log is append-only \emph
 lineages as well as within one.
 
 The fork is a recorded, authorised fact: the new lineage names its parent point and carries
-a human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability}, raised
+a recorded human authorisation --- the forward-repair gate of Chapter~\ref{ch:testability},
+counterparty agreement and personal authorisation alike, raised
 from a single move to a whole lineage --- so which lineage is authoritative is itself a
 recorded fact, and exactly one is authoritative at any position. The primitive is shared
 with the simulated ledger (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}): replay
