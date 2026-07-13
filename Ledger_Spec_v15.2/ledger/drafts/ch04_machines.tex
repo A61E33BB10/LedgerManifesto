@@ -167,7 +167,10 @@ the same total order, which is what makes two projections of one record unable
 to disagree. Where two simultaneous events on the same instrument propose
 transactions that do not commute and whose terms declare no precedence, the
 Executor refuses rather than guesses: an order the record cannot justify is an
-order nobody can recompute, and defaults fail closed (\S2). The refusal is
+order nobody can recompute, and defaults fail closed (\S2). This refusal is
+constitutional, not a design preference: C-2.7 forbids reordering anything unless
+harmlessness is proved, and two non-commuting transactions with no declared
+precedence are exactly the case where it cannot be. The refusal is
 visible, and resolution --- a declared precedence, a corrected proposal ---
 arrives through the same door.
 

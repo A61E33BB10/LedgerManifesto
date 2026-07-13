@@ -389,6 +389,61 @@ both broken designs: key idempotence on $\mathit{causeEventId}$ alone and the se
 through $n$th legs never commit (a leg dropped); drop the retry check and the second
 delivery double-commits every leg (a leg duplicated).
 
+\paragraph{Independent transactions commute; dependent ones do not.}
+Two adjacent admitted transactions with disjoint footprints swap to bit-identical state;
+two that share a footprint element may not (Proposition~\ref{prop:independent-commute}).
+The pair is tested both ways, and the second half is what keeps the first honest: without
+a witnessed non-commuting case, ``swapping preserves state'' could pass on a generator that
+only ever draws independent pairs, and the harmlessness precondition C-2.7 forces would be
+vacuous. The first property swaps a disjoint pair and asserts the full state --- balances
+and all three homes --- is identical; the second swaps a buy against a record-date event on
+the \emph{same} stock and wallet and asserts the two orders reach \emph{different} state,
+because the entitlement differs.
+
+\begin{lstlisting}
+prop_independentSwapInvariant :: History -> Property  -- Prop. 14 (independent commutation)
+prop_independentSwapInvariant h = hasDisjointAdjacentPair h ==>
+      -- swap the two adjacent txs; full state (balances + three homes) is bit-identical.
+      -- oracle is fullState . fold, independent of the swap under test (NOT x===x):
+      -- one side folds the given order, the other folds the swapped order.
+  fullState (fold h) === fullState (fold (swapAdjacent h))
+
+genDisjointPair :: Gen History  -- draw a disjoint-pair flag with rate r; when it fires,
+  -- build two adjacent txs whose footprints share NOTHING, by construction:
+  -- draw two DIFFERENT units, two DIFFERENT wallets, two DIFFERENT agreements, so the
+  -- balance cells differ AND the UnitStatus/PositionState/ProductTerms targets differ.
+prop_independentSwapInvariant_fires =    -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 hasDisjointAdjacentPair
+    "adjacent pair, disjoint across all four change kinds" genDisjointPair
+
+prop_dependentSwapDiffers :: History -> Property             -- the C-2.7 witness
+prop_dependentSwapDiffers h = hasBuyThenRecordDate h ==>
+      -- buy ACME then meet record date -> entitled; meet record date then buy -> not.
+      -- the two orders share the (wallet, ACME) footprint, so they must NOT commute:
+  entitlement (fold h) =/= entitlement (fold (swapAdjacent h))
+
+genBuyRecordDate :: Gen History  -- draw a dependent-pair flag with rate r; when it fires,
+  -- place a buy of ACME into W-ALPHA immediately adjacent to ACME's record-date event,
+  -- SAME stock, SAME wallet -> shared footprint -> the entitlement depends on the order.
+prop_dependentSwapDiffers_fires =        -- the non-commuting firing witness, asserted
+  checkCoverage $ cover 1.0 hasBuyThenRecordDate
+    "buy and record-date on the same stock and wallet, adjacent" genBuyRecordDate
+\end{lstlisting}
+
+Both preconditions are genuine, not tautologies, and the two guard against opposite
+failures. \texttt{genDisjointPair} constructs disjointness by drawing two different units,
+wallets, and agreements, so every generated pair shares no footprint element and the swap
+is provably harmless; a generator that never produced such a pair would let
+\texttt{prop\_independentSwapInvariant} pass without witnessing a single lawful swap, and
+\S 2's zero-firings rule makes that a defect. \texttt{genBuyRecordDate} constructs the
+opposite --- a buy and a record-date event on one stock in one wallet --- so the shared
+footprint makes the entitlement order-dependent; its oracle, \texttt{entitlement . fold},
+is computed independently on each order rather than compared to itself, so a green run means
+the two orders genuinely diverged. The rates $r$ are set well above the floor, and
+\texttt{checkCoverage} asserts each firing at $\ge 1\%$ of generated histories. Together the
+pair pins C-2.7 executably: the harmless swap is bit-identical, the dependent swap is not,
+and neither branch is vacuous.
+
 \subsection{The three binding conditions as executable gates}
 
 Three conditions the specification relies on are stated here as gates a candidate

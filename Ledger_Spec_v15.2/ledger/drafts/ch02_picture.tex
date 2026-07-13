@@ -6,10 +6,12 @@ This chapter discharges constitution clauses C-3.1--C-3.11 (the map-then-fold pi
 Everything this framework does is a \emph{map} followed by a \emph{fold}. The
 constitution defines both words and draws the whole picture (C-3.1); this chapter does
 not re-derive them --- it instantiates the picture on the six threads. In one line: the
-world presents a list of events, $E = [e]$; a map carries it to a list of transactions,
-$T = [tx]$; a fold reduces that list to the ledger; and every number the ledger reports
---- a balance, a valuation, a profit and loss, a report --- is a further fold of that
-same one list. Four terms recur, each defined in Chapter~\ref{ch:objects} and used here
+world presents a list of events, $E = [e]$, and the ledger is the fold of that list ---
+one event at a time, each step mapping the event to its transaction $tx$ against the
+ledger built so far, then folding that $tx$ in, so the transactions $T = [tx]$ are output
+the fold produces and never a list handed to it; and every number the ledger reports ---
+a balance, a valuation, a profit and loss, a report --- is a further fold of that same
+record. Four terms recur, each defined in Chapter~\ref{ch:objects} and used here
 only at a gloss: a \textbf{unit} is anything that can be held or owed; a \textbf{wallet}
 is where units are held; a \textbf{transaction} is the atomic bundle of changes the
 ledger records; and a \textbf{projection} is any view computed from the record.
@@ -71,10 +73,11 @@ both are on the record.
 Each event is mapped to a transaction, and the responsibility for the map divides in two.
 The \textbf{smart contracts} are the mapping functions: each is a stateless piece of code
 that, given one event and the current state of the ledger, computes the transaction the
-event requires (Chapter~\ref{ch:contracts}). The \textbf{Events Executor} applies the map
-over the list, $E=[e] \to T=[tx]$: for each event it fires the responsible contract,
-hands it the event together with the current projection of the ledger, and collects the
-proposed transaction. Many contracts, one Events Executor; the contracts carry all the
+event requires (Chapter~\ref{ch:contracts}). The \textbf{Events Executor} fires the map
+one event at a time as the fold advances: for each event, in the total order, it fires the
+responsible contract, hands it the event together with the current projection of the
+ledger, and collects the proposed transaction $tx$ --- so $T=[tx]$ is built by the fold,
+not consumed by it. Many contracts, one Events Executor; the contracts carry all the
 product knowledge, the Events Executor carries none (Chapter~\ref{ch:machines}).
 
 The map is not blind to state. To turn a dividend event into cash moves, the contract
@@ -85,12 +88,13 @@ all earlier events have already built.
 
 \subsection{The fold: the transactions become the ledger}
 
-The resulting list of transactions is folded --- reduced, one transaction at a time ---
-into the state of the system: balances, and the three homes of unit and position state
-(Chapter~6, \emph{State: The Three Homes}). The \textbf{Transaction Executor} performs the
-fold, $T=[tx] \to \mathrm{Ledger}$: it serialises, validates, and applies each
-transaction, and the immutable log is precisely the list being folded. Nothing else
-writes. And because the log is one list, every other view is a further fold of it: a
+There is no list of transactions waiting to be folded --- the fold builds it. As each
+proposed transaction arrives in the total order, the \textbf{Transaction Executor} applies
+it to the state of the system: balances, and the three homes of unit and position state
+(Chapter~6, \emph{State: The Three Homes}). It serialises, validates, and applies one
+transaction at a time, $(\,tx, \mathrm{Ledger}) \to \mathrm{Ledger}$, and the immutable log
+is precisely the list the fold has so far built --- the fold's output, never its input.
+Nothing else writes. And because the log is one list, every other view is a further fold of it: a
 balance sums the moves that touch a wallet, a valuation folds the composition against a
 price vector (Chapter~\ref{ch:valuation}), a report folds it into a presentation
 (Chapter~\ref{ch:reporting}). One record, and many folds of it --- never many records.

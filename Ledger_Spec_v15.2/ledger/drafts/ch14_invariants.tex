@@ -52,10 +52,11 @@ projection built on the image would read zero for a fully encumbered wallet
 and the finer state it certifies, keeps them distinct --- that is the exact sense in which
 it is strictly stronger. The per-coordinate grain in turn forbids a cross-coordinate
 rebooking that fabricates custody on the posted plane while conserving the gross sum; each
-grain forbids one class of fabrication the coarser one admits. The (coordinate, agreement)
-refinement of Section~\ref{sec:coordinate-vector} is parked, with exact amendment
-text, as entry PARK-3 of the parking index (Chapter~\ref{ch:scope}); no chapter amends the
-constitution.
+grain forbids one class of fabrication the coarser one admits. This theorem is the
+discharge of the constitution's third admission test for the coordinate schema ---
+conservation at the finest declared grain (C-4.10) --- for the (coordinate, agreement)
+schema Section~\ref{sec:coordinate-vector} declares; the earlier PARK-3 conflict is
+closed by the owner's ruling in v1.2 (Chapter~\ref{ch:scope}).
 
 \begin{proof}
 Induction on the log. \emph{Base:} the empty log gives every $(u,c,G)$ coordinate a sum of
@@ -86,11 +87,36 @@ conserved l u c g = sum [ balance c g w u (fold l) | w <- wallets l ] == 0
 \end{lstlisting}
 
 The word \emph{conservation} is exact: the vanishing sum is the quantity a
-symmetry of the log preserves. Reorder any two independent transactions --- ones
-that share no (wallet, unit, coordinate, agreement) --- and every coordinate sum is
-unchanged, because each is a sum of paired-leg contributions that commute.
-Permutation invariance of independent moves and the vanishing coordinate sum are
-one fact seen twice; the first is itself a checkable (metamorphic) property.
+symmetry of the log preserves. That symmetry is stronger than conservation alone. A
+transaction's \emph{footprint} is everything its fold step reads or writes across the
+four kinds of change it may bundle: the (wallet, unit, coordinate, agreement) balance
+cells its moves touch, and the UnitStatus, PositionState, and ProductTerms targets its
+unit-state, position-state, and terms changes touch. Two adjacent admitted transactions
+whose footprints are disjoint do not merely leave every coordinate sum unchanged when
+swapped --- they leave the whole state bit-identical.
+
+\begin{proposition}[Independent commutation]\label{prop:independent-commute}
+Let $t_1$ and $t_2$ be adjacent admitted transactions with disjoint footprints ---
+disjoint balance cells, and disjoint UnitStatus, PositionState, and ProductTerms
+targets. Then applying $t_1$ then $t_2$ and applying $t_2$ then $t_1$ yield
+bit-identical resulting state. Transactions that share any footprint element may not be
+presumed to commute: buy shares before a dividend's record date and the holder is
+entitled; meet the record date before buying and the holder is not, so the two orders
+reach different state (Chapter~\ref{ch:picture}).
+\end{proposition}
+
+The proof is the disjointness. The fold step is a function of exactly the state cells it
+reads and writes --- its footprint --- and of nothing else. On disjoint footprints $t_1$
+writes only cells $t_2$ neither reads nor writes and conversely, so each step sees the
+same inputs in either order and writes the same outputs; the two compositions agree cell
+by cell. This discharges C-2.7's obligation: the constitution refuses to reorder anything
+unless harmlessness is proved, and disjoint footprints are that proof --- the only case in
+which a swap is harmless. The shared-footprint case is not an exception to be handled but
+a reorder that stays forbidden, and the record-date pair is its witness. Conservation is
+the corollary read on the balance plane alone: independent moves share no balance cell, so
+every coordinate sum survives their swap, each being a sum of paired-leg contributions
+that commute. Permutation invariance and the vanishing coordinate sum are one fact seen
+twice; the first is itself a checkable (metamorphic) property.
 
 \medskip\noindent\textbf{Episode --- the future (T1): variation margin is
 conservation, not a check.}
