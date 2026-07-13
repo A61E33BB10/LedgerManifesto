@@ -94,19 +94,33 @@ mass $\sum_{G}\max(-\mathrm{bal}_{\text{posted},G}(w,u),0)$ is the separate
 receiver-side figure of the re-use line below. Under title-transfer financing the
 encumbered position is instead the claim held under the financing agreement.
 Available mass --- the quantity the wallet can still deliver --- is a different
-question, answered by the coverage net $\mathrm{bal}_{\text{owned}}-\sum_G
-\mathrm{bal}_{\text{posted},G}$ (Chapter~\ref{ch:invariants}), and it is
-non-negative because the coverage invariant bounds posting by ownership; the report
-cannot show negative free assets because the door refused the state that would
-produce one. Encumbrance sums gross, availability nets --- the two are never one
-figure.
+question, answered by the coverage net $\max(\mathrm{bal}_{\text{owned}},0)-\sum_G
+\mathrm{bal}_{\text{posted},G}$ (Chapter~\ref{ch:invariants}), the same
+$\max(\cdot,0)$ the coverage invariant carries. It is non-negative for
+\emph{every} wallet, because that invariant bounds the signed posted sum by
+$\max(\mathrm{bal}_{\text{owned}},0)$: a negative-owned wallet --- a plain short,
+or an issuer wallet conservation itself creates --- has zero available free mass,
+never a negative figure, and the report cannot show negative free assets because
+the door refused the state that would produce one. Writing $\mathrm{bal}_{\text{owned}}$
+without the $\max$ would make the figure negative for exactly those wallets, contradicting
+Chapter~\ref{ch:invariants}; the $\max$ is what keeps the two chapters one statement.
+Encumbrance sums gross, availability nets --- the two are never one figure.
 
 \emph{Re-use, receiver side.} Mass held on the received-as-collateral ray is
-available for re-use. Actual re-use is read from re-pledge moves, each of which
+available for re-use \emph{where the governing agreement grants a right of use}.
+Actual re-use is read from re-pledge moves, each of which
 carries a source-agreement reference beside its governing reference
 (Chapter~9); the source is an observable fact of the custody instruction, so
 nothing fictitious is stored, and received, re-used, and available project as
-per-(unit, agreement) actuals.
+per-(unit, agreement) actuals. Collateral received under a security interest
+\emph{without} right of use (Constitution~C-8.8, segregated cash included) must
+not be re-used, and the current coverage net does not yet gate re-use by the
+right-of-use term --- it bounds re-posting by possession alone, so it would
+\emph{admit} a re-post of segregated mass. That gap between C-8.8 and the coverage
+net is a named open problem (Chapter~\ref{ch:scope}), stated here in the open rather
+than papered over; until the right-of-use gate is built, an implementation of this
+specification must not enable collateral re-use --- the constraint is live and
+blocking, not a label.
 
 \emph{Fungible received mass.} Title-transfer received cash and securities land
 on owned, commingled with proprietary holdings of the same unit. The record

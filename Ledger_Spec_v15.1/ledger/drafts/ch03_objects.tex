@@ -184,10 +184,16 @@ admitted transaction --- hash-chained so that any alteration of history is detec
 It is the sole canonical source of truth. Three words are used precisely throughout this
 specification. The \textbf{log} is the recorded sequence itself. The \textbf{ledger} is
 the state obtained by folding the log: balances and the three homes. The \textbf{record}
-is everything that has been recorded --- the log and all it carries: transactions,
-events, observations. ``On the record'' means present there, and a \textbf{projection}
-is any view computed from the record --- which is why, in Chapter~2's typed picture, the
-watch arrow reads the Record while contract and apply consume the Ledger.
+is everything the log carries. Every observation whose reproduction the framework
+guarantees enters the record the same way every fact does --- as a moveless
+\textbf{observation-recording transaction}, a transaction with an empty move list that
+folds the observation into a home (Chapter~6), exactly as the barrier-breach recording
+above. There is no second store beside the log: the record \emph{is} the log, and the
+single-writer discipline reaches every observation, not only every move. ``On the
+record'' means present there, and a \textbf{projection} is any view computed from the
+record --- which is why, in Chapter~2's typed picture, the watch arrow reads the Record
+while contract and apply consume the Ledger, the observations a contract reads being home
+facts already folded into it.
 
 \subsection{Closure by Virtual Wallets}
 

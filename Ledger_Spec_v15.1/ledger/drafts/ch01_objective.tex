@@ -107,9 +107,11 @@ contract, the market data operator, the three homes, virtual wallet, virtual led
 watches, market data operators, and collateral eligibility are data the record
 carries, never behaviour a reader must infer from code.
 
-The commitments are ordered by what arbitrates a conflict: a design that is auditable
-and reproducible but untestable is redesigned; a design that is elegant but cannot be
-replayed is rejected. No design decision in this document rests on custom or typical
+The commitments are jointly non-negotiable, and a design is admitted only if it
+satisfies all six: a design that is auditable and reproducible but untestable is
+redesigned, and a design that is elegant but cannot be replayed is rejected --- not
+because one commitment outranks another, but because each is required and none is
+waived. No design decision in this document rests on custom or typical
 practice; each is derived from the commitments and then, where an external standard
 binds, shown to satisfy it. One boundary bounds all six: they secure one consistent
 internal record, not its correspondence with the world outside --- internal

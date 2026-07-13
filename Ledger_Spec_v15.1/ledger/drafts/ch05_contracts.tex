@@ -245,8 +245,10 @@ same recorded official closes the future settles on. Each scheduled fixing is a
 declared watch; on fixing~$k$ the Monitor emits and the contract fires. To
 extend the realised variance the firing needs the previous close and the running
 accrued statistic --- the fixings $1 \ldots k-1$. It does not hold them: the
-previous close is a recorded observation, and the accrued statistic is a
-UnitStatus fact that firing~$k-1$ wrote for exactly this purpose (Chapter~6).
+previous close is a recorded observation the firing reads from the record --- a
+home fact folded from its observation-recording transaction, never a live feed ---
+and the accrued statistic is a UnitStatus fact that firing~$k-1$ wrote for exactly
+this purpose (Chapter~6).
 Firing~$k$ reads both, forms the return, adds its square, and writes the updated
 accrued statistic back for firing~$k+1$. A firing 200 days into the swap's life
 reconstructs its entire history from the record and holds nothing of its own

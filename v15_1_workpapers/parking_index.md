@@ -62,7 +62,15 @@ aggregate projection; ch09§2 and Theorem 14.1 use `bal_{c,G}`; cites this entry
 
 ---
 
-## PARK-4 — F12 — deposit-neutrality is conditional (amends Const §8)
+## PARK-4 — F12 — deposit-neutrality is conditional (amends Const §8) — **RATIFIED (D1) 2026-07-13**
+
+**Owner disposition (consistency pass, 2026-07-13): RATIFIED as C-8.7.** The owner accepted the
+amendment below verbatim. It is recorded as a RATIFIED amendment in `constitution_v1_2_proposed.tex`
+and awaits the owner's adoption into the authoritative manifesto (the owner's sole act). Until that
+adoption the authoritative Constitution remains v1.1; the specification states deposit-neutrality as
+holding at fair value with the day-one difference recognised as financing basis, citing the ratified
+C-8.7. The original park record is retained below for provenance.
+
 
 **Clause replaced (verbatim, Const §8 case 2):** "a contribution or financing received against an
 equal obligation created in the same transaction — collateral received under title transfer, cash
@@ -83,8 +91,47 @@ true — the archetype the run screens for. Park the conflict openly; do not pap
 
 ---
 
-## Status: 4 parks filed (F11, F2, F10, F12). Parking index is NON-EMPTY (required). LEX MANDATUM G3
-## well-formedness: PENDING certification.
+---
+
+## RATIFIED-D4 — F2 (consistency pass) — the observation stream has no discipline (clarifies Const §1/§4/§5) — **RATIFIED (D4) 2026-07-13**
+
+**Clause replaced (verbatim, Const §4 / C-4.8):** "...and the **record** is everything that has been
+recorded --- the log and all it carries, transactions, events, and observations alike. `On the record'
+means present there, and a projection is any view computed from it."
+**Ratified replacement (verbatim, C-4.8):** "...and the **record** is everything the log carries. Every
+observation whose reproduction the framework guarantees enters the record only as a moveless
+transaction --- admitted through the one Transaction Executor and folded into a home --- the
+*observation-recording transaction*. An event is a trigger: it carries timing, not admitted data. No
+observation is exempt from the one door, so the single canonical record of §1 and the single writer of
+§5 extend without exception to every observation. In the typed picture of §3 the contract and the fold
+consume the ledger unchanged, because the observations a contract reads are home facts folded into the
+ledger. `On the record' means present there, and a projection is any view computed from it."
+**Rationale:** v15.0's observation stream had a second admission door with no invariants — "half the
+record has no discipline." The ruling (Option 1) is that an observation is a moveless admitted
+transaction through the ONE door; the record IS the log. This CLARIFIES (does not narrow) C-1.4 (one
+canonical record) and C-5.1 (one writer); Theorem 14.4 already assumes it. "data" (mass noun) replaces
+the memo's loose "datum" per Const §6.
+**Stated openly in v15.1:** ch03 §3.5 (record = log), ch08 (Ingest recast as untrusted ingestion
+contract proposing a moveless observation-recording transaction), ch04 (Events Executor proposes, never
+writes), ch02 (typed-picture note), ch14 (subsection + Thm restated over the record), ch15
+(prop_replayReconstructsRecord). Recorded as a RATIFIED amendment in `constitution_v1_2_proposed.tex`;
+awaits owner adoption into the authoritative manifesto.
+
+---
+
+## Consistency-pass Track-1 dispositions (owner gate, 2026-07-13)
+- **D1** (deposit-neutrality, §8/C-8.7): **RATIFIED** — see PARK-4 above.
+- **D2** (invented conflict-arbitration order among the six commitments, §2): **CONFORM SPEC** — no
+  constitutional change; ch01 §1.2 strikes "ordered" and states joint non-negotiability. No park.
+- **D3** (trade-date booking of `owned`, §4): **CONFORM SPEC** — no constitutional change; the booking
+  moment is a declared term of the agreement (default trade-date), with the settlement-date branch
+  added. §4 unchanged. No park.
+- **D4** (observation discipline, C-4.8): **RATIFIED** — see RATIFIED-D4 above.
+
+## Status (after consistency pass, 2026-07-13): PARK-4 (D1/C-8.7) and the new D4 (C-4.8) are RATIFIED by
+## the owner. PARK-1 (F11 addressing), PARK-2 (F2/§12 bitemporal), and PARK-3 (F10/§4 coordinate) are
+## unchanged from Phase A — this pass did not gate them; they remain OPEN. Parking index is NON-EMPTY
+## (required). LEX MANDATUM G3 well-formedness: PENDING re-certification for the consistency pass.
 ## Shipped-doc reflection: ch17§3 rewritten (Phase 1) — "index empty" → enumerates PARK-1..4 with the
 ## clause each touches, cites open statements at ch02/Thm timetravel (P2), sec:coordinate-vector/Thm
 ## conservation (P3), ch07 (P4). Build exit 0, 79pp. F12 (Phase 3) adds the ch07 Prop 7.3 open statement

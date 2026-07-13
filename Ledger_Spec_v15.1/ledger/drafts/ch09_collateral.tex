@@ -138,8 +138,22 @@ netting-set attribution at close-out, which is the one computation the claims
 exist to get right --- and the counterparty-state pricing above is then
 natural, because the claim is a per-counterparty object.
 
-\emph{Timing.} Owned re-books at instruction --- trade-date booking --- and
-the instruction-to-settlement gap is carried explicitly, never elided. Where a
+\emph{Timing.} The booking moment is itself a declared term of the governing
+agreement, not a constant of the ledger. Trade-date booking --- owned re-books at
+instruction --- is the default this specification carries, and the
+instruction-to-settlement gap is carried explicitly, never elided. Where an
+agreement instead declares settlement-date booking, owned re-books only on the
+recorded settlement-confirmation event, so a bought-not-yet-settled position is not
+deliverable --- its owned balance does not yet exist. Settlement-date booking changes
+only \emph{which event writes owned}; it does not remove the cum buyer's entitlement,
+so it does not remove the market claim. The claim is a function of the trade's cum/ex
+status and settlement-versus-record-date timing (Chapter~\ref{ch:settlement}), never
+of the booking policy: a cum trade unsettled at a record date still raises the
+settlement-obligation unit's market-claim leg under either booking rule, because the
+buyer bought cum and is entitled while the register shows the deliverer. The ledger
+records whichever event the declared term names; the meaning of the owned coordinate
+is fixed by the constitutional definition of the atomic move and is unchanged by
+which event writes it (Chapter~\ref{ch:settlement}). Under trade-date booking, where a
 record date falls inside the gap, the paying agent pays the record holder ---
 still the deliverer --- while the ledger's owned shows the buyer. The
 reconciling leg is the \textbf{market claim}, carried by the

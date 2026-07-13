@@ -162,6 +162,14 @@ state --- and never the clock. One \texttt{step} is a map (fire the contract) im
 followed by a fold (apply the result), and the whole run is that step folded over
 $E=[e]$. Map, then fold: the phrase is the architecture, not a metaphor for it.
 
+An observation is not outside this picture. It enters as a moveless
+\texttt{Transaction} through \texttt{apply} --- a transaction with an empty move list
+that folds the observation into a home (Chapter~\ref{ch:marketdata}) --- so the Record
+the \texttt{watch} arrow reads and the Ledger \texttt{contract} and \texttt{apply}
+consume are two views of one log, never two stores. The observations a \texttt{contract}
+reads are therefore home facts already folded into the Ledger, and the single writer of
+\texttt{apply} is the only writer of any observation.
+
 \subsection{The clock, and proposal versus authority}
 
 Two properties of the picture carry most of its weight.

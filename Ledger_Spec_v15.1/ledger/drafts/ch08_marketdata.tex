@@ -49,22 +49,33 @@ throughout this chapter:
   after which the operator has nothing left to adjust.
 \end{enumerate}
 
-\subsection{The observation door}\label{sec:obs-door}
+\subsection{The observation door is the one door}\label{sec:obs-door}
 
-No data enters the ledger as a bare read. All data crosses as a recorded
-\textbf{observation} carrying its provenance: the source that published it, the time it
-was observed, and the basis frame it was observed in. This is the door that
-Chapters~\ref{ch:valuation} and~\ref{ch:virtual} refer to when a mark or a stamped level
-``enters through the observation door.'' A read against a live feed leaves no record and
-is therefore unreproducible; a recorded observation is a fact of the log, so every
-downstream number is a function of the record alone (\S 12).
+No data enters the ledger as a bare read, and no data enters through a door of its own.
+All data crosses as a recorded \textbf{observation} carrying its provenance: the source
+that published it, the time it was observed, and the basis frame it was observed in.
+Crossing is not a second admission path beside the transaction door. An untrusted
+ingestion contract \emph{proposes} a moveless \textbf{observation-recording transaction}
+--- a transaction with an empty move list whose effect is to fold the observation into a
+home (Chapter~\ref{ch:homes}) --- and the one Transaction Executor
+(Chapter~\ref{ch:machines}) admits or refuses it, exactly as it admits or refuses any
+transaction. \emph{The record is the log}: there is no separate observation store, and the
+single-writer discipline of \S5 therefore reaches every observation, not only every move.
+This is the door Chapters~\ref{ch:valuation} and~\ref{ch:virtual} refer to when a mark or
+a stamped level ``enters through the observation door.'' A read against a live feed leaves
+no record and is therefore unreproducible; a recorded observation is a fact of the log, so
+every downstream number is a function of the record alone (\S 12).
 
 \begin{lstlisting}
 data Provenance  = Provenance { source :: SourceId, observed :: Time, basis :: BasisRef }
 data Observation = Observation { reading :: Reading, prov :: Provenance }
--- all data crosses as a recorded Observation; there is no bare read.
--- the door admits or refuses; a refusal is a returned value, never a partial write:
-data Ingest      = Admitted Observation | Refused IngestError
+-- all data crosses as a recorded Observation; there is no bare read, and no second door.
+-- an untrusted ingestion contract PROPOSES a moveless observation-recording transaction;
+-- the one Transaction Executor admits or refuses it, like any transaction.
+-- admission writes a moveless Transaction (empty move list) that folds the Observation
+-- into a home; refusal is a returned value, never a partial write:
+data Ingest      = Proposed Transaction   -- moveless: folds the Observation into a home
+                 | Refused  IngestError
 \end{lstlisting}
 
 The provenance frame is what makes ``prices and quantities are never mixed across an
@@ -79,7 +90,10 @@ record.}
 official close (Chapter~\ref{ch:objects}). \emph{The door.} The fixing is not a second
 feed; it is a read of the same recorded official-close observation that FUT-IDX settles
 against. The three settlement days of the future --- IDX closes $1{,}000.00$, $990.00$,
-$1{,}005.00$ --- are fixings $124$, $125$, and $126$ of the swap's $252$-fixing series.
+$1{,}005.00$ --- are the closes $C_{124}, C_{125}, C_{126}$ read at fixings $124$,
+$125$, and $126$ of the swap's $252$-fixing series, each fixing being the log-return
+over the prior close (fixing $125$ reads $\ln(990/1000)$, fixing $126$ reads
+$\ln(1005/990)$).
 \emph{Design point.} \emph{One recorded observation source feeds two consumers; because
 the source is on the record, the fixing series is deterministic and replayable at the data
 boundary, and firing $127$ recomputes the same statistic any party would
@@ -140,7 +154,7 @@ convention --- which components are cash and which are proportional, in which ba
 an operator scales a component it should not, or spares one it should scale, misvaluing
 across every subsequent corporate action. \emph{Detection:} the invariance witness at the
 first crossing of a corporate action (Section~\ref{sec:witness}), divergence against an
-independent source (regime W3 below), and \S 13 recomputation. \emph{Residual:} a
+independent source (failure mode W3 below), and \S 13 recomputation. \emph{Residual:} a
 misdeclaration that never meets a corporate action is invisible from inside the boundary
 --- a reconciliation matter at the perimeter, the exact sibling of the collateral regime
 bit of Chapter~\ref{ch:collateral}.
@@ -171,7 +185,7 @@ refused at the door, never silently treated as identity.
 Totality is what turns ``never improvised at read'' into a checkable property. An
 improvised adjustment is precisely a pairing with no declared operator; forbidding the
 improvisation means requiring the declaration in advance, for the whole registered domain.
-The refusal of an undeclared pairing is failure regime W4 (Section~\ref{sec:failures}), and
+The refusal of an undeclared pairing is failure mode W4 (Section~\ref{sec:failures}), and
 it fails closed, as \S 2's Correctness commitment demands: the system stops rather than
 guesses a frame.
 
@@ -305,7 +319,7 @@ value frame and the balance plane never touch.
 
 \paragraph{Declared identity is still a declaration: VS-1 and FUT-IDX on the index.} Not every
 referencing unit adjusts under every event, but totality requires the non-adjustment be
-\emph{declared}. VS-1's $252$ fixings read IDX official closes, and FUT-IDX settles the IDX
+\emph{declared}. VS-1's $252$ fixings read the $253$ IDX official closes $C_0,\dots,C_{252}$, and FUT-IDX settles the IDX
 level at multiplier~$10$; both reference IDX, so both declare a corporate-action out-edge. When
 a \emph{constituent} of IDX splits, the index divisor is adjusted to hold the published level
 continuous (the menu's divisor row above), so the level VS-1 and FUT-IDX read does not jump.
@@ -416,9 +430,11 @@ carries a cum/ex operator like the ordinary one. Their fully worked arithmetic i
 to the Worked-Examples companion (register lines~E71 and~E72); the mechanism here is
 complete without them.
 
-\subsection{Failure regimes at the boundary}\label{sec:failures}
+\subsection{Failure modes at the boundary}\label{sec:failures}
 
-The boundary has four failure modes, and each has a determined, replayable disposition --- a
+The boundary has four failure modes W1--W4, a closed set distinct from the three collateral
+inflow \emph{regimes} of Chapter~\ref{ch:collateral}: two closed enumerations, two names, never
+one word for both. Each mode has a determined, replayable disposition --- a
 function of log state alone, so replay reproduces it bit-identically. None improvises; each
 fails closed or records a flag, never a silent pick.
 

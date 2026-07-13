@@ -191,8 +191,8 @@ at $A_{126}=1{,}805{,}000$, an integer at scale $10^{-8}$: the 126 accrued squar
 compressed into one number. The firing reads $A_{126}$ and the previous close, forms the
 127th return, adds its square, and writes $A_{127}$ into UnitStatus for the 128th firing.
 \emph{The coupling.} The IDX close at fixing~126 is $1{,}005.00$ --- the same recorded
-close FUT-IDX takes as its day-3 final settlement; fixings $124,125,126$ are the future's
-three settlement days, closes $1{,}000$, $990$, $1{,}005$. One recorded observation, two
+close FUT-IDX takes as its day-3 final settlement; the closes $C_{124},C_{125},C_{126}$ read
+at fixings $124,125,126$ --- the future's three settlement days --- are $1{,}000$, $990$, $1{,}005$. One recorded observation, two
 consumers: the future writes it as a settlement level into FUT-IDX's UnitStatus, the swap
 folds it into VS-1's accrued statistic in VS-1's UnitStatus, and neither reads the other's
 home.

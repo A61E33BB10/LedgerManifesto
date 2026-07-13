@@ -84,14 +84,15 @@ fixings, strike 400 variance points, 1{,}000 USD per point) maps to a product
 whose \texttt{EconomicTerms} carry one \texttt{PerformancePayout}; its underlier
 is the index IDX as an \texttt{Observable}, and the variance computation sits in
 the payout's \texttt{returnTerms} as \texttt{VarianceReturnTerms} --- the field on
-which the CDM equity-variance qualification depends. Each of the 252 fixings ---
-the recorded IDX official closes --- is a CDM \texttt{Observation}, an observed
-value on the record; the ledger's accrual firing, which writes the accrued
+which the CDM equity-variance qualification depends. Each of the 252 fixings is a daily log-return $r_i = \ln(C_i/C_{i-1})$ over two
+consecutive recorded IDX official closes, so the 252-fixing series reads 253
+closes --- the effective-date reference close $C_0$ fixed at inception, then
+closes $C_1,\dots,C_{252}$, one per fixing date. Each recorded close is a CDM
+\texttt{Observation}, an observed value on the record; the ledger's accrual firing, which writes the accrued
 sum-of-squared-returns statistic into UnitStatus for the next firing to find,
 maps to a \texttt{BusinessEvent} whose \texttt{Reset} lands in the trade's
-\texttt{resetHistory}. Each fixing is thus a recorded observation and each
-accrual a recorded business event, exactly as the two models agree they should
-be. Final realised variance 441 points settles $1{,}000 \times (441-400) =
+\texttt{resetHistory}. The two models agree: each recorded close is a CDM observation, each accrual a
+recorded business event. Final realised variance 441 points settles $1{,}000 \times (441-400) =
 \USD{41{,}000}$ to the realised-variance receiver: one CDM transfer primitive,
 one ledger owned-cash move, one conserved fact.
 

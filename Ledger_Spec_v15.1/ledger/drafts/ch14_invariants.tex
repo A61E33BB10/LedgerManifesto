@@ -296,8 +296,8 @@ log order --- is folded at valid-time index $k$, re-sequencing the tail $A_k,\do
 forward. The two folds traverse the same observations in two different orders, and each is
 a deterministic function of the prefix; a party recomputes either one and obtains the same
 bits. Confusing them --- folding a back-dated close in log order, or asserting the log-order
-replay already carries the as-of answer --- is exactly the single-axis error the finding
-below parks.
+replay already carries the as-of answer --- is exactly the single-axis error parked
+below.
 
 \begin{theorem}[Replay determinism]\label{thm:replay}
 Discarding the ledger and the three homes and re-folding a log prefix reproduces
@@ -329,9 +329,25 @@ axis. Theorem~\ref{thm:timetravel} needs two --- a transaction-time prefix and a
 horizon --- because a back-dated observation makes the as-known-at and as-of views two
 distinct, both-correct answers. This is a genuine conflict between the single-axis guarantee
 and a system that has required both axes since the market-data boundary
-(Chapter~\ref{ch:marketdata}, regime W2). It is parked, with the exact proposed amendment
+(Chapter~\ref{ch:marketdata}, failure mode W2). It is parked, with the exact proposed amendment
 text, as entry PARK-2 of the parking index (Chapter~\ref{ch:scope}); no chapter amends the
 constitution, which is the owner's alone.
+
+\subsection{The record is the log}\label{sec:record-is-log}
+
+Replay reconstructs more than balances and the three homes. Because every observation
+whose reproduction the framework guarantees enters the log as a moveless
+observation-recording transaction (Chapters~\ref{ch:objects} and~\ref{ch:marketdata}),
+re-folding a log prefix reconstructs every recorded observation as well --- the record
+\emph{is} the log, with no second store to reconcile against. The single-writer
+discipline (Invariant~\ref{inv:writer}) therefore covers every observation, not only
+every move, and the ``two views of one log'' of Chapter~\ref{ch:picture} is exact: the
+Record the \texttt{watch} arrow reads and the Ledger the \texttt{contract} and
+\texttt{apply} arrows consume are the same folded log. Chapter~\ref{ch:testability}
+exercises this as \texttt{prop\_replayReconstructsRecord}, which regenerates the whole
+record --- observations included --- from the log alone and compares. The observation
+stream is therefore no second half of the record with a door of its own: there is one door,
+and it is the Transaction Executor.
 
 \subsection{The coverage invariant and the two-guard contrast}
 

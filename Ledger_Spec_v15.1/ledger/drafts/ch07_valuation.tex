@@ -217,12 +217,15 @@ off-market terms; but naming it does not make the inflow neutral. The
 constitutional guarantee, asserted for every case, does not hold here: it is
 narrowed to fair-value financing.
 
-This is a genuine conflict between the specification and Constitution~\S8. It is
+This is a genuine conflict between the specification and Constitution~\S8. It was
 parked --- not resolved, and not relabelled --- as entry PARK-4 of the parking
-index (Chapter~\ref{ch:scope}). The parked amendment makes \S8 case~2 conditional
-on the obligation being valued at fair value, with any day-one difference
-recognised as financing basis. Until it is adopted, the unconditional guarantee
-stands in the constitution and the off-market case stands against it, in the open.
+index (Chapter~\ref{ch:scope}), and the owner has since \textbf{ratified} the
+amendment (2026-07-13): \S8 case~2 becomes conditional on the obligation being
+valued at fair value, with any day-one difference recognised as financing basis, so
+this proposition stands as stated. The ratified clause C-8.7 awaits the owner's
+adoption into the authoritative manifesto, the owner's sole act; until that adoption
+the manifesto reads v1.1 and this proposition records the resolved delta in the open,
+never defined away.
 \end{proposition}
 
 In the fair-rate case, because the obligation is priced at par-plus-accrued, its
@@ -325,23 +328,34 @@ what is the consistent risk mark --- and their difference is a basis, computed
 on demand, never a break to be repaired.
 
 \paragraph{Example --- three venue marks, one risk mid.}
-A wallet holds $3{,}000$ units of $U$, sub-custodied across three venues:
-$1{,}500$ at venue~A, $1{,}000$ at venue~B, $500$ at venue~C. Each venue
-publishes its own official settlement close, used for that venue's margin and
-reconciliation: $A = 100.20$, $B = 100.00$, $C = 99.60$. Risk marks the whole
-holding at one mid, $100.00$.
+A holding of $3{,}000$ units of $U$ sits in three custody wallets --- $W_A$,
+$W_B$, $W_C$ --- one per venue: $1{,}500$ in $W_A$, $1{,}000$ in $W_B$, $500$ in
+$W_C$. \emph{Venue is not a new coordinate.} Sub-custody is nothing but the
+ordinary partition of a position across wallets, a dimension the fold already
+carries; ``at venue $A$'' means ``in the custody wallet $W_A$,'' and the
+mark-to-market price is the official settlement close declared for that wallet's
+venue, read at the boundary like any other observation. Each venue publishes its
+own close, used for that venue's margin and reconciliation: $A = 100.20$, $B =
+100.00$, $C = 99.60$. Risk marks the whole holding at one mid, $100.00$. $P^{\mathrm{mk}}$
+is thus a function of the custody wallet, applied wallet by wallet:
 \[
-  \mathrm{NAV}^{\mathrm{mk}} = 1{,}500(100.20) + 1{,}000(100.00) + 500(99.60)
-    = \USD{300,100},
+  \mathrm{NAV}^{\mathrm{mk}} = \sum_{w\in\{W_A,W_B,W_C\}} P^{\mathrm{mk}}(w)\,\mathrm{bal}_{\mathrm{owned}}(w,U)
+    = 1{,}500(100.20) + 1{,}000(100.00) + 500(99.60) = \USD{300,100},
 \]
 \[
   \mathrm{NAV}^{\mathrm{md}} = 3{,}000(100.00) = \USD{300,000}.
 \]
 The two money figures differ by \USD{100}, the cross-venue basis. The
-$3{,}000$ is one number from one fold: each venue's sub-position reconciles
-against its own statement under $P^{\mathrm{mk}}$, and the book aggregates for
-risk under $P^{\mathrm{md}}$, but the position cannot diverge because there is
-only one of it.
+$3{,}000$ is one number from one fold over the three custody wallets: each
+wallet's sub-position reconciles against its own venue statement under
+$P^{\mathrm{mk}}$, and the book aggregates for risk under $P^{\mathrm{md}}$, but
+the position cannot diverge because there is only one of it and no venue axis was
+added to hold it. The reduction is exactly \emph{sub-custody is a wallet partition}:
+it holds when the venue distinction coincides with a custody split. An execution
+venue with no custody partition --- one custody account marked against two exchanges'
+closes --- is a boundary-reconciliation matter, not a second position, and a
+CCP-cleared position is a counterparty wallet with a clearing-level mark
+(Chapter~\ref{ch:collateral}), not a sub-custody partition of owned mass.
 
 \subsection{The pricing-stack requirements}
 

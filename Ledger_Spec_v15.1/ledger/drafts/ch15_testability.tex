@@ -58,7 +58,7 @@ the product-graph node and edge sets --- the lifecycle states and guarded transi
 fixed at registration (Chapter~\ref{ch:objects}); the collateral regimes
 \{title-transfer, pledge, STM/CTM\} and the coordinate planes \{owned, lent, posted\}
 (Chapter~\ref{ch:collateral}); the component dimensions of the data-kind registry and the
-boundary failure regimes W1--W4 (Chapter~\ref{ch:marketdata}); and the trigger and event
+boundary failure modes W1--W4 (Chapter~\ref{ch:marketdata}); and the trigger and event
 kinds of a contract (Chapter~\ref{ch:contracts}). On the CDM side the genuinely closed
 enumerations are the day-count fraction, the option type (call or put), and the
 primitive-instruction set (Chapter~\ref{ch:cdm}). These are closed choices, and they seed
@@ -106,8 +106,8 @@ least of all.
 \paragraph{Conservation at agreement grain, and the netting collapse it catches.}
 Conservation is checked at the finest grain the coordinate vector has --- per (unit,
 coordinate, agreement), Theorem~\ref{thm:conservation} --- not at the aggregate (unit,
-coordinate) grain. The distinction has teeth precisely on the cross-agreement history the
-finding names: a wallet posts 100 of a unit under agreement $G_1$ and receives 100 of the
+coordinate) grain. The distinction has teeth precisely on the cross-agreement history it
+catches: a wallet posts 100 of a unit under agreement $G_1$ and receives 100 of the
 same unit under a different agreement $G_2$, so the aggregate posted coordinate nets to
 zero. Both the aggregate law and the finer law hold on that history --- each per-agreement
 coordinate is conserved across wallets, and so is their sum --- but a report or property
@@ -635,6 +635,168 @@ extensible predicate rather than a property that holds by construction, each new
 lifecycle event-kind must extend \emph{both} the pricing rule (Definition~7.1,
 \S\ref{sec:pricing-state}) \emph{and} the \texttt{extinguished} predicate together, or
 \texttt{prop\_noDoubleCount} silently under-quantifies and stops witnessing the new kind.
+
+\paragraph{Available free mass is non-negative for every wallet, shorts included.}
+The report's available-mass figure is $\max(\mathrm{bal}_{\text{owned}},0)-\sum_G
+\mathrm{bal}_{\text{posted},G}$ (Chapter~\ref{ch:reporting}), the same $\max(\cdot,0)$ the
+coverage invariant carries. Written without the $\max$ it goes negative for a negative-owned
+wallet --- a plain short, or an issuer wallet conservation creates --- contradicting
+Chapter~\ref{ch:invariants}. The property asserts non-negativity on exactly those wallets.
+
+\begin{lstlisting}
+prop_availabilityNonNegative :: History -> Wallet -> Unit -> Property
+prop_availabilityNonNegative h w u =
+  admitted h ==>
+       availableMass h w u >= 0                                  -- the CH.12 REPORT figure, non-negative
+  .&&. availableMass h w u
+         === max (ownedBal h w u) 0 - sum [ postedG h w u g | g <- agreements h ]
+  -- availableMass is the ch12 availability PROJECTION under test, read from the report, NOT
+  -- re-derived here: a report shipping (owned - Sigma posted) WITHOUT the max returns < 0 for a
+  -- negative-owned wallet and fires this red. Distinct from prop_coverageSignConvention, which
+  -- tests the DOOR invariant and would stay green under exactly that broken report.
+
+genNegativeOwned :: Gen History  -- draw a short-flag with rate r; when it fires, build a wallet
+  -- with owned < 0 (a plain short / issuer wallet) and read its available-mass report figure.
+prop_availability_fires =        -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 hasNegativeOwnedWallet
+    "a negative-owned (short/issuer) wallet in the availability report" genNegativeOwned
+\end{lstlisting}
+
+The negative-owned branch is a genuine precondition: a generator that only ever built long wallets
+would pass \texttt{prop\_availabilityNonNegative} without ever testing the $\max$, and \S 2's
+zero-firings rule makes that a defect. The property reads the Chapter~\ref{ch:reporting} availability
+figure itself, not a re-derivation of it: on every negative-owned wallet that figure is zero, never
+negative, and a report that dropped the $\max$ --- shipping $\mathrm{bal}_{\text{owned}}-\sum_G
+\mathrm{bal}_{\text{posted},G}$ --- returns a negative number and fails the property, exactly where
+\texttt{prop\_coverageSignConvention} (the door invariant) would still pass. That separation is the
+point: the door bound and the report figure are two statements, and this test pins the report.
+
+\paragraph{The fail transition has exactly one writer, and no orphan.}
+The walk \texttt{instructed}$\to$\texttt{failed} is written by the settlement-obligation unit's own
+contract --- the one legal writer of its lifecycle node (Chapter~\ref{ch:homes},
+Invariant~\ref{inv:one-writer}) --- on one of two recorded triggers: an external fail notice
+admitted as a moveless observation, or the due-date watch finding no settlement-confirmation
+observation by the deadline. The property asserts the writer and forbids an orphan failed node.
+
+\begin{lstlisting}
+prop_failWriterAttribution :: History -> Property
+prop_failWriterAttribution h = reachesFailedNode h ==> conjoin
+  [      writerOf t === settlementObligationContract h       -- one writer, named
+    .&&. triggerOf t `elem` [FailNotice, DueDateNoConfirm]   -- one of two recorded triggers
+  | t <- failTransitions h ]  -- EVERY failed node, so a second unit's orphan cannot escape
+  -- no `failed' node exists without one of the two triggers on the record.
+
+-- genSettlementHistory (above) already walks instructed -> failed under a fail-flag; the writer
+-- attribution and trigger presence are asserted on that same branch.
+prop_failWriter_fires =          -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 reachesFailedNode
+    "instructed -> failed written by the unit's contract on a recorded trigger" genSettlementHistory
+\end{lstlisting}
+
+On every history that reaches the failed node, the transition is authored by the
+settlement-obligation unit's contract and carries one of the two triggers on the record; a failed
+node written by any other machine, or with no trigger, fails the property --- the writerless fail the
+one-writer rule forbids.
+
+\paragraph{Venue is a custody wallet, not a coordinate: the mark-to-market fold.}
+Sub-custody across venues is the ordinary partition of a position across wallets, not a new axis
+(Chapter~\ref{ch:valuation}). The mark-to-market NAV is a fold over custody wallets, each priced at
+its venue's official close; the property asserts it equals that per-wallet sum and that the total
+holding is the sum of the custody-wallet balances --- no venue dimension was added to diverge from
+it. It bites when two or more custody wallets hold the same unit at different closes.
+
+\begin{lstlisting}
+prop_navMkFoldsOverCustodyWallets :: History -> Unit -> Property
+prop_navMkFoldsOverCustodyWallets h u = twoCustodyVenues h u ==>
+       navMk h u === sum [ closeAt (venueOf w) * ownedBal h w u | w <- custodyWallets h u ]
+  .&&. balanceCoordinates h === [Owned, Lent, Posted]  -- NO venue-indexed coordinate exists
+  -- venue is WHICH custody wallet, an existing dimension; the position cannot diverge because
+  -- there is no venue axis to hold a divergent figure. balanceCoordinates reads the balance
+  -- SCHEMA, independent of the fold, so this conjunct is not x===x: add a venue coordinate and
+  -- it fires red.
+
+genMultiVenue :: Gen History  -- draw a multi-venue flag with rate r; when it fires, hold u across
+  -- >=2 custody wallets (W_A,W_B,...) whose venues publish DIFFERENT official closes.
+prop_navMk_fires =            -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 twoCustodyVenues
+    "one unit held across >=2 custody wallets at different venue closes" genMultiVenue
+\end{lstlisting}
+
+When the flag fires the holding is split across custody wallets at differing closes by construction,
+so the cross-venue basis is non-zero and the fold is exercised; the $\ge 1\%$ floor is asserted and
+\S 2's zero-firings rule makes an unexercised multi-venue branch a defect. The property fails on the
+design that adds a venue coordinate: the position could then diverge from the wallet-partition sum,
+and \texttt{prop\_navMkFoldsOverCustodyWallets} reports the divergence the single position record
+forbids.
+
+\paragraph{Variance fixings read one-plus-closes, and the off-by-one it refuses.}
+A realised-variance fold over $N$ daily log-returns reads $N+1$ official closes:
+the effective-date reference close $C_0$ plus one close per fixing date
+$C_1,\dots,C_{N}$, with fixing $i$ the return $\ln(C_i/C_{i-1})$. The property
+asserts the count relation directly, that $C_0$ is on the record before fixing 1
+(no return references a missing close), and that the fold sums exactly $N$ squared
+returns. The precondition --- a generated variance swap --- is genuine, and every
+variance-swap history witnesses it.
+
+\begin{lstlisting}
+prop_varianceFixingsReadOnePlusCloses :: History -> Property
+prop_varianceFixingsReadOnePlusCloses h = isVarianceSwap h ==>
+       length (closesRead h)  === nFixings h + 1     -- N returns read N+1 closes
+  .&&. referenceClose h `recordedBefore` fixing 1 h  -- C_0 on the record before fixing 1
+  .&&. length (returns h)     === nFixings h          -- exactly N returns, none missing a close
+  .&&. length (foldSquares h) === nFixings h          -- fold sums exactly N squared returns
+  -- nFixings h is the DECLARED schedule count from the product terms (the scheduled 252), read
+  -- independently of the fold -- NOT length (returns h) -- so these are genuine count checks,
+  -- not x===x: an implementation reading N closes for N fixings fails the first conjunct.
+
+genVarianceSwap :: Gen History
+-- draw N in [1..252] so N VARIES; fix a reference close C_0 at the effective date,
+-- then N daily closes C_1..C_N; fixing i is the return ln(C_i / C_{i-1}).
+
+prop_varFixings_fires =                     -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 isVarianceSwap
+    "a variance-swap history: N returns folded over N+1 closes" genVarianceSwap
+\end{lstlisting}
+
+Because $C_0$ is drawn at the effective date and $C_1,\dots,C_N$ one per fixing
+date, every generated variance-swap history clears the precondition by construction,
+so the $\ge 1\%$ floor is met and \S 2's zero-firings rule turns an unwitnessed run
+into a defect. The property fails exactly on the off-by-one design: read $N$ closes
+instead of $N+1$ and $C_0$ goes unnamed, the fold produces $N-1$ returns, and
+\texttt{prop\_varianceFixingsReadOnePlusCloses} reports the missing close the
+reference exists to supply. For $N = 252$ the fold reads $253$ closes and sums $252$
+squared returns.
+
+\paragraph{The record is the log: replay reconstructs every observation.}
+Because every observation enters the log as a moveless observation-recording transaction
+(Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:machines}), re-folding a log prefix
+reconstructs not only balances and the three homes but every recorded observation --- there is no
+second store. The property discards everything but the log and rebuilds the whole record,
+observations included, and compares. A generator that recorded observations outside the log --- a
+second door --- would fail it at once.
+
+\begin{lstlisting}
+prop_replayReconstructsRecord :: History -> Property
+prop_replayReconstructsRecord h = hasObservations h ==>
+       observations (replayFromLog (logOf h)) === observations h  -- every obs rebuilt from the log
+  .&&. record       (replayFromLog (logOf h)) === record h        -- and the whole record with it
+  -- observations h / record h are the generator's INDEPENDENT oracle -- what it intended to
+  -- record -- NOT defined as replayFromLog; recording an observation outside the log makes
+  -- replayFromLog drop it and fires this red (oracle-vs-replay, not x===x). This is the decisive
+  -- check for D4: it is the record/log collapse made falsifiable.
+
+genObservationHistory :: Gen History  -- draw histories that record >=1 observation (a close, a
+  -- fixing, a barrier print) as a moveless observation-recording transaction on the one log.
+prop_replayRecord_fires =              -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 hasObservations
+    "a history recording >=1 observation as a moveless transaction" genObservationHistory
+\end{lstlisting}
+
+Every generated history records at least one observation through the one door, so the precondition
+clears by construction and the $\ge 1\%$ floor is met; \S 2's zero-firings rule turns an unwitnessed
+run into a defect. The property fails exactly on the second-door design: record an observation
+anywhere but the log and \texttt{replayFromLog} cannot rebuild it, and
+\texttt{prop\_replayReconstructsRecord} reports the store the one-door discipline exists to abolish.
 
 \subsection{What an auditor checks}
 

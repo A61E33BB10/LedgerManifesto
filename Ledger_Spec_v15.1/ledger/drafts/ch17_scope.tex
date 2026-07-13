@@ -113,10 +113,21 @@ close-out is representable, yet the algebra that nets and closes those units out
 designed. It entails, on a counterparty default, valuing each claim at close-out --- each
 priced by the taker --- netting the per-netting-set claims and obligations to a single
 figure, and decoupling recovery from that figure; it is named here so it cannot be
-improvised. Named alongside it: the correction
+improvised. Named alongside it, and surfaced by the 2026-07-13 consistency review: the
+\textbf{right-of-use gate on collateral re-use} --- Constitution~C-8.8 requires that
+collateral received under a security interest \emph{without} right of use (segregated
+included) not be re-used, yet the coverage net (Chapter~\ref{ch:invariants}) bounds
+re-posting by possession alone and does not yet exclude no-right-of-use received mass, so a
+segregated inflow is representable as deliverable, so this item is \emph{live and
+blocking}: an implementation must not enable collateral re-use until the gate is built;
+and the \textbf{quantity-aware
+settlement-obligation unit} --- a partial settlement leaves some quantity settled and a
+residual failed, which the single \texttt{instructed}/\texttt{settled}/\texttt{failed} node
+cannot yet split into a settled leg and a failed-residual leg. Named further: the correction
 algebra beyond the single compensating transaction; inter-ledger federation and
 eliminations; and the remaining items of the companion register. Naming is the whole
-obligation; none of these is a gap in what the specification does claim.
+obligation; each is stated in the open at the chapter it touches, so none is a gap hidden
+inside what the specification does claim.
 
 \paragraph{The constitutional-parking rule.} The second register governs conflict with
 Constitution v1.1 itself.
@@ -131,11 +142,15 @@ constitution. Parking makes the conflict visible and hands the owner a precise, 
 choice.
 \end{principle}
 
-\emph{Current status: the index carries four parked entries.} Adversarial review found
-four points where this specification must depart from Constitution v1.1, and each is parked
-here with the exact clause it touches; the exact proposed amendment text is carried in the
-companion register. None is fudged, and none amends the constitution: each hands the owner a
-precise, decidable choice.
+\emph{Current status: two entries ratified, three still parked.} Adversarial review found
+five points where this specification departs from Constitution v1.1, each recorded here with
+the exact clause it touches and the exact amendment text in the companion register. On
+2026-07-13 the owner \textbf{ratified} two --- PARK-4 (deposit-neutrality at fair value) and a
+clarifying amendment to C-4.8 (the observation-recording discipline) --- which now await
+adoption into the authoritative manifesto, the owner's sole act; the structural entry and two
+substantive entries stand parked. None was ever fudged, and no chapter amends the
+constitution: each handed the owner a precise, decidable choice, and the owner has now decided
+two of them.
 
 \begin{itemize}
 \item \textbf{PARK-1 (structural).} The constitution's normative content is addressed only by
@@ -153,14 +168,24 @@ precise, decidable choice.
   zero and both encumbrances vanish. The parked amendment indexes the coordinate by
   (coordinate, agreement), with conservation per (unit, coordinate, agreement). Stated openly
   at Section~\ref{sec:coordinate-vector} and Theorem~\ref{thm:conservation}.
-\item \textbf{PARK-4 (Constitution \S8).} Section~8 asserts deposit-neutrality
-  unconditionally, yet financing received at an off-market rate moves net owned value at
-  receipt by a day-one financing basis. The parked amendment makes the guarantee conditional
-  on fair-value measurement. Stated openly at Chapter~\ref{ch:valuation}.
+\item \textbf{PARK-4 (Constitution \S8) --- RATIFIED 2026-07-13.} Section~8 asserted
+  deposit-neutrality unconditionally, yet financing received at an off-market rate moves net
+  owned value at receipt by a day-one financing basis. The amendment makes the guarantee
+  conditional on fair-value measurement (C-8.7); the owner has ratified it, and it awaits
+  adoption into the authoritative manifesto. Stated openly at Chapter~\ref{ch:valuation}.
+\item \textbf{C-4.8 clarification (Constitution \S1/\S4/\S5) --- RATIFIED 2026-07-13.} The
+  observation stream once entered through a second door with no invariant of its own. The
+  ratified amendment states that every guaranteed observation enters the record only as a
+  moveless observation-recording transaction through the one Transaction Executor --- the
+  record is the log --- so the single canonical record and the single writer reach every
+  observation. It clarifies rather than narrows, and awaits adoption into the manifesto.
+  Stated openly at Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:invariants}.
 \end{itemize}
 
-\noindent The index is non-empty and live: an empty index across a specification this size
-would signal that the mechanism had never been exercised, not that no conflict exists.
+\noindent The index is non-empty and live: PARK-1, PARK-2, and PARK-3 stand parked, and two
+entries are ratified but not yet adopted into the manifesto. An empty index across a
+specification this size would signal that the mechanism had never been exercised, not that no
+conflict exists.
 
 \subsection{Authority}
 

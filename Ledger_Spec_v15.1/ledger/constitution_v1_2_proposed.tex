@@ -5,9 +5,14 @@
 %  Finding F11 instrument: clause-level addressability of the Constitution.
 %  This file renders Ledger Framework Constitution v1.1 with an identifier
 %  C-<sec>.<n> on EVERY normative clause. It is pure addressing: not one word
-%  of Constitution prose is changed. The three PARKED amendments (F2/F10/F12
-%  = PARK-2/3/4) are folded in as clearly marked v1.2 deltas — the only prose
-%  deltas; everything else is verbatim v1.1 + labels.
+%  of Constitution prose is changed. Four v1.2 deltas are folded in as clearly
+%  marked boxes — the only prose deltas; everything else is verbatim v1.1 + labels.
+%  Owner disposition (2026-07-13, consistency pass):
+%    - RATIFIED: C-8.7 (D1, was F12/PARK-4, deposit-neutrality at fair value)
+%    - RATIFIED: C-4.8 (D4, F2 "second door", observation = moveless transaction)
+%    - STILL PARKED: C-4.10 (F10/PARK-3, §4 coordinate) and §12 (F2/PARK-2, bitemporal)
+%  Ratified deltas await the owner's adoption into the authoritative manifesto,
+%  which is the owner's sole act; this vehicle only records the decision.
 %
 %  Authority is one-way and does NOT turn here. The Constitution v1.1
 %  (LedgerManifesto/leddeger_manifesto.md) remains the sole authority; this
@@ -44,6 +49,18 @@
     \emph{Clause replaced (verbatim, Constitution v1.1):} #2\par\smallskip
     \emph{Proposed v1.2 replacement (verbatim):} #3}}\par\smallskip}
 
+% --- a RATIFIED-amendment delta box: owner has accepted the amendment; it awaits
+%     the owner's adoption into the authoritative manifesto (that adoption is the
+%     owner's sole act; this vehicle only records the decision). ---
+\newcommand{\rat}[3]{%
+  \par\smallskip\noindent
+  \fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+    \small\textbf{[RATIFIED AMENDMENT --- owner 2026-07-13 --- #1]}\par\smallskip
+    \emph{Clause replaced (verbatim, Constitution v1.1):} #2\par\smallskip
+    \emph{Ratified v1.2 replacement (verbatim):} #3\par\smallskip
+    \emph{Status:} accepted by the owner; awaiting adoption into the authoritative
+    manifesto, which is the owner's alone.}}\par\smallskip}
+
 \begin{document}
 
 \begin{center}
@@ -54,9 +71,13 @@
   This document renders Ledger Framework Constitution v1.1 with a clause-level
   address \textbf{C-\textit{sec}.\textit{n}} on every normative clause --- pure
   addressing, \emph{not one word of Constitution prose changed} --- and folds in
-  the three parked amendments (F2, F10, F12) as marked v1.2 deltas. The
-  Constitution v1.1 (\texttt{LedgerManifesto/leddeger\_manifesto.md}) remains the
-  sole authority; authority is one-way and does not turn here.}}
+  four v1.2 deltas as marked boxes: two \textbf{ratified} by the owner on
+  2026-07-13 (C-8.7 deposit-neutrality at fair value, and C-4.8 observation as
+  moveless transaction) and two still \textbf{parked} (\S4 coordinate, \S12
+  bitemporal). The ratified deltas await the owner's adoption into the
+  authoritative manifesto. The Constitution v1.1
+  (\texttt{LedgerManifesto/leddeger\_manifesto.md}) remains the sole authority
+  until that adoption; authority is one-way and does not turn here.}}
 \end{center}
 
 \begin{center}
@@ -267,6 +288,21 @@ log; and the \textbf{record} is everything that has been recorded --- the log an
 all it carries, transactions, events, and observations alike. ``On the record''
 means present there, and a projection is any view computed from it.}
 
+\rat{D4 (F2, ``the second door''), amends C-4.8}{%
+  ``\ldots{} and the \textbf{record} is everything that has been recorded --- the
+  log and all it carries, transactions, events, and observations alike. `On the
+  record' means present there, and a projection is any view computed from it.''}{%
+  ``\ldots{} and the \textbf{record} is everything the log carries. Every
+  observation whose reproduction the framework guarantees enters the record only as
+  a moveless transaction --- admitted through the one Transaction Executor and
+  folded into a home --- the \emph{observation-recording transaction}. An event is
+  a trigger: it carries timing, not admitted data. No observation is exempt from
+  the one door, so the single canonical record of \S1 and the single writer of \S5
+  extend without exception to every observation. In the typed picture of \S3 the
+  contract and the fold consume the ledger unchanged, because the observations a
+  contract reads are home facts folded into the ledger. `On the record' means
+  present there, and a projection is any view computed from it.''}
+
 \clause{C-4.9}{Every counterparty outside the system is represented by a virtual
 wallet inside it, so the system is closed. Conservation holds by construction, not
 by check.}
@@ -453,7 +489,7 @@ created in the same transaction --- collateral received under title transfer, ca
 included, is this case, owned by the receiver against an equivalent-return
 obligation that is itself a unit;}
 
-\pk{F12 (PARK-4), amends \S8 case 2}{%
+\rat{D1 (was F12 / PARK-4), amends \S8 case 2 (C-8.7)}{%
   ``a contribution or financing received against an equal obligation created in the
   same transaction --- collateral received under title transfer, cash included, is
   this case, owned by the receiver against an equivalent-return obligation that is
