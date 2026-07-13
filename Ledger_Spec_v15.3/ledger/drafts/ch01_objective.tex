@@ -1,0 +1,167 @@
+% Chapter 1 — The Objective and the Commitments (KLEPPMANN, 4 pp)
+% Discharges constitution §1, §2.
+
+\begin{abstract}
+Reconciliation exists because many systems store the same facts, and independently
+maintained copies eventually disagree. The Ledger removes the cause: every fact is
+recorded exactly once, in an immutable log of atomic transactions, and every other
+number --- balances, valuations, profit and loss, reports --- is a deterministic
+projection of that single record, reproducible by any party and reconstructible at any
+past date. This specification defines the system in full, rated one-way against the
+Ledger Framework Constitution v1.2: the objects the system manipulates and the signed
+coordinate vector every balance generalises to; the three machines that evaluate the
+pipeline --- the Event Monitor, the Events Executor, and the Transaction Executor,
+three roles and one writer; smart contracts as pure, stateless transcriptions of legal
+terms; the three homes of state; valuation and profit and loss; ingestion, corporate
+actions, and the market data operator; collateral, margin, and lending under the
+declared legal regime of the governing agreement; virtual ledgers and the total return
+swap; the settlement interface; presentation and reporting projections; alignment with
+the Common Domain Model; and the invariant catalogue and executable-check regime that
+make every guarantee a property a machine can run. Six instruments with fixed terms
+and fixed quantities recur through every chapter, so that each claim is exercised on
+the same worked facts it governs.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\section{The Objective and the Commitments}\label{ch:objective}
+
+This chapter discharges constitution clauses C-1.1--C-1.5 (the objective and the one-record diagnosis) and C-2.1--C-2.8 (the eight commitments); it states the one-way authority of C-Auth.1 and the fixed vocabulary of C-Auth.4.
+
+\subsection{One record, or reconciliation}
+
+The objective, the diagnosis, and the remedy are the constitution's, and this
+specification cites them rather than re-arguing them. The objective is one clean
+post-trade and risk-management platform: a single system of record from which
+positions, valuations, profit and loss, collateral, and reports are all derived,
+exactly and reproducibly (C-1.1). The diagnosis is architectural --- reconciliation is
+the cost of storing one fact in more than one place, and two independently maintained
+stores of a fact eventually disagree (C-1.2--C-1.3). The remedy is to keep exactly one
+canonical record --- an ordered, append-only stream of atomic transactions --- of which
+every reported number is a projection, so that two projections of one record cannot
+disagree about any fact it contains (C-1.4--C-1.5).
+
+That last sentence is the design's entire ambition; the rest of this specification is
+what it forces. Its scope --- the recording, valuation, and lifecycle of trading-book
+positions held at fair value, and the projection of committed activity into settlement
+--- is fixed component by component in Chapter~17, together with the external
+authorities the ledger reconciles against at its boundary and never replaces.
+
+\subsection{The eight commitments}
+
+Eight commitments are non-negotiable, and every design decision in this specification is
+tested against them. Each is stated here with the one consequence it forces on the
+rest of the document.
+
+\textbf{Full auditability.} Every number is traceable, mechanically and completely, to
+the recorded events that produced it. History is never rewritten: a mistake is
+repaired by a recorded correction that names what it supersedes, so the error and its
+repair both survive. This commitment forces the immutable, hash-chained log of
+Chapter~\ref{ch:picture} and Chapter~3, and the repair discipline of Chapter~15: a
+wrong booking is corrected forward by a compensating transaction through the same admission
+door --- agreed, authorised, and in the open --- never by amendment of the past.
+
+\textbf{Full reproducibility.} Given the same record, any party --- the firm, a
+counterparty, an auditor, a regulator --- recomputes the same state, the same views,
+the same contract outputs, to the last minor unit. This commitment forces every arrow
+of Chapter~\ref{ch:picture} to be a deterministic function of recorded inputs and
+every quantity in this document to be an exact integer in minor units; the single
+input not on the record, the clock, is confined to one machine, whose emissions are
+themselves recorded (Chapter~4).
+
+\textbf{Time travel embedded in the design.} The exact state of the system at any past
+moment is reconstructible from the record alone, at any time, forever ---
+independently of whether the software that produced the events still exists. This
+commitment forces replay to re-read admitted transactions and never to re-execute
+smart contracts; Chapter~14 states time travel as a theorem of the fold, not a feature
+bolted onto it.
+
+\textbf{Correctness.} Illegal states are made unrepresentable wherever possible: a
+check can be forgotten or bypassed; a type cannot. Where wrongness cannot be prevented
+--- a contract can always compute the wrong economics --- it is made mechanically
+detectable and deterministically repairable. Defaults fail closed: the system stops
+rather than improvises. This commitment forces the single admission door of
+Chapter~4, the typed lifecycle graphs of Chapter~3, and the two layers of correctness
+of Chapter~15 --- structural correctness guaranteed at admission, economic correctness
+made checkable by recomputation.
+
+\textbf{Testability.} The ledger is correct because it is built to be tested. Every
+step is a pure, versioned function with explicit inputs, explicit outputs, and strong
+types --- typing alone eliminates whole classes of defects before a single test runs
+--- and every core invariant is expressed as an executable check over generated
+products, events, and histories, never defended only in prose. Correctness then
+composes: because the steps are pure and their composition is fixed --- the map, then
+the fold --- verifying each part verifies the whole. This commitment forces the
+invariant catalogue of Chapter~14 and the executable-check regime of Chapter~15, and
+it forces a rule of method: a property that cannot be tested mechanically is
+redesigned until it can be.
+
+\textbf{Clarity.} One name per component and one component per name; behaviour carried
+as declared data rather than hidden in code; every claim stated so that it can be
+checked by a reader with no prior exposure. This commitment fixes the vocabulary of
+this document --- unit, wallet, balance, move, transaction, watch, the immutable log,
+projection, the Event Monitor, the Events Executor, the Transaction Executor, smart
+contract, the market data operator, the three homes, virtual wallet, virtual ledger
+--- and forces the declared-data discipline that recurs in every chapter: terms,
+watches, market data operators, and collateral eligibility are data the record
+carries, never behaviour a reader must infer from code.
+
+\textbf{Order.} Events do not commute: each event's transaction is computed against the
+ledger all earlier events have built, so the same events in a different order are a
+different history --- buy shares then meet the dividend's record date and you are
+entitled; meet the record date then buy and you are not. The log's total order is part
+of the meaning of the record, never bookkeeping. This commitment forces the single
+writer and the single total order of Chapter~4, and the one-event-at-a-time step of
+Chapter~\ref{ch:picture} --- map one event, fold its transaction, only then map the
+next, so the transaction list is an output of the fold, never an input to it --- and
+the refusal to reorder anything unless harmlessness is proved (Chapter~14).
+
+\textbf{Simulability.} The current state is the initial state plus the fold of all
+transactions; the events that produced it are one path among the paths that could have
+occurred. The machinery must therefore run unchanged on hypothetical event streams:
+simulated paths branched from any recorded state, driven by generated events, folded by
+the same contracts and the same door, the one non-record input --- the seed --- recorded
+so that every path replays exactly. This commitment forces the purity of every contract
+(Chapter~5), the confinement of the clock to the Event Monitor (Chapter~4), and the wall
+that keeps effects --- settlement, models --- outside the fold (Chapters~8 and~11); the
+simulated ledger of Chapter~\ref{ch:virtual} and the generator regime of
+Chapter~\ref{ch:testability} are its two readings.
+
+The commitments are jointly non-negotiable, and a design is admitted only if it
+satisfies all eight: a design that is auditable and reproducible but untestable is
+redesigned, and a design that is elegant but cannot be replayed is rejected --- not
+because one commitment outranks another, but because each is required and none is
+waived. No design decision in this document rests on custom or typical
+practice; each is derived from the commitments and then, where an external standard
+binds, shown to satisfy it. One boundary bounds all eight: they secure one consistent
+internal record, not its correspondence with the world outside --- internal
+unbreakability is not external correctness, and whether a projection matches the market,
+the custodian, or the counterparty is reconciled at the boundary
+(Chapter~\ref{ch:marketdata}), never assumed.
+
+\subsection{The discipline of the document}
+
+The direction of authority is one-way. This specification is rated against the Ledger
+Framework Constitution v1.2 and against nothing else; each chapter opens by naming the
+constitution sections it discharges, and a genuine conflict with the constitution is
+never drafted around --- it is recorded in Chapter~17's open-problems index with the
+exact amendment it would require.
+
+Six instruments run through the document as threads, introduced as a cast in
+Chapter~\ref{ch:picture}: a cash-settled future, a one-touch option, a cash dividend,
+a stock split, an OTC variance swap, and a total return swap. Their terms, parties,
+dates, and quantities are fixed once and never vary, so a number met in one chapter
+can be checked against the same number in another. Each visit is an \emph{episode} in
+a fixed five-part shape: the trigger; the contract that catches it; the transactions
+it produces, as numbered rows with exact quantities; what the door checks; and the
+design point it substantiates. All quantities are exact integers in minor units;
+amounts stated in whole currency are exact in cents.
+
+Two conventions govern notation. Category-theoretic language appears only as a
+\emph{second telling}, and no knowledge of category theory is assumed of the reader:
+every concept is first fully explained in plain terms with a concrete example, and a
+marked box may then restate it categorically to remove residual ambiguity for the reader
+who wants it --- nothing later depends on any such box, and deleting them all
+leaves the specification complete. Code appears only as short typed signatures and
+data declarations; the reference implementation lies outside this document entirely.

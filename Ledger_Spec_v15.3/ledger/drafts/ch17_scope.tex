@@ -1,0 +1,211 @@
+% Chapter 17 — Scope. Author: KLEPPMANN. Budget 3 pp (G4: +1 pp for the open-problems index).
+% Discharges the Constitution v1.2 "Scope" section.
+% Hosts the open-problems index and the constitutional-parking rule (G4).
+% Target of Chapter~\ref{ch:requirements} V1 (model retention outside scope) via \label{ch:scope}.
+% No thread episodes: a scope chapter cites; it does not re-run threads.
+\section{Scope}\label{ch:scope}
+
+This chapter discharges constitution clauses C-Scope.1--C-Scope.11 (the boundary of the specification; C-Scope.9 jointly with Chapter~\ref{ch:settlement}), the Authority clauses C-Auth.1--C-Auth.4 (C-Auth.1 and C-Auth.4 jointly with Chapter~\ref{ch:objective}), and C-6.6 (managed-account consequences, delegated by its own terms to the Managed-Account Companion, register line E75).
+
+Scope fixes the boundary of the specification: what the specification covers, and what it
+reconciles against at its perimeter but never performs. The constitution states the
+in-scope object in one sentence --- the recording, valuation, and lifecycle of
+trading-book positions held at fair value, and the interface that projects committed
+activity into settlement. Everything below is that sentence made exact, component by
+component, together with the explicit list of external authorities that lie outside it.
+
+\subsection{In scope}
+
+The specification covers the following components, each defined and proved in the chapter
+named. Nothing in scope lives outside a chapter; nothing below is left to an implementation
+to invent.
+
+\begin{itemize}[leftmargin=*, itemsep=2.5pt]
+\item \textbf{The map-then-fold architecture and the projection machinery} that derives
+  every view from the log --- Chapter~\ref{ch:picture}.
+\item \textbf{The immutable log and the objects} --- units, wallets, balances, the atomic
+  move, the transaction, and the signed coordinate vector \emph{(owned, lent, posted)} ---
+  Chapter~\ref{ch:objects}.
+\item \textbf{The three machines} --- the Event Monitor, the Events Executor, and the
+  Transaction Executor --- and the single-writer door --- Chapter~\ref{ch:machines}.
+\item \textbf{The smart-contract framework}, its event-triggering discipline, and the
+  purity and idempotence requirements --- Chapter~\ref{ch:contracts}.
+\item \textbf{The three homes} --- ProductTerms, UnitStatus, PositionState --- and the
+  conditions that render illegal states unrepresentable --- Chapter~\ref{ch:homes}.
+\item \textbf{Valuation and profit and loss} --- NAV as a projection, path-independent PnL,
+  and deposit neutrality --- Chapter~\ref{ch:valuation}.
+\item \textbf{Ingestion, corporate actions, and the market data operator} --- the recorded
+  observation and the operator intrinsic to each (data-kind, event-kind) pair ---
+  Chapter~\ref{ch:marketdata}.
+\item \textbf{Collateral, margin, and lending} --- the regime key, the coverage invariant,
+  and the determination/payment split --- Chapter~\ref{ch:collateral}.
+\item \textbf{Virtual ledgers, strategies, and the total return swap} ---
+  Chapter~\ref{ch:virtual}.
+\item \textbf{The settlement interface} --- the projection of committed activity into
+  settlement --- Chapter~\ref{ch:settlement}.
+\item \textbf{Presentation and reporting projections} --- every reporting figure read from
+  coordinates, units, and declared terms alone --- Chapter~\ref{ch:reporting}.
+\item \textbf{Alignment with the Common Domain Model} --- shown, never adopted as authority
+  --- Chapter~\ref{ch:cdm}.
+\item \textbf{The invariant catalogue} and its executable properties ---
+  Chapter~\ref{ch:invariants}.
+\item \textbf{Testability and the executable-check regime} ---
+  Chapter~\ref{ch:testability}.
+\item \textbf{The minimum requirements} any conformant implementation must meet ---
+  Chapter~\ref{ch:requirements}.
+\end{itemize}
+
+\subsection{Out of scope}
+
+The following are external authorities. The ledger reconciles against each at its boundary;
+it performs none of them. Each is a function of some other system, and the ledger's
+closure holds precisely because it does not absorb them.
+
+\begin{itemize}[leftmargin=*, itemsep=2.5pt]
+\item \textbf{Price formation} --- price discovery and executable pricing. The ledger
+  records the outputs of pricing models and never runs one (Chapter~\ref{ch:valuation};
+  Chapter~\ref{ch:requirements}, V1). The discovery of price, and the model that produces
+  it, are external.
+\item \textbf{Legal agreements} --- the enforceability and validity of contracts. Every
+  right and obligation a legal contract creates is represented in the ledger as a unit
+  (Chapter~\ref{ch:contracts}), but the legal standing of the instrument is decided
+  outside the boundary.
+\item \textbf{The settlement infrastructure itself} --- settlement finality, payment-system
+  access, and custodian and CSD connectivity. The ledger says \emph{what} settles; the
+  infrastructure decides how, and whether (Chapter~\ref{ch:settlement}).
+\item \textbf{Regulatory submission} --- submission gateways and report formatting. Every
+  report is a projection of the record (Chapter~\ref{ch:reporting}); its transmission and
+  its per-regime format are external.
+\item \textbf{Reference-data authority} --- the mastering of instrument, counterparty, and
+  calendar reference data. The ledger reconciles against it at the boundary; it does not
+  master it.
+\item \textbf{Model governance and retention} --- the validation, approval, and retention
+  of pricing and strategy models, and accounting-policy decisions. Reproducing a valuation
+  from recorded inputs and identified prices is unconditional; reproducing a model's number
+  requires the model itself, whose retention is a governance matter outside the ledger's
+  scope (the anchor of Chapter~\ref{ch:requirements}, V1).
+\end{itemize}
+
+Five companion documents are named in the Exclusions Register as out-of-scope
+deliverables --- expansions the specification points to but does not contain, and not
+functions the ledger performs: the \emph{Worked-Examples Volume} (register lines E71 and
+E72), holding the dividend-forecast, special-dividend, spin-off, and elective-merger
+worked examples; the \emph{SBL Operations Companion} (register line E73), holding the full
+securities-lending operational lifecycle --- locates, buy-ins, SFTR and CSDR discipline,
+cascade recalls; the \emph{Track B graphs-interpreter companion} (register line E74),
+holding the generic term-sheet interpreter, the CDM round-trip, and term-sheet rendering;
+the \emph{Managed-Account Companion} (register line E75), holding managed-account fee
+accrual and NAV attribution --- the consequences Constitution \S6 delegates to the detailed
+specification for managed accounts; and the \emph{Simulation Companion} (register line
+E76), holding the stochastic models, probability measures, calibration procedures, and
+variance-reduction techniques that drive simulated paths --- the model content the
+constitution places outside the fold. What is \emph{in} this specification is the boundary
+that companion plugs into, not the models it holds: branch construction, seed discipline,
+and result provenance (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}). Each is
+named so its absence from this specification is deliberate and auditable, never silent.
+
+\subsection{The open-problems index and the constitutional-parking rule}
+
+Two registers live in this chapter. The first names the design questions the specification
+leaves open; the second parks any genuine conflict with the constitution.
+
+\paragraph{The open-problems index.} The constitution requires that implementation
+questions be named and left, not silently dropped. Each open design question is named here
+and carried in full in the \emph{Open-Problems and Escalation Register} companion. The
+top open risk is close-out and netting algebra: the collateral ruling made
+per-netting-set claim units first-class (Chapter~\ref{ch:collateral}) precisely so that
+close-out is representable, yet the algebra that nets and closes those units out is not yet
+designed. It entails, on a counterparty default, valuing each claim at close-out --- each
+priced by the taker --- netting the per-netting-set claims and obligations to a single
+figure, and decoupling recovery from that figure; it is named here so it cannot be
+improvised. Named alongside it, and surfaced by the 2026-07-13 consistency review: the
+\textbf{right-of-use gate on collateral re-use} --- Constitution~C-8.8 requires that
+collateral received under a security interest \emph{without} right of use (segregated
+included) not be re-used, yet the coverage net (Chapter~\ref{ch:invariants}) bounds
+re-posting by possession alone and does not yet exclude no-right-of-use received mass, so a
+segregated inflow is representable as deliverable, so this item is \emph{live and
+blocking}: an implementation must not enable collateral re-use until the gate is built;
+and the \textbf{quantity-aware
+settlement-obligation unit} --- a partial settlement leaves some quantity settled and a
+residual failed, which the single \texttt{instructed}/\texttt{settled}/\texttt{failed} node
+cannot yet split into a settled leg and a failed-residual leg. Named further: the correction
+algebra beyond the single compensating transaction; inter-ledger federation and
+eliminations; \textbf{behavioural-event generation} --- a generator that reaches the events
+that are \emph{decisions} (a default, an elective exercise, an election on a merger) must
+model the deciding party's behaviour, not just the market, and that model is not yet designed;
+\textbf{corporate-action generation} --- a simulated corporate action is a generated
+\emph{terms version} that must cross as a notice and drive the term-adjustment operator
+(Chapter~\ref{ch:marketdata}) exactly as a real one does, and the generator of well-typed
+terms versions is open; \textbf{nested simulation} --- a simulated path that itself branches
+a simulated ledger (an XVA computation off each exposure state); seed discipline and result
+provenance must compose across levels, named here so it cannot be improvised; and the
+remaining items of the companion register. Naming
+is the whole obligation; each is stated in the open at the chapter it touches, so none is a
+gap hidden inside what the specification does claim.
+
+\paragraph{The constitutional-parking rule.} The second register governs conflict with
+Constitution v1.2 itself.
+
+\begin{principle}[Constitutional parking]
+A genuine conflict between this specification and the constitution --- discovered in
+drafting or in review --- is parked in this index with the exact proposed amendment text.
+It is never silently amended and never fudged. Constitutional amendments are the owner's
+alone, under the constitution's closing \emph{Authority and Amendment} section; the
+one-way direction of authority forbids an author from resolving a conflict by editing the
+constitution. Parking makes the conflict visible and hands the owner a precise, decidable
+choice.
+\end{principle}
+
+\emph{Current status: every entry closed; the emptied index is evidenced, not suspicious.}
+Adversarial review found five points where this specification departed from Constitution
+v1.1, each parked here with the exact clause it touched and the exact amendment text in the
+companion register --- the mechanism exercised, never bypassed. On 2026-07-13 the owner
+ratified and adopted Constitution v1.2, which resolves all five. Each closure is recorded
+with its resolution, because an index that empties without a trace would be
+indistinguishable from an index that was never used:
+
+\begin{itemize}
+\item \textbf{PARK-1 (structural) --- CLOSED in v1.2.} The constitution's normative content
+  was addressed only by section, so ``this chapter discharges \S N'' could not be checked.
+  Resolution: v1.2 embeds the clause identifiers
+  $\mathrm{C}\text{-}\langle\text{sec}\rangle.\langle n\rangle$ in the manifesto's margin,
+  append-only and never renumbered; the separate clause-addressed rendering is retired, and
+  every chapter here opens with the clause identifiers it discharges.
+\item \textbf{PARK-2 (Constitution \S12) --- CLOSED in v1.2.} Section~12 once named a single
+  timestamp, while the system has required two axes since Chapter~\ref{ch:marketdata}: a
+  transaction-time prefix (what was known) and a valid-time horizon (which recorded
+  observations are in force). Resolution: the owner's \S 12 ruling restates C-12.1 to name
+  both honest answers and \emph{delegate their indexing to this specification}; the two-axis
+  machinery is retained, unchanged, as that indexing. Stated at Chapter~\ref{ch:picture} and
+  Theorem~\ref{thm:timetravel}.
+\item \textbf{PARK-3 (Constitution \S4) --- CLOSED in v1.2.} Section~4 once fixed the
+  coordinate schema, and a single \emph{posted} axis lets two encumbrances under two
+  agreements net to nothing. Resolution: the owner's \S 4 ruling restates C-4.10 to fix
+  ownership first and three admission tests, delegating the schema to this specification;
+  Section~\ref{sec:coordinate-vector} declares the (coordinate, agreement) schema and
+  demonstrates it compliant, with conservation at the finest declared grain held as
+  Theorem~\ref{thm:conservation}.
+\item \textbf{PARK-4 (Constitution \S8) --- CLOSED in v1.2.} Section~8 asserted
+  deposit-neutrality unconditionally, yet financing received at an off-market rate moves net
+  owned value at receipt by a day-one financing basis. Resolution: C-8.7 as adopted makes the
+  guarantee conditional on fair-value measurement, the day-one difference recognised as
+  financing basis; Chapter~\ref{ch:valuation} discharges the adopted clause.
+\item \textbf{C-4.8 clarification --- CLOSED in v1.2.} The observation stream once entered
+  through a second door with no invariant of its own. Resolution: C-4.8 as adopted states
+  that every guaranteed observation enters the record only as a moveless
+  observation-recording transaction through the one Transaction Executor --- the record is
+  the log --- so the single canonical record and the single writer reach every observation.
+  Stated at Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:invariants}.
+\end{itemize}
+
+\noindent The index is empty of open conflicts and live in its history: five were parked with
+exact amendment text, five decided by the owner, the resolutions above the evidence. A future
+conflict parks here the same way.
+
+\subsection{Authority}
+
+The direction of authority is one-way. This specification is rated against the
+constitution, and against nothing else; the constitution is rated against nothing. Where a
+future improvement requires departing from the constitution, the constitution is amended
+first --- through the parking rule above and the owner's decision --- never the
+specification bent in silence to fit it, and never the constitution bent to fit it.

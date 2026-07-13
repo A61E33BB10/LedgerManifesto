@@ -184,3 +184,18 @@ same edge already surfacing.)
    idempotent under the cause-derived identifier).
 
 Phase B (v15.3) drafts nothing until you rule.
+
+---
+
+## OWNER RULING (2026-07-14, recorded at the gate)
+
+1. **C-4.12 RATIFIED** — the parked text above, verbatim. Adoption into the manifesto
+   remains the owner's sole act; until then the specification cites the clause as
+   ratified-awaiting-adoption, exactly as the C-8.7/C-4.8 cycle did.
+2. **Registry ruling CONFIRMED** — one registry, two kind-columns: an explicit event-kind
+   column on the existing §8.3 registry, routing mandatory at registration.
+3. **Quarantine discipline CONFIRMED** — every arriving event is recorded, or its refusal
+   is recorded; the four properties (registry totality, routing determinism,
+   quarantine-never-drop, late-registration replay determinism) each carry firing floors.
+
+Phase B (v15.3) proceeds against this ruling.

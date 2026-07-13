@@ -1,0 +1,302 @@
+% Chapter 4 — The Machines. Author: KLEPPMANN. Budget 5 pp.
+\section{The Machines}\label{ch:machines}
+
+This chapter discharges constitution clauses C-5.1--C-5.8 (the three machines, the single-writer door, the cause-derived identifier, and the trust boundary).
+
+The framework has three machines, one for each arrow of the typed picture of
+Chapter~2 (\emph{The Picture: Map, Then Fold}): the Event Monitor evaluates
+\texttt{watch}, the Events Executor evaluates \texttt{contract}, and the
+Transaction Executor evaluates \texttt{apply}. All three are generic machinery.
+No machine holds a line of product knowledge: what a dividend, a touch, or an
+expiry \emph{means} lives in the smart contracts (Chapter~5); the machines only
+notice, deliver, and admit. And only the last of the three ever writes. The
+Event Monitor emits events; the Events Executor collects proposals; the
+Transaction Executor alone changes the state of the ledger. Three roles, one
+writer. In one picture --- machines in brackets, data on the arrows, the dotted
+line the trust boundary:
+
+{\small
+\begin{verbatim}
+ ................... outside the trust boundary ...................
+ :                                                                :
+ :      clock                          external events            :
+ :        |                                  |                    :
+ :        v                                  v                    :
+ :   [Event Monitor] -- emits Event --> [Events Executor]         :
+ :                                           |  fires             :
+ :                                           v                    :
+ :                                    [Smart Contract]            :
+ :                                           |  proposes          :
+ :                                           v                    :
+ :                                      Transaction               :
+ :...........................................|....................:
+                                             v
+               [Transaction Executor] -- admits --> Immutable Log
+                    (the one writer)                     |
+                                                         v
+                                                    projections
+\end{verbatim}
+}
+
+\subsection{The Event Monitor}
+
+The Event Monitor owns time and attention. It holds every declared watch ---
+the dates, observations, and conditions each unit's terms require watching
+(Chapter~3) --- and evaluates them against the clock and the recorded
+observations, emitting an event onto the record the moment a condition is met.
+It holds no private list: the watches it evaluates are on the record, declared
+by the units, so the Monitor's workload is itself a projection. And it emits
+events, never transactions: nothing the Monitor does can place so much as one
+move before the door.
+
+The clock is the single input to the whole system that is not on the record,
+and the Event Monitor is the single place it is consulted. The event the
+Monitor emits \emph{is} recorded, so everything downstream of the emission is a
+function of the record alone. Two consequences follow, and both are
+load-bearing. A late firing produces the identical transaction: the contract
+reads the recorded event and the recorded state, never the wall clock, so delay
+costs timeliness and nothing else. And emission itself is verifiable: because
+watches are declared data and the Monitor is deterministic, any party holding
+the record and the clock recomputes which events should have been emitted, and
+when --- the Monitor is auditable against its own inputs.
+
+The relationship between the units and the Monitor is a recorded handshake.
+Each declared watch is acknowledged by the Monitor, and the acknowledgement ---
+an event like any other, flowing through the same pipeline --- is written into
+the unit's state. A watch is thus visibly \emph{declared}, then \emph{armed},
+then \emph{fired} or \emph{expired}, and each step is on the record. A declared
+watch that is never armed is therefore a visible gap, never a silent one: it
+stands in the unit's state as declared-but-unarmed, an overdue item any reader
+can query. The full chain can be walked in either direction --- register a
+unit, the conditions it declares, the acknowledgements, the events, the
+transactions, the state updates --- which is the auditability commitment
+(\S2) applied to attention itself.
+
+The Monitor can affect timeliness and liveness; it cannot affect the
+correctness of ledger state, because it only emits events, and an event changes
+nothing until a contract's proposal passes the door.
+
+\subsection{The Events Executor}
+
+The Events Executor owns delivery. It does two things and nothing else. First,
+it captures the events arriving from outside --- trades executed in the market,
+corporate-action notices, fixings and other observations --- and \emph{proposes}
+their recording: an observation crosses as a moveless observation-recording
+transaction (Chapter~\ref{ch:marketdata}), which the Transaction Executor admits
+or refuses like any other. Second, for each event, arrived or emitted, it fires the
+responsible smart contract, handing it the event together with the current
+projection of the ledger, and collects the proposed transaction. Many
+contracts, one Events Executor: the contracts carry all the product knowledge;
+the Events Executor carries none.
+
+A trigger carries timing, not data: the firing says \emph{when}, and everything
+the event means is read from the record. The Events Executor runs the
+contracts; it never writes the ledger --- not even an observation --- and its
+output is only proposals. A proposal is not a fact --- it becomes one only if the
+one Transaction Executor admits it.
+
+\subsection{The Transaction Executor}
+
+The Transaction Executor owns the record. It is the gatekeeper of the ledger
+door: the single component through which every transaction must pass, and the
+only component permitted to change the ledger's state. On each proposal it
+validates structure. Conservation is automatic --- a move is paired-leg by
+construction, so the per-(unit, coordinate) sums cannot be disturbed
+(Chapter~3); authorisation, idempotence, consistency of reference, and writer
+discipline are enforced as checks at the door. If the proposal is admissible,
+the Executor appends it to the immutable log; if not, it refuses, and the
+refusal is a returned value, never a half-applied state. It creates nothing and
+runs nothing. There is no other way to change the ledger's state.
+
+Idempotence is the door's own defence, owed to no one upstream, and its key is the
+transaction's own identifier. Start with the case the identifier must get right. One
+corporate action --- a single cash dividend declared on stock ACME --- is one cause,
+yet it touches every unit that references ACME, and each is adjusted by its own
+transaction. The Monitor emits one event; the contract fires once per affected unit
+and proposes one transaction per unit. These are \emph{different} transactions of the
+\emph{same} cause, and every one of them must commit. An identifier that keyed on the
+cause alone would collapse the whole set to one and silently drop every unit but the
+first. So the cause alone cannot be the key.
+
+\textbf{The derivation rule.} Every proposed transaction carries the identifier
+\[
+  \mathit{txid} \;=\; H(\mathit{causeEventId},\ \mathit{contractId},\ \mathit{unitId},\ \mathit{seq}),
+\]
+where $\mathit{causeEventId}$ is the recorded event that fired the contract,
+$\mathit{contractId}$ and $\mathit{unitId}$ name the contract and the unit the
+transaction acts on, $\mathit{seq}$ distinguishes the several legs one firing may
+propose on a single unit, and $H$ is a fixed collision-resistant hash. The door keys
+idempotence on $\mathit{txid}$: a proposal whose $\mathit{txid}$ already stands on the
+log is committed zero further times; a proposal whose $\mathit{txid}$ is new is
+admitted on its merits. Two properties make this rule exactly right, and each is
+proved, not asserted.
+
+\emph{Constant under retry.} Re-delivering the same firing recomputes the identical
+tuple. All four components are read from the record: $\mathit{causeEventId}$ is the
+recorded event, $\mathit{contractId}$ and $\mathit{unitId}$ are fixed by which
+contract fired on which unit, and $\mathit{seq}$ is assigned by the contract as a pure
+function of that recorded input (Chapter~\ref{ch:contracts}). A retry, a duplicate, or
+a late re-firing therefore presents the same four components, so $H$ returns the same
+$\mathit{txid}$; the door finds it already on the log and commits it once. Delay and
+duplication cost timeliness and nothing else.
+
+\emph{Injective over a cascade.} Fix one cause, so $\mathit{causeEventId}$ is held
+constant across the whole cascade. The remaining three components
+$(\mathit{contractId}, \mathit{unitId}, \mathit{seq})$ identify a leg uniquely: two
+legs of the cascade differ in the unit they act on, or --- for two legs on one unit
+--- in $\mathit{seq}$; no two distinct legs agree on all three. So the map
+$(\mathit{contractId}, \mathit{unitId}, \mathit{seq}) \mapsto \mathit{txid}$ is
+injective on the cascade's legs, \emph{provided} $H$ is injective on the tuple domain.
+That is the standing assumption on $H$, stated rather than left implicit: over the
+finite domain of well-formed cause tuples $H$ admits no collision --- exactly the
+guarantee a collision-resistant hash is chosen to give. Under it, a cascade of $n$
+legs carries $n$ distinct identifiers, the door sees $n$ new $\mathit{txid}$s, and all
+$n$ commit. The two properties are jointly exact: a retry collapses because its tuple
+is unchanged, and a genuine second leg commits because its tuple differs.
+
+\begin{lstlisting}
+txid :: EventId -> ContractId -> UnitId -> Seq -> Txid  -- txid = H(cause, contract, unit, seq)
+-- retry:   same four arguments        => same Txid     => committed once (constant under retry)
+-- cascade: one cause, distinct (contract, unit, seq)   => distinct Txids  => all n commit (injective)
+\end{lstlisting}
+
+The single-writer discipline is a correctness requirement, not an
+implementation preference. The Transaction Executor presents to the log a
+strictly monotonic sequence of committed transactions: every projection folds
+the same total order, which is what makes two projections of one record unable
+to disagree. Where two simultaneous events on the same instrument propose
+transactions that do not commute and whose terms declare no precedence, the
+Executor refuses rather than guesses: an order the record cannot justify is an
+order nobody can recompute, and defaults fail closed (\S2). This refusal is
+constitutional, not a design preference: C-2.7 forbids reordering anything unless
+harmlessness is proved, and two non-commuting transactions with no declared
+precedence are exactly the case where it cannot be. The refusal is
+visible, and resolution --- a declared precedence, a corrected proposal ---
+arrives through the same door.
+
+\subsection{One event, three machines, one write}
+
+This section runs OT-1 (Cast, \S\ref{sec:cast}) through the three machines and adds one
+thing the pipeline walk of \S\ref{ch:picture} did not: what happens when the same emission
+fires twice.
+
+\textbf{Trigger.} OMEGA's official close of 79.00 is recorded. The declared
+condition is met, and the Event Monitor emits the touch event onto the record.
+No ledger state has changed: the Monitor emits events and cannot write state.
+
+\textbf{Contract.} The Events Executor fires OT-1's smart contract, handing it
+the touch event and the current projection. The contract reads the terms, the
+holder (\mbox{W-ALPHA}), and the unit's state (\emph{live}), and returns one
+transaction.
+
+\textbf{Transaction.}
+
+\begin{center}
+\begin{tabular}{@{}rll@{}}
+\toprule
+ & Kind & Content \\
+\midrule
+1 & unit-state change & OT-1: UnitStatus \emph{live} $\to$ \emph{triggered} \\
+2 & move & owned(USD) 1{,}000{,}000: W-BANK $\to$ W-ALPHA \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Where the unit stands encumbered under a collateral agreement, the payment leg
+routes through that agreement's conditional obligation; Chapter~9 works this
+same knock start to finish. The machines are identical in both tellings.
+
+\textbf{The door.} The Transaction Executor checks the paired legs (the
+per-(unit, coordinate) sums are undisturbed), the cause-derived identifier (the
+touch event, not yet processed), and writer discipline (OT-1's state is written
+by OT-1's contract), and admits. One append; the fold advances; the ledger now
+shows the cash with \mbox{W-ALPHA} and the option \emph{triggered}.
+
+\textbf{Duplicate emission.} Emission is at-least-once (Chapter~16), so the
+Monitor may emit the touch again. The Events Executor fires the contract again;
+the contract finds UnitStatus already \emph{triggered} and proposes nothing.
+Had a duplicate proposal been produced anyway, its identifier recomputes to a
+$\mathit{txid}$ already on the log and the door commits it zero further times. Two
+independent defences, either one sufficient.
+
+\emph{One event, three machines, one write --- and the recorded state is
+exactly what makes a duplicate harmless.}
+
+\subsection{The watch handshake}
+
+\textbf{Trigger.} On 2026-05-04 the issuer of stock ACME announces a cash
+dividend of 1.50 per share: record date 2026-05-15, payment date 2026-05-22.
+The announcement is an external event; the Events Executor captures and records
+it at the boundary.
+
+\textbf{Contract.} The announcement fires ACME's smart contract once --- not to
+pay, but to register the watches the dividend creates. Nothing is owed yet and
+nothing moves; what the dividend has created is two future obligations of
+attention, and the unit declares them exhaustively, exactly as it declared its
+watches at registration.
+
+\textbf{Transaction.} One moveless transaction:
+
+\begin{center}
+\begin{tabular}{@{}rll@{}}
+\toprule
+ & Kind & Content \\
+\midrule
+1 & unit-state change & ACME: record-date watch declared, 2026-05-15 \\
+2 & unit-state change & ACME: payment-date watch declared, 2026-05-22 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The door.} A moveless transaction is well-formed: a transaction is a
+bundle of four kinds of change and may carry no moves (Chapter~3). The
+identifier derives from the recorded announcement; conservation is undisturbed
+because nothing moved; the declaring writer is ACME's own contract.
+
+\textbf{The handshake.} The Monitor acknowledges each declared watch; each
+acknowledgement is an event like any other, flows through the same pipeline,
+and lands as a unit-state update: both watches now visibly \emph{armed}. On
+2026-05-15 the Monitor emits the record-date event and that watch is
+\emph{fired}; on 2026-05-22 the payment-date watch fires likewise. What the two
+firings do --- record each holder's entitlement movelessly, then pay against
+the recorded entitlements --- is Chapter~5's episode, and the entitlement's
+home is Chapter~\ref{ch:homes}'s; the machines' contribution is that neither
+date could have passed silently. Had either watch remained unacknowledged
+beyond its arming window, the unit's state would show a declared, unarmed
+watch: an overdue item, never an absence.
+
+\emph{A watch is visibly declared, then armed, then fired or expired; a date
+that matters cannot pass silently, because attention itself is on the record.}
+
+\subsection{The trust boundary}
+
+The three roles sit at different levels of trust, and the dotted line of the
+opening picture is exact: everything above it is untrusted. The Transaction
+Executor is the trusted component --- the ledger's integrity rests on it and on
+nothing else. The smart contracts, the Event Monitor, and the Events Executor
+sit outside the boundary, untrusted in three different ways.
+
+A contract can be economically wrong. Its proposal can be structurally
+impeccable and still book the wrong economics, and the door cannot know that.
+The defence is not prevention but recomputation: the events and the
+transactions are both on the record, so verification re-runs the map on the
+recorded event and compares (Chapter~15); a discrepancy is a defect of the
+contract, not of the ledger, and it is repaired forward by an authorised compensating transaction
+through the same door (Chapter~\ref{ch:testability}).
+
+The Event Monitor and the Events Executor cannot corrupt the ledger at all. A
+late emission or a late firing produces the identical transaction, because
+everything downstream reads the record and not the clock. A duplicate is
+committed once, under the cause-derived identifier. A spurious firing finds
+nothing due --- the one-touch's second touch above --- and proposes nothing, or
+proposes something the door refuses. Every failure these two machines can
+commit maps to delay or noise, never to wrong state.
+
+What the untrusted machines do carry is liveness. Integrity owes them nothing;
+timeliness owes them everything: watches must actually arm, events must
+actually be emitted, contracts must actually be fired, obligations must
+actually be discharged by their deadlines. Those duties are stated as minimum
+requirements --- durable watches and timers, at-least-once emission,
+acknowledged watches, triggers carrying timing not data, replayable
+orchestration, no write privilege, obligation liveness --- in Chapter~16, and
+each degrades, when unmet, to a visible overdue item rather than to silence.
