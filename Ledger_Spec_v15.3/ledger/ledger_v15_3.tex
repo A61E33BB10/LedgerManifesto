@@ -2174,7 +2174,7 @@ adds no store to the ledger: it is the log, folded and priced.
 % half-page examples), G3 (W1-W4), G5 (cum/ex). Declares the boundary-convention slot Ch.12 consumes.
 \section{Ingestion, Corporate Actions, and the Market Data Operator}\label{ch:marketdata}
 
-This chapter discharges constitution clauses C-9.1--C-9.3 (the corporate action as a transaction, the market data operator, and its three governing principles).
+This chapter discharges constitution clauses C-9.1--C-9.3 (the corporate action as a transaction, the market data operator, and its three governing principles), and C-4.12 (the event universe: finite, closed, declared event kinds with routing total at registration; jointly with Chapters~\ref{ch:machines}, \ref{ch:testability}, and~\ref{ch:requirements}).
 
 \S 9 governs the one place the closed system is not closed: the boundary where external
 data crosses in. Everything inside the ledger conserves quantity by construction
@@ -6080,7 +6080,7 @@ An auditor confirms conformance by exercising each group against generated produ
 events, and histories, on the executable-check surface of Chapter~\ref{ch:testability}.
 
 The machine minima (M1--M8) are liveness and replay properties: generate restart,
-duplicate-emission, and late-firing histories, and confirm that no event is lost, that
+duplicate-emission, and late-firing histories, and confirm that no captured event is lost, that
 every watch is acknowledged or stands overdue, that every late firing reproduces the
 identical transaction, and that neither machine writes the ledger. The valuation minima
 (V1--V6) are checkable over generated positions and prices: recompute every NAV from the

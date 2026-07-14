@@ -53,3 +53,10 @@ arrival; the perimeter is a named trust assumption).
 
 Certification: adversarial reviewer (stale-language + overreach sweep) → FORMALIS (no normative
 property changed) → CONCORDIA (115-clause audit vs v1.3, C-4.12 discharged as adopted) — pending.
+
+Certification COMPLETE: reviewer+FORMALIS all five sweeps CLEAN (1 polish nit applied: "no
+captured event is lost" at the ch16 Verification summary); CONCORDIA VETO (C-4.12 discharge-header
+orphan — the C-6.6 situation; register named four claim sites no header carried) → repaired with
+its one-line ch:marketdata header extension (joint pointer to ch:machines/ch:testability/
+ch:requirements) → **SIGNED 2026-07-14**. 115/115 clauses two-way complete. 100pp = hard cap.
+The v15.3.1 housekeeping pass is certified; the parking index is fully closed with its history.
