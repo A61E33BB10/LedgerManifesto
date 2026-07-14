@@ -35,7 +35,7 @@ owner's to amend.
 
 # v15.3.1 Housekeeping Pass (Constitution v1.3)
 
-Authority: `leddeger_manifesto_v1_3.tex` (committed 2cb905c BEFORE drafting). One clause changed:
+Authority: `ledger_manifesto_v1_3.tex` (committed 2cb905c BEFORE drafting). One clause changed:
 C-4.12 ADOPTED with the owner's two deltas — the generalisation (quarantine covers every
 unprocessable arrival, matching what v15.3 built) and the arrival bound (the guarantee runs from
 arrival; the perimeter is a named trust assumption).

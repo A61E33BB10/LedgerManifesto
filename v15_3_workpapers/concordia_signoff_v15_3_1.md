@@ -3,7 +3,7 @@
 VERDICT: SIGNED
 
 1. Audited: `Ledger_Spec_v15.3/ledger/ledger_v15_3.tex` against Constitution v1.3
-   (`leddeger_manifesto_v1_3.tex`, adopted 2026-07-14). I did not author the pass.
+   (`ledger_manifesto_v1_3.tex`, adopted 2026-07-14). I did not author the pass.
 2. 115-clause discharge audit: PASS both directions. All 115 \clabel clauses of v1.3 are claimed
    by at least one chapter discharge header; no header claims a clause absent from v1.3.
 3. C-4.12 claim site: primary claim in the Ingestion chapter header (ch:marketdata), jointly with

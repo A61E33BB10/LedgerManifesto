@@ -2,7 +2,7 @@
 
 Base: certified Ledger_Spec_v15.1 (92pp → now 96pp, builds clean, boxes=4, datum=0).
 Author: orchestrator (single writer). Certifiers must be independent (no agent certifies own work).
-Authoritative manifesto `LedgerManifesto/leddeger_manifesto.{tex,md,pdf}` is BYTE-UNTOUCHED.
+Authoritative manifesto `LedgerManifesto/ledger_manifesto.{tex,md,pdf}` is BYTE-UNTOUCHED.
 
 ## Owner gate (2026-07-13) — ratified/conformed
 - **D1 RATIFIED** deposit-neutrality at fair value (C-8.7). Recorded in `constitution_v1_2_proposed.tex`

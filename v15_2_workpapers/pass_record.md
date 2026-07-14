@@ -2,7 +2,7 @@
 
 Object: produce Specification v15.2 from certified v15.1, discharging the Constitution v1.2
 changes (ratified and adopted by the owner 2026-07-13). Authority one-way:
-`LedgerManifesto/leddeger_manifesto_v1_2.tex`. Page cap below 100 — final build **99pp**, exit 0,
+`LedgerManifesto/ledger_manifesto_v1_2.tex`. Page cap below 100 — final build **99pp**, exit 0,
 datum=0, boxes=4, stale v1.1 citations=0.
 
 ## Repository trail (one commit per step, clause-named)

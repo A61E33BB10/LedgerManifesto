@@ -4,7 +4,7 @@
 **From:** FORMALIS (Leroy, chair; Coquand, Huet, Paulin-Mohring, de Moura, Avigad)
 **Date:** 2026-07-12
 **Authority:** rated one-way against the Ledger Framework Constitution v1.1
-(`LedgerManifesto/leddeger_manifesto.md`). Read-only pass: no chapter edited.
+(`LedgerManifesto/ledger_manifesto.md`). Read-only pass: no chapter edited.
 **Inputs:** Constitution v1.1; the 17 chapter drafts
 `Ledger_Spec_v15.0/ledger/drafts/ch01…ch17`; the ratified Phase 1 Design Ruling
 `v15_workpapers/phase1_design_ruling_memo.md`.

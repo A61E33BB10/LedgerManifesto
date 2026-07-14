@@ -2,7 +2,7 @@
 
 **Custodian:** CARTAN (completeness auditor). **Phase:** 2. **Date:** 2026-07-11.
 **Inputs:** v13.1 digests (`v15_workpapers/v13_1_digest_sec01-09.md`, `v13_1_digest_sec10-31.md`);
-Constitution v1.1 (`LedgerManifesto/leddeger_manifesto.md`); Phase 1 Design Ruling
+Constitution v1.1 (`LedgerManifesto/ledger_manifesto.md`); Phase 1 Design Ruling
 (`v15_workpapers/phase1_design_ruling_memo.md`); v14 topic list (orchestrator).
 
 ## The rule

@@ -9,7 +9,7 @@ and the Constitution conflict, the Constitution wins.
 
 ## 1. The Constitution is non-negotiable
 
-`LedgerManifesto/leddeger_manifesto.tex` (with its `.pdf` and `.md` siblings) is the Ledger
+`LedgerManifesto/ledger_manifesto.tex` (with its `.pdf` and `.md` siblings) is the Ledger
 Framework Constitution — the authoritative statement of intent, principle, and minimum
 requirement for this project.
 

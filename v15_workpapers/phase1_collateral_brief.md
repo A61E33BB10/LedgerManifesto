@@ -7,7 +7,7 @@ the memo's consultation annex. The bench advises; the owner decides.
 
 ## Governing constitution (binding; the ruling is rated against it)
 
-The Ledger Framework Constitution v1.0 (`LedgerManifesto/leddeger_manifesto.md`) rules:
+The Ledger Framework Constitution v1.0 (`LedgerManifesto/ledger_manifesto.md`) rules:
 
 - **§4 (objects, coordinates):** "When a balance must carry more information than a
   single number, it generalises to a vector of coordinates: owned, lent out, borrowed,

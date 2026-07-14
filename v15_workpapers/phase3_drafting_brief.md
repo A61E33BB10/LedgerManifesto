@@ -3,7 +3,7 @@
 You are drafting one or more chapters of Ledger Specification v15. This brief is
 binding. Read, before writing a word, in this order:
 
-1. `/home/renaud/Ledger/LedgerManifesto/leddeger_manifesto.md` — Constitution v1.1.
+1. `/home/renaud/Ledger/LedgerManifesto/ledger_manifesto.md` — Constitution v1.1.
    The direction of authority is one-way; your chapter is rated against it, line by
    line. Your chapter OPENS by naming the constitution sections it discharges (one
    sentence, e.g. "This chapter discharges §4 and §7 of the constitution.").
