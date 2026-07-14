@@ -993,7 +993,8 @@ is a defined word --- the contract or contracts the registration names. Many
 contracts, one Events Executor: the contracts carry all the product knowledge;
 the Events Executor carries none.
 
-Capture itself is unconditional. The Executor stamps every arrival with its
+Capture of every arrival is unconditional --- the guarantee runs from arrival, the
+perimeter being TA-ARRIVAL's matter (Chapter~\ref{ch:requirements}). The Executor stamps every arrival with its
 \textbf{capture envelope} --- the delivering source and the arrival's log position, which
 every push carries even when its payload is malformed --- and proposes its recording
 \emph{before} payload validation. An arrival whose event kind is registered then routes as
@@ -2682,7 +2683,9 @@ a moveless recorded fact carrying at least its capture envelope
 \emph{processing} is refused, the refusal itself a fact of the record. The system still stops rather than improvises
 (\S2); it no longer forgets what it stopped on. The quarantined event mints a visible,
 deadline-bearing open item and stands until its kind is registered or a person disposes of
-it (C-12.4 phase-0, constitution C-4.12).
+it (C-12.4 phase-0, constitution C-4.12). The guarantee runs from arrival: whether the
+world's events reach the boundary at all is the perimeter trust assumption TA-ARRIVAL
+(Chapter~\ref{ch:requirements}), reconciled against external authorities, never assumed.
 
 When the kind is later registered, or a person disposes, the arrival is processed then: the
 processing transaction's cause is the recorded quarantined event --- idempotent under the
@@ -5521,7 +5524,7 @@ When the late-flag fires the generator constructs $k<\text{end}$ by construction
 firing witness asserts the branch (\S 2). On every history that clears the precondition,
 BITEMP-1 fires and finds the as-known-at view unchanged by the later correction, and BITEMP-2
 fires and finds the as-of view recomputed bit-for-bit --- the two axes exercised, not merely
-asserted. C-12.1 (v1.2) names both answers and delegates their indexing here; BITEMP-1 and BITEMP-2
+asserted. C-12.1 (v1.3) names both answers and delegates their indexing here; BITEMP-1 and BITEMP-2
 exercise that indexing, and entry PARK-2 is closed (Chapter~\ref{ch:scope}).
 
 \paragraph{(iii) The temporal residual: a safety and liveness model.}
@@ -6036,7 +6039,7 @@ governing agreement, whose provenance is the executed agreement rather than a ma
   the worked instance; the duty is general over every declared term.
 \end{enumerate}
 
-The boundary rests on three named trust assumptions and no other: TA-KIND, that a kind
+The boundary rests on four named trust assumptions and no other: TA-KIND, that a kind
 declaration faithfully renders its publisher's quotation convention, owned by data
 governance and detected by the invariance witness, source divergence, and recomputation
 (Chapter~\ref{ch:marketdata}); TA-TERMS, that a declared agreement term faithfully
@@ -6056,7 +6059,19 @@ recorded ex-date that misstates it misroutes faithfully to the record --- a peri
 reconciliation matter, the sibling of TA-KIND and TA-TERMS. The fourth quadrant is handled
 on the record either way: the mirror market-claim leg routes the distribution to the
 entitled seller whether or not the convention held, so TA-EXDATE names a residual the
-ledger reconciles against, not a gap in the routing. Everything else that crosses is
+ledger reconciles against, not a gap in the routing. And \textbf{TA-ARRIVAL}: the world's
+events reach the boundary --- the set of sources the perimeter listens to covers the
+events the book's units require. The adopted C-4.12 fixes this bound itself: the
+quarantine guarantee runs from arrival, and whether the world's events reach the boundary
+at all is a perimeter matter, named here and reconciled against external authorities,
+never assumed. \emph{Owner:} perimeter governance. \emph{Violation:} an event the world
+presented never arrives --- a lapsed subscription, a silent source, an unconnected venue
+--- so a fixing, notice, or fill is missed with nothing recorded. \emph{Detection:} for
+scheduled events, the declared watches themselves --- an armed watch whose observation
+never arrives stands overdue (M1, M3, M7; W1 staleness); for unscheduled events, perimeter
+reconciliation against external authorities (custodian, venue, corporate-action calendar).
+\emph{Residual:} the non-arrival of an unscheduled event is invisible from inside the
+boundary --- the exact sibling of TA-KIND's residual. Everything that does cross is
 recorded, framed, and replayable.
 
 \subsection{Verification}
