@@ -3040,8 +3040,9 @@ same.}
 
 \medskip\noindent\textbf{Episode: the segregated inflow and the refused re-post.}
 Wallet W-SEG receives \USD{100} of USD as variation margin under agreement G-SEG,
-whose declared regime is custody --- a security interest \emph{without} right of use
-(\S8 case 3, the third row above). The inflow writes marker mass on the posted plane:
+whose declared regime is custody and whose declared terms grant \emph{no} right of use ---
+a security interest withholding use (\S8 case 3, the third row above); the regime and the
+right-of-use term are two declared bits, not one. The inflow writes marker mass on the posted plane:
 W-SEG's posted coordinate under G-SEG is $-100$, received-negative, owned untouched.
 \emph{The attempted re-post.} W-SEG proposes to re-pledge \USD{60} under a second
 agreement G2, a move carrying G-SEG as its source-agreement reference
@@ -3376,8 +3377,11 @@ offer-side market quotation in USD. SIGMA now prints $44.00$, and W-BORR default
   transaction enforcing the security interest;
 \item the determination print $44.00$ is recorded, moveless; CLM-L, priced at the taker's
   (W-BORR's) state, values at $1{,}000 \times 44.00 = \USD{44,000}$;
-\item net within L: $44{,}000 - 41{,}000 = \USD{3,000}$ owed to W-LEND --- a projection over
-  L's netting set, the collateral already applied;
+\item net within L: CLM-L's close-out value --- the projection over L's netting set,
+  \USD{44,000} --- less the \USD{41,000} collateral applied at step~(2), leaves
+  $\USD{3,000}$ owed to W-LEND; the projection and the collateral offset are two
+  operations, exactly as the recomputation property reads them
+  (Chapter~\ref{ch:testability});
 \item CLM-CO is minted at par \USD{3,000} (W-LEND $+3{,}000$, W-BORR's estate $-3{,}000$),
   and CLM-L retires from the zero vector by close-out compensation, its declared \S14.1
   fallback;
@@ -4055,7 +4059,9 @@ and the parent leaves the ledger from the zero vector (\S4) --- its mass conserv
 created and none destroyed. The fails cascade then fires on the residual leg's $q_r$
 only; the settled leg is untouched. The split adds no machinery: each leg is a
 settlement-obligation unit at its own node, so the four-quadrant routing below applies
-leg-wise and stays total over partial fills. In both cases the Transaction Executor admits the
+leg-wise and stays total over partial fills --- and a further partial confirmation on the
+residual leg splits it again by the same edge, recursively, each round conserving its own
+$q_s + q_r$. In both cases the Transaction Executor admits the
 transition like any other transaction; no other machine writes the node, and no
 \texttt{failed} node exists without one of the two triggers on the record. The settlement-obligation unit's market-claim leg carries
 a deadline, a discharge predicate, and a fallback (\S14.1); by its deadline it is
@@ -4691,7 +4697,12 @@ checks included --- reads or writes: it writes the (wallet, unit, coordinate, ag
 balance cells its moves touch and the three homes' targets its other changes touch, and
 it reads more --- a marker move at $(w,u)$ is admitted against the coverage net over
 \emph{all} agreements (Invariant~\ref{inv:coverage}), so its read-set takes the whole
-$(w,u)$ posted and lent fibres with $(w,u)$ owned, and an owned reduction symmetrically
+$(w,u)$ posted and lent fibres with $(w,u)$ owned, \emph{and the declared right-of-use
+term of every agreement those fibres range over} --- the gate reads $\mathrm{rou}(G)$
+from each source agreement's ProductTerms, so those terms are in the read-set too, and a
+terms change amending an agreement's right of use shares a footprint element with every
+guarded move under it: amend-then-re-post and re-post-then-amend reach different states,
+and the shared footprint keeps that reorder forbidden. An owned reduction symmetrically
 reads the marker fibres it must not breach. Two moves on one $(w,u)$ under different
 agreements therefore never have disjoint footprints, though their cells differ --- the
 rehypothecation chain is order-sensitive for exactly this reason. Two adjacent admitted
