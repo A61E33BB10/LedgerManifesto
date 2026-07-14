@@ -79,7 +79,7 @@ recorded exactly once, in an immutable log of atomic transactions, and every oth
 number --- balances, valuations, profit and loss, reports --- is a deterministic
 projection of that single record, reproducible by any party and reconstructible at any
 past date. This specification defines the system in full, rated one-way against the
-Ledger Framework Constitution v1.2: the objects the system manipulates and the signed
+Ledger Framework Constitution v1.3: the objects the system manipulates and the signed
 coordinate vector every balance generalises to; the three machines that evaluate the
 pipeline --- the Event Monitor, the Events Executor, and the Transaction Executor,
 three roles and one writer; smart contracts as pure, stateless transcriptions of legal
@@ -214,7 +214,7 @@ the custodian, or the counterparty is reconciled at the boundary
 \subsection{The discipline of the document}
 
 The direction of authority is one-way. This specification is rated against the Ledger
-Framework Constitution v1.2 and against nothing else; each chapter opens by naming the
+Framework Constitution v1.3 and against nothing else; each chapter opens by naming the
 constitution sections it discharges, and a genuine conflict with the constitution is
 never drafted around --- it is recorded in Chapter~17's open-problems index with the
 exact amendment it would require.
@@ -377,7 +377,7 @@ close does not edit day~2: it is recorded at its own valid-time index~$k=2$, the
 that index forward is re-derived, and the earlier as-known-at view survives beside it.
 Theorem~\ref{thm:timetravel} states this over the pair of axes and proves both facts.
 
-The constitution names both answers and delegates their indexing here. C-12.1 (v1.2) fixes
+The constitution names both answers and delegates their indexing here. C-12.1 (v1.3) fixes
 the standing duty as computing both honest answers --- what the book said then, and the
 numbers with a later correction in force --- each a deterministic replay of the one log, and
 leaves \emph{how the two views are indexed} to this specification. The log prefix and the
@@ -2169,7 +2169,7 @@ adds no store to the ledger: it is the log, folded and priced.
 
 % ===================== drafts/ch08_marketdata.tex (inlined) =====================
 % Chapter 8 — Ingestion, Corporate Actions, and the Market Data Operator (NAZAROV, 8.5 pp).
-% Discharges Constitution v1.2 §9. Carries G1 (four mechanisms + spin-off/elective-merger
+% Discharges Constitution v1.3 §9. Carries G1 (four mechanisms + spin-off/elective-merger
 % half-page examples), G3 (W1-W4), G5 (cum/ex). Declares the boundary-convention slot Ch.12 consumes.
 \section{Ingestion, Corporate Actions, and the Market Data Operator}\label{ch:marketdata}
 
@@ -2301,7 +2301,7 @@ quarantined, its processing refused (W4, Section~\ref{sec:failures}), never drop
 The registry has a second column under the same immutable discipline: the \textbf{event
 kind} --- the kind of thing that fires a contract: a split, a fixing, a fill, an external
 fail notice. The kinds of event the system can process form a finite, closed, declared set
-(constitution C-4.12, ratified 2026-07-14, awaiting adoption); a kind is registered, on the record, before any
+(constitution C-4.12, adopted in v1.3); a kind is registered, on the record, before any
 event of it crosses, and registration names its \textbf{routing} --- the contract or
 contracts that must fire on it, total at registration: a kind cannot register without a
 router. ``Fires the responsible contract'' (Chapter~\ref{ch:machines}) is thereby a
@@ -2661,7 +2661,7 @@ carries the correction --- recomputes the derived folds over the affected valid-
 interval, bit-exactly (\S 2). Both views survive; neither overwrites the other. An amended
 or withdrawn corporate-action notice is this same case --- superseding data recorded at
 its own transaction-time position, never an edit of the original notice, so the
-pre-amendment frame and the corrected one both survive. C-12.1 (v1.2) requires both honest
+pre-amendment frame and the corrected one both survive. C-12.1 (v1.3) requires both honest
 answers --- as known at $t$, and with corrections through $t'$ --- and delegates their
 indexing to this specification; W2 is where the two-axis indexing discharges that duty
 (entry PARK-2 closed, Chapter~\ref{ch:scope}). W3 is the
@@ -4692,7 +4692,7 @@ the condition under which replay reproduces the homes exactly.
 \subsection{Time travel and replay}
 
 Section \S 12's guarantees are theorems of the fold, and the fold runs along two axes, not
-one. C-12.1 (v1.2) names both honest answers and delegates their indexing to this
+one. C-12.1 (v1.3) names both honest answers and delegates their indexing to this
 specification; the two axes are that indexing, and the discharge is stated at the close of
 this subsection.
 
@@ -4763,7 +4763,7 @@ the recorded fixings and comparing, and inserting a back-dated observation to
 witness that the as-known-at view holds while the as-of view recomputes --- and
 this catalogue does not restate the test.
 
-\emph{The discharge.} Constitution C-12.1 (v1.2) names both answers --- what the book said
+\emph{The discharge.} Constitution C-12.1 (v1.3) names both answers --- what the book said
 then, never rewritten by later arrivals, and the numbers with a later correction in force ---
 as deterministic replays of the one log, and delegates their indexing to this specification.
 Theorem~\ref{thm:timetravel} is that discharge: the transaction-time prefix and valid-time
@@ -4942,7 +4942,7 @@ invariant.
 
 % ===================== drafts/ch15_testability.tex (inlined) =====================
 % Chapter 15 — Testability and the Executable-Check Regime (WILSON). Budget 5.5 pp.
-% Discharges Constitution v1.2 §13 (two layers of correctness) and the §2 Testability commitment.
+% Discharges Constitution v1.3 §13 (two layers of correctness) and the §2 Testability commitment.
 \section{Testability and the Executable-Check Regime}\label{ch:testability}
 
 This chapter discharges constitution clauses C-13.1--C-13.3 (the two layers of correctness) and the Testability commitment C-2.5 (jointly with Chapter~\ref{ch:objective}). The claim it makes good is the constitution's: the
@@ -5871,7 +5871,7 @@ construction principle here, not a phase at the end.
 
 % ===================== drafts/ch16_requirements.tex (inlined) =====================
 % Chapter 16 — Minimum Requirements. Author: NAZAROV. Budget 4 pp.
-% Discharges Constitution v1.2 §14.1 and §14.2. Restates as minima the derivations of
+% Discharges Constitution v1.3 §14.1 and §14.2. Restates as minima the derivations of
 % Ch.4 (machines, §14.1), Ch.7 (valuation P1–P6, §14.2), Ch.8 (six auditor checks, §14.2).
 % No thread episodes: requirements chapters cite episodes, they do not re-run them.
 \section{Minimum Requirements}\label{ch:requirements}
@@ -5936,7 +5936,7 @@ and replayability, and the following eight requirements are its minimum.
 \item \textbf{No captured event is lost.} Every arriving external event must be recorded,
   or its refusal recorded; an event of an unregistered kind must be recorded as a
   \emph{quarantined event} with its provenance and a deadline-bearing open item, never
-  returned as a bare value (C-4.12, ratified 2026-07-14, awaiting adoption); later processing is idempotent
+  returned as a bare value (C-4.12, adopted in v1.3); later processing is idempotent
   under the cause-derived identifier, over a versioned registry read in force at each
   position. A dropped arrival is unrecoverable; a quarantined one stands visible until its
   kind is registered or a person disposes.
@@ -6088,7 +6088,7 @@ specification proves rest on stated, testable minima.
 
 % ===================== drafts/ch17_scope.tex (inlined) =====================
 % Chapter 17 — Scope. Author: KLEPPMANN. Budget 3 pp (G4: +1 pp for the open-problems index).
-% Discharges the Constitution v1.2 "Scope" section.
+% Discharges the Constitution v1.3 "Scope" section.
 % Hosts the open-problems index and the constitutional-parking rule (G4).
 % Target of Chapter~\ref{ch:requirements} V1 (model retention outside scope) via \label{ch:scope}.
 % No thread episodes: a scope chapter cites; it does not re-run threads.
@@ -6214,7 +6214,7 @@ is the whole obligation; each is stated in the open at the chapter it touches, s
 gap hidden inside what the specification does claim.
 
 \paragraph{The constitutional-parking rule.} The second register governs conflict with
-Constitution v1.2 itself.
+Constitution v1.3 itself.
 
 \begin{principle}[Constitutional parking]
 A genuine conflict between this specification and the constitution is parked in this index
@@ -6223,10 +6223,10 @@ is the owner's alone (the constitution's \emph{Authority and Amendment} section)
 makes the conflict visible and hands the owner a precise, decidable choice.
 \end{principle}
 
-\emph{Current status: five closed, one ratified awaiting adoption.} Five conflicts parked
-against v1.1 were resolved by the owner's v1.2; the Event Universe review parked one more,
-ratified 2026-07-14. Each closure keeps its resolution --- an index that empties without a
-trace would be indistinguishable from one never used:
+\emph{Current status: the parking index is fully closed.} Five conflicts parked against
+v1.1 were resolved by the owner's v1.2; the sixth, the event universe, was ratified
+2026-07-14 and adopted in v1.3. Each closure keeps its resolution --- an index that empties
+without a trace would be indistinguishable from one never used:
 
 \begin{itemize}
 \item \textbf{PARK-1 (structural) --- CLOSED in v1.2.} Clause addressing: v1.2 embeds the
@@ -6244,17 +6244,21 @@ trace would be indistinguishable from one never used:
 \item \textbf{C-4.8 clarification --- CLOSED in v1.2.} The second door: every guaranteed
   observation a moveless transaction through the one Executor; the record is the log
   (Chapters~\ref{ch:objects}, \ref{ch:marketdata}, \ref{ch:invariants}).
-\item \textbf{C-4.12 (the event universe) --- RATIFIED 2026-07-14, awaiting adoption.} No
-  closure, no total routing, four loss paths on the captured side: event kinds now finite,
-  closed, declared; routing total at registration; an undeclared event never processed and
-  never lost --- quarantined through the one door. Discharged at
+\item \textbf{C-4.12 (the event universe) --- CLOSED in v1.3.} No closure, no total
+  routing, four loss paths on the captured side: event kinds now finite, closed, declared;
+  routing total at registration. In adopting, the owner \emph{generalised} the ratified
+  text --- the quarantine guarantee covers every unprocessable arrival (undeclared kind,
+  unresolvable reference, failed validation), not the undeclared-kind case alone, and the
+  clause states where the guarantee stops: it runs from arrival, the perimeter named as a
+  trust assumption (TA-ARRIVAL, Chapter~\ref{ch:requirements}). Discharged at
   Chapters~\ref{ch:marketdata}, \ref{ch:machines}, \ref{ch:testability},
-  \ref{ch:requirements} (M8); adoption is the owner's sole act.
+  \ref{ch:requirements} (M8).
 \end{itemize}
 
-\noindent The index is live in its history: six conflicts parked with exact text, six
-decided by the owner --- five adopted in v1.2, one ratified awaiting adoption --- the
-resolutions above the evidence. A future conflict parks here the same way.
+\noindent The parking index is fully closed, and live in its history: six conflicts
+parked with exact text, six decided and adopted by the owner --- five in v1.2, the sixth
+in v1.3 --- the six resolutions above the evidence. A future conflict parks here the same
+way.
 
 \subsection{Authority}
 
