@@ -3790,7 +3790,7 @@ Chapter~\ref{ch:testability}; no new machinery is added, and no fourth home.
 -- The settlement-obligation unit (S5.6): an instructed-but-unsettled trade is a
 -- delivery-versus-payment obligation, so it is a unit like any other.
 data SettlementObligation = SettlementObligation
-  { deliveryLeg   :: (WalletId, UnitId, Quantity)    -- the security the seller owes the buyer
+  { deliveryLeg   :: (WalletId, UnitId, Quantity)    -- Q, the security the seller owes the buyer
   , paymentLeg    :: (WalletId, UnitId, MinorUnits)  -- the cash the buyer owes the seller
   , dueDate       :: Date
   , dischargePred :: Predicate  -- satisfied by settlement confirmation on the external register
@@ -3799,6 +3799,10 @@ data SettlementObligation = SettlementObligation
 --   instructed --confirmed--> settled     the ordinary walk; the unit retires unless a
 --                                          record date straddles the settled node (see below)
 --   instructed --fails------> failed      the fails-cascade obligation (S9.3): the SAME unit, later node
+--   instructed --partial(q_s)-> SPLIT     on a partial confirmation 0 < q_s < Q (= deliveryLeg
+--                                          quantity): mint a settled leg (q_s, at settled) and a
+--                                          failed-residual leg (q_r = Q - q_s, at instructed); the
+--                                          parent retires from the zero vector, q_s + q_r = Q
 --   at INSTRUCTED, a CUM trade across a record date raises the market-claim leg (deliverer -,
 --     cum-buyer +), valued at par, discharged by the deliverer's receipt of the distribution.
 --   at SETTLED, an EX trade across a record date raises the MIRROR market-claim leg, signs
@@ -3827,6 +3831,11 @@ from the wrongly-paid buyer to the entitled seller.
 No distribution reaches any wallet except by a recorded move against a determined
 entitlement or the discharge of a market-claim leg --- direct or mirror --- of the
 settlement-obligation unit.
+On a partial fill the settlement-obligation unit splits into a settled leg and a
+failed-residual leg, each a settlement-obligation unit at its own node, so the four
+quadrants apply leg-wise: a cum sale part-settled across the record date raises the
+market-claim leg on the unsettled quantity alone. The proposition is thereby total over
+partial fills, with no new routing logic.
 \end{proposition}
 
 \medskip\noindent\textbf{Worked micro-example (dividend).} Stock ACME pays a cash
@@ -3901,17 +3910,60 @@ notice, a registered event kind whose routing names this settlement-obligation u
 contract (Chapter~\ref{ch:marketdata}), admitted through the one door as a moveless
 observation-recording transaction, or the due-date watch firing and finding the cumulative
 confirmed settled quantity short of the instructed quantity by the deadline. The
-second trigger reads quantity, not mere presence, so a partial settlement --- some
-delivered, a residual failed --- fires it on the unmet residual rather than passing
-silently; the quantity-aware splitting of the settlement-obligation unit into a
-settled leg and a failed residual leg is a named open problem (Chapter~\ref{ch:scope}),
-and until it is settled the residual is carried on the single \texttt{failed} node with
-its recorded shortfall quantity. In both cases the Transaction Executor admits the
+second trigger reads quantity, not mere presence, and a partial settlement is not
+carried on one overloaded node: it walks a declared \textbf{partial edge} that splits
+the unit. On a partial confirmation --- cumulative confirmed quantity $q_s$ with
+$0 < q_s < Q$, where $Q$ is the instructed quantity --- the edge's action mints two
+successor settlement-obligation units of the same product graph and retires the parent:
+a \textbf{settled leg} at the \texttt{settled} node carrying $q_s$, and a
+\textbf{failed-residual leg} carrying $q_r = Q - q_s$, at \texttt{instructed} until its
+deadline and then walked \texttt{instructed}$\to$\texttt{failed} on the residual alone.
+Each leg carries the parent's identity and its own cause-derived txid; the split is one
+paired-leg transaction that moves the parent's delivery and payment mass into the legs,
+so $q_s + q_r = Q$ on the delivery coordinate, the payment is pro-rated across the two,
+and the parent leaves the ledger from the zero vector (\S4) --- its mass conserved, none
+created and none destroyed. The fails cascade then fires on the residual leg's $q_r$
+only; the settled leg is untouched. The split adds no machinery: each leg is a
+settlement-obligation unit at its own node, so the four-quadrant routing below applies
+leg-wise and stays total over partial fills. In both cases the Transaction Executor admits the
 transition like any other transaction; no other machine writes the node, and no
 \texttt{failed} node exists without one of the two triggers on the record. The settlement-obligation unit's market-claim leg carries
 a deadline, a discharge predicate, and a fallback (\S14.1); by its deadline it is
 discharged, compensated, or declared defaulted --- a failed distribution is a
 visible, overdue item, never a silent balance edit.
+
+\medskip\noindent\textbf{Worked micro-example (partial fill across the record date).}
+Same cast, same dividend: W-ALPHA sells its $10{,}000$ ACME to W-BETA, instructed
+2026-05-14, due 2026-05-16, and the $1.50$ dividend has record date 2026-05-15. On
+2026-05-15, before the record snapshot, the external register confirms $6{,}000$ of the
+$10{,}000$ settled. The settlement-obligation unit walks its partial edge and splits: a
+settled leg SO-s carrying $q_s = 6{,}000$ at \texttt{settled}, and a failed-residual leg
+SO-r carrying $q_r = 4{,}000$ at \texttt{instructed}. $6{,}000 + 4{,}000 = 10{,}000$, and
+the parent retires from the zero vector.
+
+\emph{Record date --- determination, leg-wise.} The watch fires on each leg. Determination
+reads the owned plane --- W-BETA owns $10{,}000$, title having moved at instruction --- and
+records the full entitlement $10{,}000 \times 1.50 = \USD{15{,}000}$ to W-BETA in
+PositionState. Routing then splits by leg:
+\begin{enumerate}[label=(\arabic*),nosep]
+\item SO-s is \emph{cum, settled}: the register shows W-BETA for its $6{,}000$, who is
+entitled, so the paying agent credits W-BETA the $6{,}000 \times 1.50 = \USD{9{,}000}$
+directly and no leg arises (quadrant (ii));
+\item SO-r is \emph{cum, unsettled}: the register still shows the deliverer W-ALPHA for its
+$4{,}000$, so the market-claim leg MC-r is raised on the unsettled quantity alone,
+$4{,}000 \times 1.50 = \USD{6{,}000}$: move owned(MC-r) $600{,}000$ (minor units,
+$=\USD{6{,}000}$), W-ALPHA $\to$ W-BETA --- W-ALPHA $-600{,}000$, W-BETA $+600{,}000$
+(quadrant (i)).
+\end{enumerate}
+The two paths sum to W-BETA's \USD{15{,}000}: \USD{9{,}000} credited directly, \USD{6{,}000}
+by the claim. The claim is on $4{,}000$, not $10{,}000$, because only $4{,}000$ is unsettled
+at the record date.
+
+\emph{Due date --- the residual fails.} On 2026-05-16 SO-r's cumulative confirmed quantity
+is still $0$ against its $4{,}000$, so its contract walks it
+\texttt{instructed}$\to$\texttt{failed} on the $4{,}000$; SO-s, already \texttt{settled}, is
+untouched. The fails cascade carries the $4{,}000$ residual as a recorded obligation, and
+MC-r stands to its deadline. Nothing is reversed, and every quantity is conserved.
 
 \medskip\noindent\textbf{Load-bearing, not a reporting axis.} The settlement-obligation
 unit's lifecycle node is therefore a correctness input, not a presentation dimension. A
@@ -5279,6 +5331,54 @@ the property confirms the distribution routes to the entitled seller on the reco
 the registered buyer --- the reflection, across the settlement node, of the cum-unsettled
 market claim.
 
+\paragraph{The partial fill: the split into legs, and the pro-rated claim.} A generator that
+only ever confirms the whole instructed quantity never walks the partial edge, so the split
+is unwitnessed. Branch~5 draws a partial-flag with rate $r$; when it fires it confirms $q_s$
+with $0 < q_s < Q$ before the record date, so the settlement-obligation unit splits into a
+settled leg ($q_s$, node \texttt{settled}) and a failed-residual leg ($q_r = Q - q_s$, node
+\texttt{instructed}), with a cum record date in the gap.
+
+\begin{lstlisting}
+genSettlementHistory :: Gen History   -- (extended)
+-- 5. draw a partial-flag with rate r; when it fires, confirm q_s with 0 < q_s < Q before the
+--    record date, so the unit walks its partial edge: mint a settled leg (q_s, node settled)
+--    and a failed-residual leg (q_r = Q - q_s, node instructed); a CUM record date sits in the
+--    gap, so the residual leg raises the market claim on q_r and later walks instructed->failed.
+
+prop_splitConservation :: History -> Property   -- (i) q_s + q_r = Q across the split's changes
+prop_splitConservation h = isPartialFill h ==> conjoin
+  [      settledLegQty h + residualLegQty h === instructedQty h   -- delivery: q_s + q_r = Q
+    .&&. settledLegPay h + residualLegPay h === instructedPay h   -- payment: pro-rata, conserved
+    .&&. nodeOf (settledLeg  h) === Settled                       -- both legs' UnitStatus nodes
+    .&&. nodeOf (residualLeg h) === Instructed                    --   are the split's targets
+    .&&. parentVector h === zeroVector ]                          -- parent retired from the zero vector
+
+prop_proRatedClaim :: History -> Property   -- (ii) claim == entitlement on the UNSETTLED qty
+prop_proRatedClaim h = isPartialFill h ==>
+       claimMinted h === residualLegQty h * ratePerShare h        -- 4,000 * 1.50 = 6,000
+   .&&. claimMinted h =/= instructedQty  h * ratePerShare h       -- NOT the full 10,000 * 1.50
+  -- oracle: entitlement recomputed from the record-date holdings on the unsettled quantity
+  -- alone -- independent of the minted claim it checks.
+
+prop_split_fires =                     -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 isPartialFill
+    "settlement-obligation unit splits: settled leg q_s + failed-residual leg q_r = Q"
+    genSettlementHistory
+\end{lstlisting}
+
+When the partial-flag fires the generator confirms a strict part before the record date by
+construction, so the unit splits and the residual raises its claim on $q_r$ alone;
+\texttt{prop\_split\_fires} asserts the branch at $\ge 1\%$ (\S 2). On every partial-fill
+history the two legs' quantities sum to the instructed $Q$, both legs' UnitStatus nodes are
+the split's targets, and the parent's coordinate vector is zero --- the retirement of \S4.
+The pro-rated claim equals the entitlement on the unsettled quantity, computed by an oracle
+from the record-date holdings, and the property fails any design that raises the claim on the
+whole instructed quantity or carries the residual on one overloaded node. The four properties
+of Invariant~\ref{inv:graph-consistency}, already on this surface, now run over the partial
+branch too: \texttt{prop\_firedMatchesOneEdge} confirms the partial confirmation lands each
+successor on its declared node, and \texttt{prop\_actionEqualsRecorded} confirms the split
+transaction equals the partial edge's declared action.
+
 \paragraph{The position-state collection: two entitlements in flight, each retiring alone.}
 PositionState holds a collection keyed by the cause-derived identifier
 (Chapter~\ref{ch:homes}): two entitlements can be live on one (wallet, unit) pair at once,
@@ -6218,9 +6318,13 @@ figure is not yet designed --- named here so it cannot be improvised. Named alon
 re-use of no-right-of-use collateral, yet the coverage net
 (Chapter~\ref{ch:invariants}) bounds re-posting by possession alone, so a segregated
 inflow is representable as deliverable; \emph{live and blocking} --- no implementation
-enables re-use until the gate is built; and the \textbf{quantity-aware
-settlement-obligation unit} --- a partial settlement leaves a settled quantity and a failed
-residual the single lifecycle node cannot yet split into legs. Named further: the correction
+enables re-use until the gate is built. One item named here at the 2026-07-13 consistency
+review is now closed and kept named, not erased: the \textbf{quantity-aware
+settlement-obligation unit} --- a partial settlement leaving a settled quantity and a failed
+residual the single lifecycle node could not split into legs --- is settled in v16.0 by the
+partial edge that splits the unit into a settled leg and a failed-residual leg
+(Chapter~\ref{ch:settlement}), each a settlement-obligation unit at its own node, so the
+four-quadrant routing stays total over partial fills. Named further: the correction
 algebra beyond the single compensating transaction; inter-ledger federation and
 eliminations; \textbf{behavioural-event generation} --- a generator reaching the events
 that are \emph{decisions} (default, elective exercise, merger election) must model the
