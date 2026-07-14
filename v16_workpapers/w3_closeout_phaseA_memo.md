@@ -104,3 +104,17 @@ P3 retirement only from the zero vector with coverage-forced ordering (metamorph
    write-off path (C-8.4), citing C-12.4 by analogy only — never conflated with error-repair.
 
 Phase B drafts nothing until the owner rules.
+
+---
+
+## OWNER RULING (2026-07-14, recorded at the gate)
+1. **Valuation convention RATIFIED as declared data** on the master's close-out-mechanics slot
+   (TA-TERMS boundary data; never improvised at default).
+2. **Cross-master refusal form: DOOR-REFUSED** (not typed) — legs of one close-out transaction
+   must all name one master, read from declared terms; P1 fires on the refusal.
+3. **No constitutional change CONFIRMED** — C-6.5/C-8.3/C-8.4/C-8.6–9/C-2.4 + zero-vector
+   discipline suffice; nothing parked.
+4. **Drafting flag ACKNOWLEDGED** — default write-down = lawful loss on the supervised write-off
+   path (C-8.4); C-12.4 cited by analogy only, never conflated with error-repair.
+
+Phase B drafts against this ruling.
