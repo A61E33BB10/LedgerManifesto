@@ -30,3 +30,26 @@ kind-columns; quarantine discipline confirmed. Page cap holds (<100).
 Final build 100pp (= ratified hard cap), exit 0, datum=0, boxes=4, "quarantined event" the sole
 name of the recorded object. C-4.12 remains ratified-awaiting-adoption — the manifesto is the
 owner's to amend.
+
+---
+
+# v15.3.1 Housekeeping Pass (Constitution v1.3)
+
+Authority: `leddeger_manifesto_v1_3.tex` (committed 2cb905c BEFORE drafting). One clause changed:
+C-4.12 ADOPTED with the owner's two deltas — the generalisation (quarantine covers every
+unprocessable arrival, matching what v15.3 built) and the arrival bound (the guarantee runs from
+arrival; the perimeter is a named trust assumption).
+
+- **H1** adoption sweep: all awaiting-adoption citations → adopted in v1.3; constitution citations
+  v1.3 (v1.2 RULING mentions kept as history); ch17 C-4.12 entry CLOSED in v1.3 noting the owner's
+  generalisation; parking index declared FULLY CLOSED, six resolutions the evidence. (3b6e80b)
+- **H2** TA-ARRIVAL added as the fourth named trust assumption (TA-KIND pattern; wording verified
+  against the ADOPTED clause); count 3→4; ch04/ch08 discharge text aligned with the arrival bound.
+- **H3** scope check: NO sentence states or implies capture before arrival. Sweep of "never
+  lost/never dropped/nothing lost/unconditional": every capture claim is arrival-scoped
+  ("Capture of every arrival...", M8's "Every arriving external event...", the W4 quarantine
+  sites); non-capture hits (deposit-neutrality history, valuation recomputation, conditional legs)
+  are unrelated. Expected result confirmed: none.
+
+Certification: adversarial reviewer (stale-language + overreach sweep) → FORMALIS (no normative
+property changed) → CONCORDIA (115-clause audit vs v1.3, C-4.12 discharged as adopted) — pending.
