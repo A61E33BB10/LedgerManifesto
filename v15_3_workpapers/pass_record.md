@@ -20,10 +20,13 @@ kind-columns; quarantine discipline confirmed. Page cap holds (<100).
    W1–W6 with no W7, so no v15.2 ch17 open-problems entry exists for the event universe to
    close; recorded here so the audit trail is exact.
 
-## Certification (to run)
-Adversarial review (loss-path hunt on the NEW text; one-name discipline; C-4.12 fidelity) →
-FORMALIS-style check (property soundness, no vacuity) → CONCORDIA discharge audit
-(C-4.12 as ratified-pending-adoption; no clause regression) — signs last.
+## Certification — COMPLETE
+| Reviewer | Verdict |
+|---|---|
+| Adversarial + FORMALIS-delegate | C-4.12 discharge FAITHFUL; emitted side INTACT; properties sound. 1 BLOCKING finding (M8 unbacked over malformed/provenance-less arrivals — the L3/L4 hole) → REPAIRED with its preferred fix: the **capture envelope**, stamped source+log-position and recorded BEFORE payload validation; W4 gains the failed-validation trigger; bare-read pull vs pushed arrival distinguished. 5 minors applied (awaiting-adoption citations; "responsible" forward ref; park→recorded sweep; genRegistry vacuity guard + prop_registryRouted_fires; registry-in-force cross-ref). Page-cap recommendation: 100 compliant. |
+| CONCORDIA (absolute veto, signs last) | **SIGNED 2026-07-14.** Repairs confirmed (no circularity in the envelope); 104-clause two-way map preserved by construction (no header touched; C-4.12 cited, never claimed adopted); sweep clean; page cap ruled compliant at the HARD CAP 100 (reserve drawn to preserve normative minima). See `concordia_signoff.md`. |
 
-## Status
-Phase B drafting in flight (NAZAROV boundary; WILSON minimum + properties).
+## Status: SIGNED — the v15.3 Event Universe pass is certified.
+Final build 100pp (= ratified hard cap), exit 0, datum=0, boxes=4, "quarantined event" the sole
+name of the recorded object. C-4.12 remains ratified-awaiting-adoption — the manifesto is the
+owner's to amend.

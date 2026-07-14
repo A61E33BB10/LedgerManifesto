@@ -91,10 +91,16 @@ is a defined word --- the contract or contracts the registration names. Many
 contracts, one Events Executor: the contracts carry all the product knowledge;
 the Events Executor carries none.
 
-A captured arrival whose event kind is registered routes as above. One whose kind is
-undeclared, or whose reference the record cannot resolve, is still recorded --- as a
-\textbf{quarantined event}, the record-then-refuse-processing discipline of failure mode
-W4 (Chapter~\ref{ch:marketdata}): never routed, never lost.
+Capture itself is unconditional. The Executor stamps every arrival with its
+\textbf{capture envelope} --- the delivering source and the arrival's log position, which
+every push carries even when its payload is malformed --- and proposes its recording
+\emph{before} payload validation. An arrival whose event kind is registered then routes as
+above. One whose kind is undeclared, whose reference the record cannot resolve, or whose
+payload fails validation --- provenance incomplete included --- is still recorded, under
+the envelope it did carry, as a \textbf{quarantined event}: the record-then-refuse-processing
+discipline of failure mode W4 (Chapter~\ref{ch:marketdata}). Never routed, never lost;
+``carrying its provenance'' means at least this envelope, and the payload's own provenance
+where it has one.
 
 A trigger carries timing, not data: the firing says \emph{when}, and everything
 the event means is read from the record. The Events Executor runs the

@@ -59,8 +59,11 @@ into a home (Chapter~\ref{ch:homes}) --- and the one Transaction Executor admits
 refuses it like any transaction. \emph{The record is the log}: no separate observation
 store, and the single-writer discipline of \S5 reaches every observation. This is the door
 Chapters~\ref{ch:valuation} and~\ref{ch:virtual} name when a mark ``enters through the
-observation door.'' A bare read against a live feed leaves no record and is unreproducible;
-a recorded observation is a fact of the log, so every downstream number is a function of
+observation door.'' A bare read against a live feed --- a pull that records nothing ---
+is refused outright: nothing arrived, so there is nothing to quarantine, and an
+unreproducible read must not exist. A \emph{pushed} arrival is the opposite case: it is
+captured under its envelope even when malformed (W4, Section~\ref{sec:failures}). A
+recorded observation is a fact of the log, so every downstream number is a function of
 the record alone (\S 12).
 
 \begin{lstlisting}
@@ -128,7 +131,7 @@ quarantined, its processing refused (W4, Section~\ref{sec:failures}), never drop
 The registry has a second column under the same immutable discipline: the \textbf{event
 kind} --- the kind of thing that fires a contract: a split, a fixing, a fill, an external
 fail notice. The kinds of event the system can process form a finite, closed, declared set
-(constitution C-4.12, ratified 2026-07-14); a kind is registered, on the record, before any
+(constitution C-4.12, ratified 2026-07-14, awaiting adoption); a kind is registered, on the record, before any
 event of it crosses, and registration names its \textbf{routing} --- the contract or
 contracts that must fire on it, total at registration: a kind cannot register without a
 router. ``Fires the responsible contract'' (Chapter~\ref{ch:machines}) is thereby a
@@ -501,10 +504,12 @@ correlated stress --- every venue diverging at once --- it defers valuation book
 than choose a number, an intended fail-closed whose calibration is a governance matter, not a
 hidden behaviour. W4 is
 totality enforced without loss. An event of an undeclared kind, an unresolvable reference,
-or a pairing with no declared operator (Principle~\ref{prin:sched-total}) is neither
+a pairing with no declared operator (Principle~\ref{prin:sched-total}), or a payload that
+fails validation --- provenance incomplete included --- is neither
 silently dropped nor silently guessed: it crosses the one door as a quarantined event ---
-a moveless recorded fact carrying its provenance --- and its \emph{processing} is refused,
-the refusal itself a fact of the record. The system still stops rather than improvises
+a moveless recorded fact carrying at least its capture envelope
+(Chapter~\ref{ch:machines}), and the payload's own provenance where it has one --- and its
+\emph{processing} is refused, the refusal itself a fact of the record. The system still stops rather than improvises
 (\S2); it no longer forgets what it stopped on. The quarantined event mints a visible,
 deadline-bearing open item and stands until its kind is registered or a person disposes of
 it (C-12.4 phase-0, constitution C-4.12).

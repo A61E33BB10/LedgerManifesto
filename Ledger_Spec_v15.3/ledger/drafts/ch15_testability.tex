@@ -847,7 +847,7 @@ anywhere but the log and \texttt{replayFromLog} cannot rebuild it, and
 
 \paragraph{The event door: one registry, mandatory routing, and the quarantine that never drops.}
 Every arriving external event is recorded, or its refusal recorded; a kind registers only with
-routing defined for it, and an event of an unregistered kind is parked as a \emph{quarantined
+routing defined for it, and an event of an unregistered kind is recorded as a \emph{quarantined
 event} --- never dropped, never a bare value (C-4.12). Four properties pin the door.
 
 \begin{lstlisting}
@@ -857,8 +857,12 @@ prop_registryTotality r reg =
   .&&. conjoin [ isJust (routerFor reg k) | k <- registeredKinds reg ] -- admitted: routing total
   -- the refusal is the DOOR's, not the constructor's (not x===x).
 genRegistration :: Gen Registration  -- draw a router-flag rate r: when it fires OMIT the router.
+genRegistry     :: Gen Registry      -- >=1 registered, routed kind, so the totality conjunct
+                                     -- never ranges over an empty registry (vacuity guard).
 prop_registryTotality_fires =
   checkCoverage $ cover 1.0 lacksRouter "registration without a router -> refused" genRegistration
+prop_registryRouted_fires =
+  checkCoverage $ cover 1.0 hasRegisteredKind "a routed, non-empty registry" genRegistry
 prop_routingDeterminism :: History -> Property
 prop_routingDeterminism h = hasCapturedEvents h ==>
   routeAll (replayFromLog (logOf h)) === recordedRouting h
@@ -877,19 +881,20 @@ prop_quarantineNeverDrop_fires =
     "unregistered-kind event delivered -> recorded as a quarantined event" genUnregisteredArrivals
 prop_lateRegistrationReplay :: History -> Property
 prop_lateRegistrationReplay h = registersAfterQuarantine h ==>
+      -- replayFromLog reads the registry IN FORCE at each log position (Ch. 8, W4; M8):
       fullState (replayFromLog (logOf h)) === fullState (fold h)       -- replay bit-identical
   .&&. asKnownAt (beforeRegistration h) h === showsQuarantined h       -- pre-reg view still parks it
   -- replay-vs-fold (not x===x); parked processing keyed on the quarantined event's cause.
 genLateRegistration :: Gen History  -- late-reg flag rate r: quarantine an off-registry event,
-  -- THEN register its kind+router, THEN process the parked event (cause = the quarantined
+  -- THEN register its kind+router, THEN process the held event (cause = the quarantined
   -- event), delivered TWICE (idempotence).
 prop_lateRegistrationReplay_fires =
   checkCoverage $ cover 1.0 registersAfterQuarantine
-    "kind registered after quarantine -> parked event processed once, replay bit-identical" genLateRegistration
+    "kind registered after quarantine -> held event processed once, replay bit-identical" genLateRegistration
 \end{lstlisting}
 
 Each firing witness asserts its branch (\S 2): drop the routing-total conjunct and a
-router-less kind admits; drop the arrival count and a silent drop passes; key the parked
+router-less kind admits; drop the arrival count and a silent drop passes; key the later
 processing on arrival rather than the quarantined event's cause and replay diverges.
 
 \subsection{What an auditor checks}
@@ -912,8 +917,8 @@ retires on its own payment date; a coordinated cascade delivered twice commits e
 legs exactly once and all $n$; the bitemporal pair BITEMP-1 and BITEMP-2 hold with the
 back-dated-observation branch ($k<\text{end}$) exercised; every arriving external event is
 recorded or refused, no event kind registers without routing defined for it, an event of an
-unregistered kind is parked as a quarantined event with provenance and an open item rather than
-dropped, and a kind registered after quarantine processes its parked event once with replay
+unregistered kind is recorded as a quarantined event with provenance and an open item rather than
+dropped, and a kind registered after quarantine processes its held event once with replay
 bit-identical; and the
 knock--revalue--call--discharge model holds its two safety invariants
 always and its liveness obligation eventually, with sufficiency asserted only as the latter.

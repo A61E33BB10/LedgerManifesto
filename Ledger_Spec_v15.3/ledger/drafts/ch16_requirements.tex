@@ -64,7 +64,7 @@ and replayability, and the following eight requirements are its minimum.
 \item \textbf{No captured event is lost.} Every arriving external event must be recorded,
   or its refusal recorded; an event of an unregistered kind must be recorded as a
   \emph{quarantined event} with its provenance and a deadline-bearing open item, never
-  returned as a bare value (C-4.12, ratified 2026-07-14); later processing is idempotent
+  returned as a bare value (C-4.12, ratified 2026-07-14, awaiting adoption); later processing is idempotent
   under the cause-derived identifier, over a versioned registry read in force at each
   position. A dropped arrival is unrecoverable; a quarantined one stands visible until its
   kind is registered or a person disposes.

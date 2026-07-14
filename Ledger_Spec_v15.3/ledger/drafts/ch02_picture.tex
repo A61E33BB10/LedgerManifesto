@@ -77,7 +77,8 @@ event requires (Chapter~\ref{ch:contracts}). The \textbf{Events Executor} fires 
 one event at a time as the fold advances: for each event, in the total order, it fires the
 responsible contract, hands it the event together with the current projection of the
 ledger, and collects the proposed transaction $tx$ --- so $T=[tx]$ is built by the fold,
-not consumed by it. Many contracts, one Events Executor; the contracts carry all the
+not consumed by it; \emph{responsible} is a defined word, the routing the registry names
+(Chapters~\ref{ch:machines} and~\ref{ch:marketdata}). Many contracts, one Events Executor; the contracts carry all the
 product knowledge, the Events Executor carries none (Chapter~\ref{ch:machines}).
 
 The map is not blind to state. To turn a dividend event into cash moves, the contract

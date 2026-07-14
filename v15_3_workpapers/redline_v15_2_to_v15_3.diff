@@ -1,0 +1,760 @@
+--- Ledger_Spec_v15.2/ledger/drafts/ch02_picture.tex	2026-07-13 23:15:25.667941899 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch02_picture.tex	2026-07-14 01:05:34.859832036 +0100
+@@ -77,7 +77,8 @@
+ one event at a time as the fold advances: for each event, in the total order, it fires the
+ responsible contract, hands it the event together with the current projection of the
+ ledger, and collects the proposed transaction $tx$ --- so $T=[tx]$ is built by the fold,
+-not consumed by it. Many contracts, one Events Executor; the contracts carry all the
++not consumed by it; \emph{responsible} is a defined word, the routing the registry names
++(Chapters~\ref{ch:machines} and~\ref{ch:marketdata}). Many contracts, one Events Executor; the contracts carry all the
+ product knowledge, the Events Executor carries none (Chapter~\ref{ch:machines}).
+ 
+ The map is not blind to state. To turn a dividend event into cash moves, the contract
+--- Ledger_Spec_v15.2/ledger/drafts/ch04_machines.tex	2026-07-13 23:15:25.667941899 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch04_machines.tex	2026-07-14 01:05:10.820113127 +0100
+@@ -83,12 +83,25 @@
+ corporate-action notices, fixings and other observations --- and \emph{proposes}
+ their recording: an observation crosses as a moveless observation-recording
+ transaction (Chapter~\ref{ch:marketdata}), which the Transaction Executor admits
+-or refuses like any other. Second, for each event, arrived or emitted, it fires the
+-responsible smart contract, handing it the event together with the current
+-projection of the ledger, and collects the proposed transaction. Many
++or refuses like any other. Second, for each event, arrived or emitted, it fires the contracts the registry's
++routing names for that event's kind (Chapter~\ref{ch:marketdata}), handing each the event
++together with the current projection of the ledger, and collects the proposed transaction.
++The Executor never decides routing; it reads it from the registry, and \emph{responsible}
++is a defined word --- the contract or contracts the registration names. Many
+ contracts, one Events Executor: the contracts carry all the product knowledge;
+ the Events Executor carries none.
+ 
++Capture itself is unconditional. The Executor stamps every arrival with its
++\textbf{capture envelope} --- the delivering source and the arrival's log position, which
++every push carries even when its payload is malformed --- and proposes its recording
++\emph{before} payload validation. An arrival whose event kind is registered then routes as
++above. One whose kind is undeclared, whose reference the record cannot resolve, or whose
++payload fails validation --- provenance incomplete included --- is still recorded, under
++the envelope it did carry, as a \textbf{quarantined event}: the record-then-refuse-processing
++discipline of failure mode W4 (Chapter~\ref{ch:marketdata}). Never routed, never lost;
++``carrying its provenance'' means at least this envelope, and the payload's own provenance
++where it has one.
++
+ A trigger carries timing, not data: the firing says \emph{when}, and everything
+ the event means is read from the record. The Events Executor runs the
+ contracts; it never writes the ledger --- not even an observation --- and its
+--- Ledger_Spec_v15.2/ledger/drafts/ch05_contracts.tex	2026-07-13 23:15:25.663941805 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch05_contracts.tex	2026-07-14 00:47:47.230842026 +0100
+@@ -142,7 +142,9 @@
+ \end{lstlisting}
+ 
+ The class decides which watch the Monitor evaluates and which inputs the firing
+-reads; the signature above is unchanged across all of them. A future exercises
++reads; the signature above is unchanged across all of them. For an \texttt{External}
++observation, which contract fires is not improvised: it is the routing the data-kind
++registry declares for that event's kind (Chapter~\ref{ch:marketdata}). A future exercises
+ two of the classes on one instrument.
+ 
+ \subsection{The future: settlement prints and the expiry unwind}
+--- Ledger_Spec_v15.2/ledger/drafts/ch08_marketdata.tex	2026-07-13 23:14:59.235321489 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch08_marketdata.tex	2026-07-14 01:05:10.822113187 +0100
+@@ -52,19 +52,19 @@
+ \subsection{The observation door is the one door}\label{sec:obs-door}
+ 
+ No data enters the ledger as a bare read, and no data enters through a door of its own.
+-All data crosses as a recorded \textbf{observation} carrying its provenance: the source
+-that published it, the time it was observed, and the basis frame it was observed in.
+-Crossing is not a second admission path beside the transaction door. An untrusted
+-ingestion contract \emph{proposes} a moveless \textbf{observation-recording transaction}
+---- a transaction with an empty move list whose effect is to fold the observation into a
+-home (Chapter~\ref{ch:homes}) --- and the one Transaction Executor
+-(Chapter~\ref{ch:machines}) admits or refuses it, exactly as it admits or refuses any
+-transaction. \emph{The record is the log}: there is no separate observation store, and the
+-single-writer discipline of \S5 therefore reaches every observation, not only every move.
+-This is the door Chapters~\ref{ch:valuation} and~\ref{ch:virtual} refer to when a mark or
+-a stamped level ``enters through the observation door.'' A read against a live feed leaves
+-no record and is therefore unreproducible; a recorded observation is a fact of the log, so
+-every downstream number is a function of the record alone (\S 12).
++All data crosses as a recorded \textbf{observation} carrying its provenance --- source,
++observation time, basis frame. An untrusted ingestion contract \emph{proposes} a moveless
++\textbf{observation-recording transaction} --- empty move list, folding the observation
++into a home (Chapter~\ref{ch:homes}) --- and the one Transaction Executor admits or
++refuses it like any transaction. \emph{The record is the log}: no separate observation
++store, and the single-writer discipline of \S5 reaches every observation. This is the door
++Chapters~\ref{ch:valuation} and~\ref{ch:virtual} name when a mark ``enters through the
++observation door.'' A bare read against a live feed --- a pull that records nothing ---
++is refused outright: nothing arrived, so there is nothing to quarantine, and an
++unreproducible read must not exist. A \emph{pushed} arrival is the opposite case: it is
++captured under its envelope even when malformed (W4, Section~\ref{sec:failures}). A
++recorded observation is a fact of the log, so every downstream number is a function of
++the record alone (\S 12).
+ 
+ \begin{lstlisting}
+ data Provenance  = Provenance { source :: SourceId, observed :: Time, basis :: BasisRef }
+@@ -125,12 +125,28 @@
+ declaration: each component's dimension --- price-in-basis, proportional, or quantity ---
+ and the quotation convention it renders. Registration is immutable: a correction is a new
+ kind plus a retirement of the old, never an edit, so no data ever changes dimension under
+-a reader's feet. Data whose kind is not registered is refused at the door.
++a reader's feet. Data of an unregistered kind is not silently framed: the arrival is
++quarantined, its processing refused (W4, Section~\ref{sec:failures}), never dropped.
++
++The registry has a second column under the same immutable discipline: the \textbf{event
++kind} --- the kind of thing that fires a contract: a split, a fixing, a fill, an external
++fail notice. The kinds of event the system can process form a finite, closed, declared set
++(constitution C-4.12, ratified 2026-07-14, awaiting adoption); a kind is registered, on the record, before any
++event of it crosses, and registration names its \textbf{routing} --- the contract or
++contracts that must fire on it, total at registration: a kind cannot register without a
++router. ``Fires the responsible contract'' (Chapter~\ref{ch:machines}) is thereby a
++declared fact, not an assumption. One cause may route to many units --- one ACME dividend,
++one firing per referencing unit --- separated by the cause-derived identifier. Closed and
++declared, the event-kind set is the alphabet of the paths that could have occurred: what
++makes the generated-event universe and the simulation sample space well defined (C-2.8).
+ 
+ \begin{lstlisting}
+ data Dim      = Price | Proportional | Quantity          -- component dimensions
+ data Reading  = Reading { kind :: KindId, comps :: [(Dim, Integer)] }  -- exact minor units
+ data IngestError = UnknownUnit | UndeclaredConvention | UnregisteredKind
++data Routing  = Routing { eventKind :: EventKind, fires :: NonEmpty ContractId }
++-- second column: every registered event kind names the contract(s) that must fire;
++-- a kind cannot register without a router --- routing is total at registration.
+ -- the market data operator acts on Price components; Proportional stands; Quantity is
+ -- walled off to the move plane (Chapter 3) and is never carried on the value frame.
+ \end{lstlisting}
+@@ -178,8 +194,9 @@
+ For every registered data kind and every event kind the boundary admits, an operator is
+ declared --- the identity operator where a kind is genuinely unaffected, but declared, not
+ assumed. There is no (data kind, event kind) pair for which a read finds the adjustment
+-undefined. A corporate action whose pairing has no declared operator does not cross: it is
+-refused at the door, never silently treated as identity.
++undefined. A corporate action whose pairing has no declared operator is not processed: the
++arrival is recorded as a quarantined event and its adjustment refused (W4), never silently
++treated as identity.
+ \end{principle}
+ 
+ Totality is what turns ``never improvised at read'' into a checkable property. An
+@@ -452,8 +469,9 @@
+ W3 & contradictory sources & sources diverging beyond the declared threshold yield a \\
+    &                       & flagged ``aggregation failed'' observation, never a silent \\
+    &                       & pick; sources and threshold are recorded \\
+-W4 & unmappable event & a pairing with no declared operator, or data of an \\
+-   &                  & unregistered kind, is refused at the door (Principle~\ref{prin:sched-total}) \\
++W4 & unroutable or & the arrival is recorded as a \textbf{quarantined event}, a \\
++   & unmappable event & moveless provenance-carrying fact, and its \emph{processing} \\
++   &                  & is refused --- the refusal on the record; fail-closed, nothing lost \\
+ \bottomrule
+ \end{tabular}
+ \end{center}
+@@ -485,7 +503,22 @@
+ correlated stress --- every venue diverging at once --- it defers valuation book-wide rather
+ than choose a number, an intended fail-closed whose calibration is a governance matter, not a
+ hidden behaviour. W4 is
+-adjustment-schedule totality enforced: the undeclared pairing cannot cross.
++totality enforced without loss. An event of an undeclared kind, an unresolvable reference,
++a pairing with no declared operator (Principle~\ref{prin:sched-total}), or a payload that
++fails validation --- provenance incomplete included --- is neither
++silently dropped nor silently guessed: it crosses the one door as a quarantined event ---
++a moveless recorded fact carrying at least its capture envelope
++(Chapter~\ref{ch:machines}), and the payload's own provenance where it has one --- and its
++\emph{processing} is refused, the refusal itself a fact of the record. The system still stops rather than improvises
++(\S2); it no longer forgets what it stopped on. The quarantined event mints a visible,
++deadline-bearing open item and stands until its kind is registered or a person disposes of
++it (C-12.4 phase-0, constitution C-4.12).
++
++When the kind is later registered, or a person disposes, the arrival is processed then: the
++processing transaction's cause is the recorded quarantined event --- idempotent under the
++cause-derived identifier, carrying the quarantined event's own valid-time coordinate (W2
++above). The registry is versioned declared data read in force at each log position, so
++replay across its evolution is deterministic: every reader computes one answer.
+ 
+ \subsection{The boundary-convention slot}\label{sec:slot}
+ 
+@@ -521,7 +554,7 @@
+ 
+ \subsection{What an auditor checks}
+ 
+-A candidate implementation satisfies this chapter when six things hold, each mechanically
++A candidate implementation satisfies this chapter when seven things hold, each mechanically
+ checkable over generated data and histories: all data on the record carries provenance,
+ and no valuation reads data that does not (Section~\ref{sec:obs-door}); every data kind
+ is registered with component dimensions before it crosses, and an unregistered kind is
+@@ -531,8 +564,10 @@
+ recomputed at read from the original under the declared operators
+ (Sections~\ref{sec:menu}--\ref{sec:recompose}); the invariance witness holds across every
+ generated corporate action, and a stale-frame or wrong-side-of-ex read is refused
+-(Section~\ref{sec:witness}); and each of W1--W4 produces its determined disposition on
+-replay (Section~\ref{sec:failures}). These restate as minima in
++(Section~\ref{sec:witness}); each of W1--W4 produces its determined disposition on
++replay (Section~\ref{sec:failures}); and every unroutable or unmappable arrival is recorded
++as a quarantined event, never dropped, and re-processes deterministically once its kind is
++registered (Sections~\ref{sec:registry},~\ref{sec:failures}). These restate as minima in
+ Chapter~\ref{ch:requirements}. The boundary is then closed: what crosses it is recorded,
+ framed, and replayable, and the conservation the rest of the specification proves rests on
+ solid ground.
+--- Ledger_Spec_v15.2/ledger/drafts/ch11_settlement.tex	2026-07-13 23:03:21.679670849 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch11_settlement.tex	2026-07-14 00:47:47.230842026 +0100
+@@ -372,8 +372,9 @@
+ named: the settlement-obligation unit's own smart contract, the one legal writer of
+ that unit's lifecycle node (Chapter~\ref{ch:homes}, Invariant~\ref{inv:one-writer}).
+ It proposes the transition on one of two recorded triggers --- an external fail
+-notice, admitted through the one door as a moveless observation-recording transaction
+-(Chapter~\ref{ch:marketdata}), or the due-date watch firing and finding the cumulative
++notice, a registered event kind whose routing names this settlement-obligation unit's
++contract (Chapter~\ref{ch:marketdata}), admitted through the one door as a moveless
++observation-recording transaction, or the due-date watch firing and finding the cumulative
+ confirmed settled quantity short of the instructed quantity by the deadline. The
+ second trigger reads quantity, not mere presence, so a partial settlement --- some
+ delivered, a residual failed --- fires it on the unmet residual rather than passing
+--- Ledger_Spec_v15.2/ledger/drafts/ch12_reporting.tex	2026-07-13 23:28:18.983738966 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch12_reporting.tex	2026-07-14 00:53:25.833389071 +0100
+@@ -105,18 +105,13 @@
+ 
+ \emph{Re-use, receiver side.} Mass held on the received-as-collateral ray is
+ available for re-use \emph{where the governing agreement grants a right of use}.
+-Actual re-use is read from re-pledge moves, each of which
+-carries a source-agreement reference beside its governing reference
+-(Chapter~9); the source is an observable fact of the custody instruction, so
+-nothing fictitious is stored, and received, re-used, and available project as
+-per-(unit, agreement) actuals. Collateral received under a security interest
+-\emph{without} right of use (Constitution~C-8.8, segregated cash included) must
+-not be re-used, and the current coverage net does not yet gate re-use by the
+-right-of-use term --- it bounds re-posting by possession alone, so it would
+-\emph{admit} a re-post of segregated mass. That gap between C-8.8 and the coverage
+-net is a named open problem (Chapter~\ref{ch:scope}), stated here in the open rather
+-than papered over; until the right-of-use gate is built, an implementation of this
+-specification must not enable collateral re-use --- the constraint is live and
++Actual re-use is read from re-pledge moves, each carrying a source-agreement reference
++beside its governing reference (Chapter~9), so received, re-used, and available project as
++per-(unit, agreement) actuals. Collateral received \emph{without} right of use
++(Constitution~C-8.8, segregated included) must not be re-used, and the coverage net does
++not yet gate re-use by the right-of-use term --- it would admit a re-post of segregated
++mass. That gap is a named open problem (Chapter~\ref{ch:scope}), stated in the open;
++until the gate is built, an implementation must not enable collateral re-use --- live and
+ blocking, not a label.
+ 
+ \emph{Fungible received mass.} Title-transfer received cash and securities land
+--- Ledger_Spec_v15.2/ledger/drafts/ch14_invariants.tex	2026-07-13 23:37:55.247412154 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch14_invariants.tex	2026-07-14 00:53:25.833389071 +0100
+@@ -393,19 +393,15 @@
+ 
+ \subsection{The record is the log}\label{sec:record-is-log}
+ 
+-Replay reconstructs more than balances and the three homes. Because every observation
+-whose reproduction the framework guarantees enters the log as a moveless
+-observation-recording transaction (Chapters~\ref{ch:objects} and~\ref{ch:marketdata}),
+-re-folding a log prefix reconstructs every recorded observation as well --- the record
+-\emph{is} the log, with no second store to reconcile against. The single-writer
+-discipline (Invariant~\ref{inv:writer}) therefore covers every observation, not only
+-every move, and the ``two views of one log'' of Chapter~\ref{ch:picture} is exact: the
+-Record the \texttt{watch} arrow reads and the Ledger the \texttt{contract} and
+-\texttt{apply} arrows consume are the same folded log. Chapter~\ref{ch:testability}
+-exercises this as \texttt{prop\_replayReconstructsRecord}, which regenerates the whole
+-record --- observations included --- from the log alone and compares. The observation
+-stream is therefore no second half of the record with a door of its own: there is one door,
+-and it is the Transaction Executor.
++Replay reconstructs more than balances and the three homes. Every guaranteed observation
++enters the log as a moveless observation-recording transaction
++(Chapter~\ref{ch:marketdata}), so re-folding a prefix reconstructs every recorded
++observation as well --- the record \emph{is} the log, no second store, and the
++single-writer discipline (Invariant~\ref{inv:writer}) covers every observation.
++Chapter~\ref{ch:testability} exercises this as
++\texttt{prop\_replayReconstructsRecord}, rebuilding the whole record from the log alone.
++The observation stream is no second half of the record with a door of its own: there is
++one door, and it is the Transaction Executor.
+ 
+ \subsection{The coverage invariant and the two-guard contrast}
+ 
+--- Ledger_Spec_v15.2/ledger/drafts/ch15_testability.tex	2026-07-13 23:37:55.247412154 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch15_testability.tex	2026-07-14 01:05:34.861832096 +0100
+@@ -155,16 +155,12 @@
+ 
+ \paragraph{Conservation at agreement grain, and the netting collapse it catches.}
+ Conservation is checked at the finest grain the coordinate vector has --- per (unit,
+-coordinate, agreement), Theorem~\ref{thm:conservation} --- not at the aggregate (unit,
+-coordinate) grain. The distinction has teeth precisely on the cross-agreement history it
+-catches: a wallet posts 100 of a unit under agreement $G_1$ and receives 100 of the
+-same unit under a different agreement $G_2$, so the aggregate posted coordinate nets to
+-zero. Both the aggregate law and the finer law hold on that history --- each per-agreement
+-coordinate is conserved across wallets, and so is their sum --- but a report or property
+-that reads only the aggregate posted axis sees zero and passes \emph{vacuously}, reporting
+-a fully encumbered wallet as unencumbered (Chapter~\ref{ch:reporting}). The finer law keeps
+-$\mathrm{bal}_{\text{posted},G_1}=+100$ and $\mathrm{bal}_{\text{posted},G_2}=-100$ as two
+-coordinates, and the gross-encumbrance property reads them as $100$, not $0$.
++coordinate, agreement), Theorem~\ref{thm:conservation}. The teeth are the cross-agreement
++history: post 100 under $G_1$, receive 100 under $G_2$, aggregate posted axis zero. A
++property reading only the aggregate sees zero and passes \emph{vacuously}, reporting a
++fully encumbered wallet as unencumbered (Chapter~\ref{ch:reporting}); the finer law keeps
++$+100$ and $-100$ as two coordinates, and the gross-encumbrance property reads them as
++$100$, not $0$.
+ 
+ \begin{lstlisting}
+ prop_conservation :: History -> Unit -> Coord -> Agreement -> Property  -- Theorem 14.1
+@@ -251,15 +247,13 @@
+ never disagree.
+ 
+ \paragraph{Term adjustment on a corporate action, and the phantom knock it refuses.}
+-One out-edge every referencing unit declares is the corporate-action edge
+-(Chapter~\ref{ch:objects}, Section~\ref{sec:termsheet-graphs}): across a split of a referenced
+-underlying, its action appends a new ProductTerms version carrying each referencing term
+-through the term-adjustment operator (Chapter~\ref{ch:marketdata}). The edge carries its own
+-executable witness --- the derivative reading of the invariance witness
+-(Invariant~\ref{inv:consistency}): the derivative's payoff read on the appended terms equals
+-its payoff read on the pre-event terms, and no guard fires that the pre-event terms would not
+-have fired. The precondition --- a generated derivative \emph{and} a generated corporate action
+-on the unit its terms reference --- is a genuine one, not a tautology.
++Across a split of a referenced underlying, the corporate-action edge
++(Section~\ref{sec:termsheet-graphs}) appends a new ProductTerms version through the
++term-adjustment operator (Chapter~\ref{ch:marketdata}), and it carries its own executable
++witness (Invariant~\ref{inv:consistency}): the payoff read on the appended terms equals the
++payoff on the pre-event terms, and no guard fires that the pre-event terms would not have
++fired. The precondition --- a generated derivative \emph{and} a generated corporate action
++on its referenced underlying --- is genuine, not a tautology.
+ 
+ \begin{lstlisting}
+ prop_termAdjustmentInvariance :: History -> Property
+@@ -289,16 +283,11 @@
+ 
+ \paragraph{The settlement-obligation graph, and the fail branch it must walk.} The
+ settlement-obligation unit (Chapter~\ref{ch:settlement}) is a product graph like any
+-other: its nodes are \texttt{instructed}, \texttt{settled}, and \texttt{failed}, and the
+-four properties above (Invariant~\ref{inv:graph-consistency}) test its three interpreters
+-for agreement --- no new machinery. What the generator must not leave unwitnessed is the
+-off-happy-path walk: the \texttt{instructed}$\to$\texttt{failed} edge, on which the same
+-unit \emph{becomes} the fails-cascade obligation (Chapter~\ref{ch:collateral}, \S9.3); the
+-\texttt{instructed}-node record-date branch on which a cum trade raises the market-claim
+-leg; and the \texttt{settled}-node record-date branch on which an ex trade raises the
+-mirror market-claim leg --- the fourth quadrant. A generator that only ever settles, or
+-only ever leaves an ex trade unsettled, would satisfy the four properties without
+-exercising these.
++other, tested by the four properties above (Invariant~\ref{inv:graph-consistency}) --- no
++new machinery. What the generator must not leave unwitnessed is the off-happy-path walk:
++the fail edge, the cum record-date branch, and the fourth-quadrant mirror branch, each
++constructed below; a generator that only ever settles would satisfy the four properties
++without exercising any of them.
+ 
+ \begin{lstlisting}
+ genSettlementHistory :: Gen History
+@@ -340,12 +329,11 @@
+ market claim.
+ 
+ \paragraph{The position-state collection: two entitlements in flight, each retiring alone.}
+-PositionState holds not one fact per (wallet, unit) pair but a collection keyed by the
+-cause-derived identifier (Chapter~\ref{ch:homes}). The guarantee that makes the key
+-load-bearing is that two entitlements can be live on one pair at once and each retires exactly
+-when its own obligation discharges --- never early, never on the other's discharge. A generator
+-that declares only one dividend at a time would satisfy every balance property without ever
+-placing two facts in one slot.
++PositionState holds a collection keyed by the cause-derived identifier
++(Chapter~\ref{ch:homes}): two entitlements can be live on one (wallet, unit) pair at once,
++each retiring exactly when its own obligation discharges. A generator that declares only one
++dividend at a time would satisfy every balance property without ever placing two facts in
++one slot.
+ 
+ \begin{lstlisting}
+ prop_twoEntitlementsRetireIndependently :: History -> Property
+@@ -373,14 +361,10 @@
+ could never hold the two the routine Tuesday puts in flight.
+ 
+ \paragraph{The coordinated cascade: delivered twice, each leg once, all $n$ committed.}
+-One cause can move many units. A single corporate action fires the contract once per
+-affected unit and proposes one transaction per unit --- a cascade of $n$ legs tied
+-together by their shared $\mathit{causeEventId}$, yet each carrying its own identifier
+-$\mathit{txid}=H(\mathit{causeEventId},\mathit{contractId},\mathit{unitId},\mathit{seq})$
+-(Chapter~\ref{ch:machines}). Idempotence keyed on the event would suppress every leg
+-but the first; idempotence keyed on the $\mathit{txid}$ commits all $n$ and each
+-exactly once. The property asserts both directions --- no leg dropped, no leg
+-duplicated --- by delivering the whole cascade twice, reordered.
++One cause can move many units: a cascade of $n$ legs sharing one $\mathit{causeEventId}$,
++each with its own $\mathit{txid}$ (the derivation rule of Chapter~\ref{ch:machines}).
++The property asserts both directions --- no leg dropped, no leg duplicated --- by
++delivering the whole cascade twice, reordered.
+ 
+ \begin{lstlisting}
+ prop_cascadeIdempotence :: History -> Property
+@@ -664,16 +648,13 @@
+ unsound in the direction that either fabricates breaches or hides them.
+ 
+ \paragraph{NoDoubleCount fires over every extinguishing event.}
+-\texttt{NoDoubleCount} quantifies over units, not over one instrument, so it must be witnessed
+-on every kind of lifecycle event that extinguishes an exposure --- and a property whose
+-precondition is never generated passes without seeing anything. Two kinds extinguish. OT-1's
+-barrier touch is one: a triggered one-touch prices at $0$. The day's settlement of a
+-settled-to-market future is the other: once the variation margin is owned cash the future's
+-exposure is gone, so it prices at $0$ too, and marking it against the futures level would count
+-the day's move a second time --- exactly the double-count \S\ref{sec:pricing-state} forbids. A
+-collateralised-to-market future is the contrast that keeps the predicate honest: its return
+-obligation survives the settlement, so it is \emph{not} extinguished, and it prices against the
+-last settled level; the generator must produce it, and the property must not zero it. The
++\texttt{NoDoubleCount} quantifies over units, so it must be witnessed on every extinguishing
++kind. Two kinds extinguish: OT-1's barrier touch (a triggered one-touch prices at $0$) and
++the settled-to-market future's daily settlement (the exposure is owned cash; marking against
++the futures level would double-count, \S\ref{sec:pricing-state}). The
++collateralised-to-market future is the honest contrast: its return obligation survives, it
++is \emph{not} extinguished, and it prices at the last settled level --- the generator must
++produce it and the property must not zero it. The
+ signatures below are Haskell illustration --- the executable form of \texttt{NoDoubleCount} and
+ its firing regime, kept separate from the TLA\textsuperscript{+}-style model above so the two
+ notations do not run together in one block:
+@@ -864,6 +845,58 @@
+ anywhere but the log and \texttt{replayFromLog} cannot rebuild it, and
+ \texttt{prop\_replayReconstructsRecord} reports the store the one-door discipline exists to abolish.
+ 
++\paragraph{The event door: one registry, mandatory routing, and the quarantine that never drops.}
++Every arriving external event is recorded, or its refusal recorded; a kind registers only with
++routing defined for it, and an event of an unregistered kind is recorded as a \emph{quarantined
++event} --- never dropped, never a bare value (C-4.12). Four properties pin the door.
++
++\begin{lstlisting}
++prop_registryTotality :: Registration -> Registry -> Property
++prop_registryTotality r reg =
++      lacksRouter r ==> refusedAtDoor r                                -- router-less: refused
++  .&&. conjoin [ isJust (routerFor reg k) | k <- registeredKinds reg ] -- admitted: routing total
++  -- the refusal is the DOOR's, not the constructor's (not x===x).
++genRegistration :: Gen Registration  -- draw a router-flag rate r: when it fires OMIT the router.
++genRegistry     :: Gen Registry      -- >=1 registered, routed kind, so the totality conjunct
++                                     -- never ranges over an empty registry (vacuity guard).
++prop_registryTotality_fires =
++  checkCoverage $ cover 1.0 lacksRouter "registration without a router -> refused" genRegistration
++prop_registryRouted_fires =
++  checkCoverage $ cover 1.0 hasRegisteredKind "a routed, non-empty registry" genRegistry
++prop_routingDeterminism :: History -> Property
++prop_routingDeterminism h = hasCapturedEvents h ==>
++  routeAll (replayFromLog (logOf h)) === recordedRouting h
++  -- replay-vs-recorded routing: an independent oracle (not x===x).
++genCapturedHistory :: Gen History  -- capture >=1 event of a REGISTERED kind; replay the prefix twice.
++prop_routingDeterminism_fires =
++  checkCoverage $ cover 1.0 hasCapturedEvents "a captured event routed on replay" genCapturedHistory
++prop_quarantineNeverDrop :: History -> Property
++prop_quarantineNeverDrop h =
++      length (arrivals h) === length (recordedOrQuarantined h)         -- nothing dropped
++  .&&. all (\q -> hasProvenance q && hasOpenItem q) (quarantined h)    -- each visible, deadline-bearing
++  -- arrivals h is the generator's INDEPENDENT delivered-count, never read back from the log.
++genUnregisteredArrivals :: Gen History  -- unregistered-kind flag rate r: deliver an off-registry kind.
++prop_quarantineNeverDrop_fires =
++  checkCoverage $ cover 1.0 hasUnregisteredArrival
++    "unregistered-kind event delivered -> recorded as a quarantined event" genUnregisteredArrivals
++prop_lateRegistrationReplay :: History -> Property
++prop_lateRegistrationReplay h = registersAfterQuarantine h ==>
++      -- replayFromLog reads the registry IN FORCE at each log position (Ch. 8, W4; M8):
++      fullState (replayFromLog (logOf h)) === fullState (fold h)       -- replay bit-identical
++  .&&. asKnownAt (beforeRegistration h) h === showsQuarantined h       -- pre-reg view still parks it
++  -- replay-vs-fold (not x===x); parked processing keyed on the quarantined event's cause.
++genLateRegistration :: Gen History  -- late-reg flag rate r: quarantine an off-registry event,
++  -- THEN register its kind+router, THEN process the held event (cause = the quarantined
++  -- event), delivered TWICE (idempotence).
++prop_lateRegistrationReplay_fires =
++  checkCoverage $ cover 1.0 registersAfterQuarantine
++    "kind registered after quarantine -> held event processed once, replay bit-identical" genLateRegistration
++\end{lstlisting}
++
++Each firing witness asserts its branch (\S 2): drop the routing-total conjunct and a
++router-less kind admits; drop the arrival count and a silent drop passes; key the later
++processing on arrival rather than the quarantined event's cause and replay diverges.
++
+ \subsection{What an auditor checks}
+ 
+ A candidate implementation satisfies this chapter when the checks above run green over the
+@@ -882,7 +915,11 @@
+ show zero; two dividends in flight are both live in the position-state collection and each
+ retires on its own payment date; a coordinated cascade delivered twice commits each of its $n$
+ legs exactly once and all $n$; the bitemporal pair BITEMP-1 and BITEMP-2 hold with the
+-back-dated-observation branch ($k<\text{end}$) exercised; and the
++back-dated-observation branch ($k<\text{end}$) exercised; every arriving external event is
++recorded or refused, no event kind registers without routing defined for it, an event of an
++unregistered kind is recorded as a quarantined event with provenance and an open item rather than
++dropped, and a kind registered after quarantine processes its held event once with replay
++bit-identical; and the
+ knock--revalue--call--discharge model holds its two safety invariants
+ always and its liveness obligation eventually, with sufficiency asserted only as the latter.
+ Each is mechanical, each is replayable from a seed, and each fails closed. A property that
+--- Ledger_Spec_v15.2/ledger/drafts/ch16_requirements.tex	2026-07-13 23:15:55.412646849 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch16_requirements.tex	2026-07-14 01:05:10.822113187 +0100
+@@ -29,7 +29,7 @@
+ The Event Monitor and the Events Executor sit outside the trust boundary
+ (Chapter~\ref{ch:machines}). No failure either can commit corrupts ledger state; every one
+ must degrade to a visible, overdue item rather than to silence. What they owe is liveness
+-and replayability, and the following seven requirements are its minimum.
++and replayability, and the following eight requirements are its minimum.
+ 
+ \begin{enumerate}[label=\textbf{M\arabic*.}, ref=M\arabic*, leftmargin=*, itemsep=3pt]
+ \item \textbf{Durable watches and timers.} A watch registered for a future date or
+@@ -61,6 +61,13 @@
+   discharged, compensated, or declared defaulted. A duty that fails to fire must degrade to
+   a visible, overdue item, never to silence. This is the liveness counterpart of the value
+   sufficiency obligation of Chapter~\ref{ch:collateral} and Chapter~\ref{ch:invariants}.
++\item \textbf{No captured event is lost.} Every arriving external event must be recorded,
++  or its refusal recorded; an event of an unregistered kind must be recorded as a
++  \emph{quarantined event} with its provenance and a deadline-bearing open item, never
++  returned as a bare value (C-4.12, ratified 2026-07-14, awaiting adoption); later processing is idempotent
++  under the cause-derived identifier, over a versioned registry read in force at each
++  position. A dropped arrival is unrecoverable; a quarantined one stands visible until its
++  kind is registered or a person disposes.
+ \end{enumerate}
+ 
+ \subsection{Valuation semantics}
+@@ -185,7 +192,7 @@
+ An auditor confirms conformance by exercising each group against generated products,
+ events, and histories, on the executable-check surface of Chapter~\ref{ch:testability}.
+ 
+-The machine minima (M1--M7) are liveness and replay properties: generate restart,
++The machine minima (M1--M8) are liveness and replay properties: generate restart,
+ duplicate-emission, and late-firing histories, and confirm that no event is lost, that
+ every watch is acknowledged or stands overdue, that every late firing reproduces the
+ identical transaction, and that neither machine writes the ledger. The valuation minima
+--- Ledger_Spec_v15.2/ledger/drafts/ch17_scope.tex	2026-07-13 23:43:15.722234171 +0100
++++ Ledger_Spec_v15.3/ledger/drafts/ch17_scope.tex	2026-07-14 00:56:21.505957270 +0100
+@@ -7,12 +7,11 @@
+ 
+ This chapter discharges constitution clauses C-Scope.1--C-Scope.11 (the boundary of the specification; C-Scope.9 jointly with Chapter~\ref{ch:settlement}), the Authority clauses C-Auth.1--C-Auth.4 (C-Auth.1 and C-Auth.4 jointly with Chapter~\ref{ch:objective}), and C-6.6 (managed-account consequences, delegated by its own terms to the Managed-Account Companion, register line E75).
+ 
+-Scope fixes the boundary of the specification: what the specification covers, and what it
+-reconciles against at its perimeter but never performs. The constitution states the
+-in-scope object in one sentence --- the recording, valuation, and lifecycle of
+-trading-book positions held at fair value, and the interface that projects committed
+-activity into settlement. Everything below is that sentence made exact, component by
+-component, together with the explicit list of external authorities that lie outside it.
++Scope fixes the boundary: what the specification covers, and what it reconciles against
++at its perimeter but never performs. The constitution states the in-scope object in one
++sentence --- the recording, valuation, and lifecycle of trading-book positions held at
++fair value, and the interface that projects committed activity into settlement; everything
++below is that sentence made exact, with the external authorities that lie outside it.
+ 
+ \subsection{In scope}
+ 
+@@ -23,9 +22,8 @@
+ \begin{itemize}[leftmargin=*, itemsep=2.5pt]
+ \item \textbf{The map-then-fold architecture and the projection machinery} that derives
+   every view from the log --- Chapter~\ref{ch:picture}.
+-\item \textbf{The immutable log and the objects} --- units, wallets, balances, the atomic
+-  move, the transaction, and the signed coordinate vector \emph{(owned, lent, posted)} ---
+-  Chapter~\ref{ch:objects}.
++\item \textbf{The immutable log and the objects} --- units, wallets, balances, moves,
++  transactions, the coordinate vector --- Chapter~\ref{ch:objects}.
+ \item \textbf{The three machines} --- the Event Monitor, the Events Executor, and the
+   Transaction Executor --- and the single-writer door --- Chapter~\ref{ch:machines}.
+ \item \textbf{The smart-contract framework}, its event-triggering discipline, and the
+@@ -35,7 +33,7 @@
+ \item \textbf{Valuation and profit and loss} --- NAV as a projection, path-independent PnL,
+   and deposit neutrality --- Chapter~\ref{ch:valuation}.
+ \item \textbf{Ingestion, corporate actions, and the market data operator} --- the recorded
+-  observation and the operator intrinsic to each (data-kind, event-kind) pair ---
++  observation, the registry, and the operator per (data-kind, event-kind) pair ---
+   Chapter~\ref{ch:marketdata}.
+ \item \textbf{Collateral, margin, and lending} --- the regime key, the coverage invariant,
+   and the determination/payment split --- Chapter~\ref{ch:collateral}.
+@@ -62,28 +60,23 @@
+ closure holds precisely because it does not absorb them.
+ 
+ \begin{itemize}[leftmargin=*, itemsep=2.5pt]
+-\item \textbf{Price formation} --- price discovery and executable pricing. The ledger
+-  records the outputs of pricing models and never runs one (Chapter~\ref{ch:valuation};
+-  Chapter~\ref{ch:requirements}, V1). The discovery of price, and the model that produces
+-  it, are external.
+-\item \textbf{Legal agreements} --- the enforceability and validity of contracts. Every
+-  right and obligation a legal contract creates is represented in the ledger as a unit
+-  (Chapter~\ref{ch:contracts}), but the legal standing of the instrument is decided
+-  outside the boundary.
+-\item \textbf{The settlement infrastructure itself} --- settlement finality, payment-system
+-  access, and custodian and CSD connectivity. The ledger says \emph{what} settles; the
+-  infrastructure decides how, and whether (Chapter~\ref{ch:settlement}).
+-\item \textbf{Regulatory submission} --- submission gateways and report formatting. Every
+-  report is a projection of the record (Chapter~\ref{ch:reporting}); its transmission and
+-  its per-regime format are external.
+-\item \textbf{Reference-data authority} --- the mastering of instrument, counterparty, and
+-  calendar reference data. The ledger reconciles against it at the boundary; it does not
+-  master it.
+-\item \textbf{Model governance and retention} --- the validation, approval, and retention
+-  of pricing and strategy models, and accounting-policy decisions. Reproducing a valuation
+-  from recorded inputs and identified prices is unconditional; reproducing a model's number
+-  requires the model itself, whose retention is a governance matter outside the ledger's
+-  scope (the anchor of Chapter~\ref{ch:requirements}, V1).
++\item \textbf{Price formation} --- the ledger records the outputs of pricing models and
++  never runs one (Chapter~\ref{ch:valuation}; Chapter~\ref{ch:requirements}, V1); price
++  discovery is external.
++\item \textbf{Legal agreements} --- every right and obligation a contract creates is a
++  unit (Chapter~\ref{ch:contracts}); the instrument's legal standing is decided outside
++  the boundary.
++\item \textbf{The settlement infrastructure itself} --- finality, payment-system access,
++  custodian and CSD connectivity: the ledger says \emph{what} settles; the infrastructure
++  decides how, and whether (Chapter~\ref{ch:settlement}).
++\item \textbf{Regulatory submission} --- every report is a projection of the record
++  (Chapter~\ref{ch:reporting}); its transmission and per-regime format are external.
++\item \textbf{Reference-data authority} --- instrument, counterparty, and calendar
++  mastering: reconciled against at the boundary, never performed.
++\item \textbf{Model governance and retention} --- validation, approval, retention of
++  models, and accounting policy. Reproducing a valuation from recorded inputs is
++  unconditional; reproducing a model's number requires the model, whose retention is
++  governance outside scope (Chapter~\ref{ch:requirements}, V1).
+ \end{itemize}
+ 
+ Five companion documents are named in the Exclusions Register as out-of-scope
+@@ -95,51 +88,39 @@
+ cascade recalls; the \emph{Track B graphs-interpreter companion} (register line E74),
+ holding the generic term-sheet interpreter, the CDM round-trip, and term-sheet rendering;
+ the \emph{Managed-Account Companion} (register line E75), holding managed-account fee
+-accrual and NAV attribution --- the consequences Constitution \S6 delegates to the detailed
+-specification for managed accounts; and the \emph{Simulation Companion} (register line
+-E76), holding the stochastic models, probability measures, calibration procedures, and
+-variance-reduction techniques that drive simulated paths --- the model content the
+-constitution places outside the fold. What is \emph{in} this specification is the boundary
+-that companion plugs into, not the models it holds: branch construction, seed discipline,
+-and result provenance (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}). Each is
+-named so its absence from this specification is deliberate and auditable, never silent.
++accrual and NAV attribution (the C-6.6 delegation); and the \emph{Simulation Companion}
++(register line E76), holding the stochastic models, measures, calibration, and
++variance-reduction techniques that drive simulated paths --- what is \emph{in} this
++specification is the boundary that companion plugs into: branch construction, seed
++discipline, result provenance (Chapter~\ref{ch:virtual}, Section~\ref{sec:simulated}).
++Each is named so its absence is deliberate and auditable, never silent.
+ 
+ \subsection{The open-problems index and the constitutional-parking rule}
+ 
+-Two registers live in this chapter. The first names the design questions the specification
+-leaves open; the second parks any genuine conflict with the constitution.
++Two registers live here: open design questions, and parked constitutional conflicts.
+ 
+ \paragraph{The open-problems index.} The constitution requires that implementation
+-questions be named and left, not silently dropped. Each open design question is named here
+-and carried in full in the \emph{Open-Problems and Escalation Register} companion. The
+-top open risk is close-out and netting algebra: the collateral ruling made
+-per-netting-set claim units first-class (Chapter~\ref{ch:collateral}) precisely so that
+-close-out is representable, yet the algebra that nets and closes those units out is not yet
+-designed. It entails, on a counterparty default, valuing each claim at close-out --- each
+-priced by the taker --- netting the per-netting-set claims and obligations to a single
+-figure, and decoupling recovery from that figure; it is named here so it cannot be
+-improvised. Named alongside it, and surfaced by the 2026-07-13 consistency review: the
+-\textbf{right-of-use gate on collateral re-use} --- Constitution~C-8.8 requires that
+-collateral received under a security interest \emph{without} right of use (segregated
+-included) not be re-used, yet the coverage net (Chapter~\ref{ch:invariants}) bounds
+-re-posting by possession alone and does not yet exclude no-right-of-use received mass, so a
+-segregated inflow is representable as deliverable, so this item is \emph{live and
+-blocking}: an implementation must not enable collateral re-use until the gate is built;
+-and the \textbf{quantity-aware
+-settlement-obligation unit} --- a partial settlement leaves some quantity settled and a
+-residual failed, which the single \texttt{instructed}/\texttt{settled}/\texttt{failed} node
+-cannot yet split into a settled leg and a failed-residual leg. Named further: the correction
++questions be named and left, not silently dropped; each is carried in full in the
++\emph{Open-Problems and Escalation Register} companion. The top open risk is close-out and
++netting algebra: per-netting-set claim units are first-class
++(Chapter~\ref{ch:collateral}) precisely so close-out is representable, yet the algebra
++that values each claim at close-out, nets per netting set, and decouples recovery from the
++figure is not yet designed --- named here so it cannot be improvised. Named alongside it: the \textbf{right-of-use gate on collateral re-use} --- C-8.8 forbids
++re-use of no-right-of-use collateral, yet the coverage net
++(Chapter~\ref{ch:invariants}) bounds re-posting by possession alone, so a segregated
++inflow is representable as deliverable; \emph{live and blocking} --- no implementation
++enables re-use until the gate is built; and the \textbf{quantity-aware
++settlement-obligation unit} --- a partial settlement leaves a settled quantity and a failed
++residual the single lifecycle node cannot yet split into legs. Named further: the correction
+ algebra beyond the single compensating transaction; inter-ledger federation and
+-eliminations; \textbf{behavioural-event generation} --- a generator that reaches the events
+-that are \emph{decisions} (a default, an elective exercise, an election on a merger) must
+-model the deciding party's behaviour, not just the market, and that model is not yet designed;
+-\textbf{corporate-action generation} --- a simulated corporate action is a generated
+-\emph{terms version} that must cross as a notice and drive the term-adjustment operator
+-(Chapter~\ref{ch:marketdata}) exactly as a real one does, and the generator of well-typed
+-terms versions is open; \textbf{nested simulation} --- a simulated path that itself branches
+-a simulated ledger (an XVA computation off each exposure state); seed discipline and result
+-provenance must compose across levels, named here so it cannot be improvised; and the
+-remaining items of the companion register. Naming
++eliminations; \textbf{behavioural-event generation} --- a generator reaching the events
++that are \emph{decisions} (default, elective exercise, merger election) must model the
++deciding party, not just the market; \textbf{corporate-action generation} --- a simulated
++corporate action is a generated \emph{terms version} crossing as a notice through the
++term-adjustment operator, and its well-typed generator is open; \textbf{nested simulation}
++--- a path that itself branches a simulated ledger (XVA off each exposure state), whose
++seed discipline and provenance must compose across levels; and the remaining items of the
++companion register. Naming
+ is the whole obligation; each is stated in the open at the chapter it touches, so none is a
+ gap hidden inside what the specification does claim.
+ 
+@@ -147,60 +128,44 @@
+ Constitution v1.2 itself.
+ 
+ \begin{principle}[Constitutional parking]
+-A genuine conflict between this specification and the constitution --- discovered in
+-drafting or in review --- is parked in this index with the exact proposed amendment text.
+-It is never silently amended and never fudged. Constitutional amendments are the owner's
+-alone, under the constitution's closing \emph{Authority and Amendment} section; the
+-one-way direction of authority forbids an author from resolving a conflict by editing the
+-constitution. Parking makes the conflict visible and hands the owner a precise, decidable
+-choice.
++A genuine conflict between this specification and the constitution is parked in this index
++with the exact proposed amendment text --- never silently amended, never fudged. Amendment
++is the owner's alone (the constitution's \emph{Authority and Amendment} section); parking
++makes the conflict visible and hands the owner a precise, decidable choice.
+ \end{principle}
+ 
+-\emph{Current status: every entry closed; the emptied index is evidenced, not suspicious.}
+-Adversarial review found five points where this specification departed from Constitution
+-v1.1, each parked here with the exact clause it touched and the exact amendment text in the
+-companion register --- the mechanism exercised, never bypassed. On 2026-07-13 the owner
+-ratified and adopted Constitution v1.2, which resolves all five. Each closure is recorded
+-with its resolution, because an index that empties without a trace would be
+-indistinguishable from an index that was never used:
++\emph{Current status: five closed, one ratified awaiting adoption.} Five conflicts parked
++against v1.1 were resolved by the owner's v1.2; the Event Universe review parked one more,
++ratified 2026-07-14. Each closure keeps its resolution --- an index that empties without a
++trace would be indistinguishable from one never used:
+ 
+ \begin{itemize}
+-\item \textbf{PARK-1 (structural) --- CLOSED in v1.2.} The constitution's normative content
+-  was addressed only by section, so ``this chapter discharges \S N'' could not be checked.
+-  Resolution: v1.2 embeds the clause identifiers
+-  $\mathrm{C}\text{-}\langle\text{sec}\rangle.\langle n\rangle$ in the manifesto's margin,
+-  append-only and never renumbered; the separate clause-addressed rendering is retired, and
+-  every chapter here opens with the clause identifiers it discharges.
+-\item \textbf{PARK-2 (Constitution \S12) --- CLOSED in v1.2.} Section~12 once named a single
+-  timestamp, while the system has required two axes since Chapter~\ref{ch:marketdata}: a
+-  transaction-time prefix (what was known) and a valid-time horizon (which recorded
+-  observations are in force). Resolution: the owner's \S 12 ruling restates C-12.1 to name
+-  both honest answers and \emph{delegate their indexing to this specification}; the two-axis
+-  machinery is retained, unchanged, as that indexing. Stated at Chapter~\ref{ch:picture} and
+-  Theorem~\ref{thm:timetravel}.
+-\item \textbf{PARK-3 (Constitution \S4) --- CLOSED in v1.2.} Section~4 once fixed the
+-  coordinate schema, and a single \emph{posted} axis lets two encumbrances under two
+-  agreements net to nothing. Resolution: the owner's \S 4 ruling restates C-4.10 to fix
+-  ownership first and three admission tests, delegating the schema to this specification;
+-  Section~\ref{sec:coordinate-vector} declares the (coordinate, agreement) schema and
+-  demonstrates it compliant, with conservation at the finest declared grain held as
+-  Theorem~\ref{thm:conservation}.
+-\item \textbf{PARK-4 (Constitution \S8) --- CLOSED in v1.2.} Section~8 asserted
+-  deposit-neutrality unconditionally, yet financing received at an off-market rate moves net
+-  owned value at receipt by a day-one financing basis. Resolution: C-8.7 as adopted makes the
+-  guarantee conditional on fair-value measurement, the day-one difference recognised as
+-  financing basis; Chapter~\ref{ch:valuation} discharges the adopted clause.
+-\item \textbf{C-4.8 clarification --- CLOSED in v1.2.} The observation stream once entered
+-  through a second door with no invariant of its own. Resolution: C-4.8 as adopted states
+-  that every guaranteed observation enters the record only as a moveless
+-  observation-recording transaction through the one Transaction Executor --- the record is
+-  the log --- so the single canonical record and the single writer reach every observation.
+-  Stated at Chapters~\ref{ch:objects}, \ref{ch:marketdata}, and~\ref{ch:invariants}.
++\item \textbf{PARK-1 (structural) --- CLOSED in v1.2.} Clause addressing: v1.2 embeds the
++  margin identifiers, append-only; the separate rendering retired; every chapter opens with
++  the clauses it discharges.
++\item \textbf{PARK-2 (\S12) --- CLOSED in v1.2.} One timestamp where two axes were needed:
++  C-12.1 restated --- both honest answers, indexing delegated here; the two-axis machinery
++  retained (Theorem~\ref{thm:timetravel}).
++\item \textbf{PARK-3 (\S4) --- CLOSED in v1.2.} Fixed schema against the netting collapse:
++  C-4.10 restated --- ownership first, three admission tests, schema delegated here;
++  Section~\ref{sec:coordinate-vector} demonstrates compliance
++  (Theorem~\ref{thm:conservation}).
++\item \textbf{PARK-4 (\S8) --- CLOSED in v1.2.} Unconditional deposit-neutrality against
++  the day-one basis: C-8.7 adopted, conditional on fair value (Chapter~\ref{ch:valuation}).
++\item \textbf{C-4.8 clarification --- CLOSED in v1.2.} The second door: every guaranteed
++  observation a moveless transaction through the one Executor; the record is the log
++  (Chapters~\ref{ch:objects}, \ref{ch:marketdata}, \ref{ch:invariants}).
++\item \textbf{C-4.12 (the event universe) --- RATIFIED 2026-07-14, awaiting adoption.} No
++  closure, no total routing, four loss paths on the captured side: event kinds now finite,
++  closed, declared; routing total at registration; an undeclared event never processed and
++  never lost --- quarantined through the one door. Discharged at
++  Chapters~\ref{ch:marketdata}, \ref{ch:machines}, \ref{ch:testability},
++  \ref{ch:requirements} (M8); adoption is the owner's sole act.
+ \end{itemize}
+ 
+-\noindent The index is empty of open conflicts and live in its history: five were parked with
+-exact amendment text, five decided by the owner, the resolutions above the evidence. A future
+-conflict parks here the same way.
++\noindent The index is live in its history: six conflicts parked with exact text, six
++decided by the owner --- five adopted in v1.2, one ratified awaiting adoption --- the
++resolutions above the evidence. A future conflict parks here the same way.
+ 
+ \subsection{Authority}
+ 
