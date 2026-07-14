@@ -2312,7 +2312,11 @@ event of it crosses, and registration names its \textbf{routing} --- the contrac
 contracts that must fire on it, total at registration: a kind cannot register without a
 router. ``Fires the responsible contract'' (Chapter~\ref{ch:machines}) is thereby a
 declared fact, not an assumption. One cause may route to many units --- one ACME dividend,
-one firing per referencing unit --- separated by the cause-derived identifier. Closed and
+one firing per referencing unit --- separated by the cause-derived identifier. The worked
+instance of a routed lifecycle event is \texttt{COUNTERPARTY-DEFAULT}: its router names the
+master agreement unit's own smart contract, one firing per master referencing the defaulted
+counterparty, the members under that master separated by the same cause-derived identifier
+(Chapter~\ref{ch:collateral}). Closed and
 declared, the event-kind set is the alphabet of the paths that could have occurred: what
 makes the generated-event universe and the simulation sample space well defined (C-2.8).
 
@@ -3282,6 +3286,114 @@ event permits clearing the marker planes by compensating moves against
 explicit, simultaneous loss recognition --- recorded, authorised, and open,
 without the voluntary agreement machinery, and never silent. The centrepiece's
 step~6 needs the voluntary machinery; a book that cannot run it runs this one.
+
+\subsection{Close-out and the netting algebra}\label{sec:closeout}
+
+A counterparty default is the one lifecycle event that must value every claim and
+obligation under a master agreement at once, net them to a single figure, and turn the
+residue into a recovery claim. The machinery is already built: the event-kind registry
+(Chapter~\ref{ch:marketdata}), the claim priced by the taker, the coverage-forced
+ordering of \S\ref{sec:knockpledged}, retirement from the zero vector, and the supervised
+write-off path above. This section is their assembly. It adds one unit --- the
+\textbf{close-out amount claim} (CLM-CO) --- and nothing else.
+
+\emph{The event and its router.} \texttt{COUNTERPARTY-DEFAULT} is a registered event kind
+(Chapter~\ref{ch:marketdata}, Section~\ref{sec:registry}) whose routing names the master
+agreement unit's own smart contract --- the settlement-obligation pattern of
+Chapter~\ref{ch:settlement}, the master's contract the one legal writer of the close-out.
+It fires once per master referencing the defaulted counterparty; the members under that
+master are separated by the cause-derived identifier, one leg each; the default notice
+enters as a moveless observation-recording transaction. Routing to the master is what makes
+``net within a master'' a fact of \emph{which} contract fires: no contract spans two
+masters, so no firing can net across them.
+
+\emph{Taker-state valuation under the declared convention.} Each member is valued at the
+close-out determination through the ordinary state-parameterised pricing layer (\S8),
+priced by the taker --- the claim-for-equivalent rule of this chapter, generalised from one
+claim to the netting set. The valuation convention --- the side (bid, offer, or mid), the
+method (market quotation, loss, or dealer poll), and the termination currency --- is
+declared data on the master agreement unit's close-out-mechanics terms, transcribed once
+from the executed agreement and never improvised at default. It is boundary data under
+TA-TERMS (Chapter~\ref{ch:requirements}, B7): a misdeclaration is a perimeter
+reconciliation, not an internal break, and the declared convention keeps the figure
+recomputable from the record.
+
+\emph{The netting set, and the refusal across masters.} The netting set is the set of units
+whose declared terms name one master agreement unit; the net is a projection over those
+units, never a stored figure. Cross-master netting is refused at the door, not made
+unrepresentable: every leg of one close-out transaction must name one master, read from each
+unit's declared terms, and a transaction whose legs name two masters is refused --- a door
+check of coverage's shape (Invariant~\ref{inv:coverage}). Typing the master into every unit
+would contradict the per-agreement-via-declared-terms design of this chapter and add
+machinery the refusal already supplies.
+
+\emph{One figure, one claim, recovery decoupled.} The net mints as a single unit, CLM-CO:
+the surviving party positive, the defaulter's estate negative, par the net figure. Each
+member claim retires from the zero vector by close-out compensation --- the declared
+\S14.1 fallback the redelivery and margin obligations already carry. Recovery then decouples
+exactly as the claim-for-equivalent decouples on a taker default: CLM-CO's UnitStatus walks
+to \emph{defaulted}, and its mark tracks recoverability, not par. Two marks across one status
+transition on one immutable unit are the loss recognised by construction (C-8.4) --- the fall
+in the mark \emph{is} the fall in NAV, and no second copy of a realised loss is kept beside
+it.
+
+\emph{The write-down is lawful loss, not error repair.} The par-minus-recoverable gap is
+recognised on the \textbf{supervised write-off path} above --- person-authorised, evidenced,
+recorded, and open. It is a lawful economic loss by construction (C-8.4), not the forward
+repair of a wrong recorded event: C-12.4's discipline --- human authorisation and evidence
+--- is borrowed for the authorisation, but the write-down corrects nothing, because nothing
+was recorded wrong.
+
+\emph{The ordering, forced by coverage.} The admitted transactions run in one sequence, and
+the order is forced, not preferred: the default notice, moveless, routed to the master; the
+marker planes clear, because coverage refuses extinguishing owned while posted mass stands
+(the ordering of \S\ref{sec:knockpledged}); the determination observations, moveless;
+net-and-mint, each member claim retired from the zero vector and CLM-CO minted at the net;
+the recovery decoupling to \emph{defaulted}; the authorised write-down. Marker clearing
+precedes member retirement because a member claim is an owned holding, and coverage refuses
+its extinguishment while collateral marker mass still stands.
+
+\emph{Close-out is itself an obligation} (\S14.1): its deadline is the declared close-out
+period, its discharge predicate is the amount determined and CLM-CO claimed, and its fallback
+is the supervised write-off. A stalled close-out is a visible, overdue item on the record,
+never silence and never a dead unit in the liveness queue.
+
+\medskip\noindent\textbf{Episode (close-out): the borrower defaults mid-loan.}
+The loan of the previous episode stands: W-LEND lent $1{,}000$ SIGMA to W-BORR under master
+agreement~L, holding CLM-L (W-LEND $+1{,}000$, W-BORR $-1{,}000$), priced by the borrower's
+state. W-BORR has posted \USD{41,000} of cash collateral under L's security-interest terms
+\emph{without} right of use --- posted-plane marker, received-negative (W-LEND $-41{,}000$,
+W-BORR $+41{,}000$), W-BORR's owned untouched. L's close-out-mechanics terms declare
+offer-side market quotation in USD. SIGMA now prints $44.00$, and W-BORR defaults.
+
+\emph{The walk.} Seven admitted transactions, each through the one door:
+\begin{enumerate}[label=(\arabic*),nosep]
+\item the \texttt{COUNTERPARTY-DEFAULT} notice is recorded, moveless, and routes to L's
+  contract; the members cascade by the cause-derived identifier, and a duplicate notice
+  proposes nothing;
+\item the collateral marker clears first --- posted(USD) $\pm 41{,}000$ (W-BORR, W-LEND)
+  $\to 0$, and owned(USD) \USD{41,000} W-BORR $\to$ W-LEND --- one coverage-ordered
+  transaction enforcing the security interest;
+\item the determination print $44.00$ is recorded, moveless; CLM-L, priced at the taker's
+  (W-BORR's) state, values at $1{,}000 \times 44.00 = \USD{44,000}$;
+\item net within L: $44{,}000 - 41{,}000 = \USD{3,000}$ owed to W-LEND --- a projection over
+  L's netting set, the collateral already applied;
+\item CLM-CO is minted at par \USD{3,000} (W-LEND $+3{,}000$, W-BORR's estate $-3{,}000$),
+  and CLM-L retires from the zero vector by close-out compensation, its declared \S14.1
+  fallback;
+\item CLM-CO's UnitStatus walks to \emph{defaulted}, decoupling its mark from par --- the
+  claim-for-equivalent decoupling generalised;
+\item the authorised write-down records the evidenced recovery of $40\%$ on the supervised
+  write-off path, so CLM-CO marks at $0.40 \times 3{,}000 = \USD{1,200}$ and NAV falls by
+  \USD{1,800} --- the loss, by construction (C-8.4), with no second copy booked.
+\end{enumerate}
+
+\emph{The door.} Conservation per (unit, coordinate) on every paired-leg move; coverage
+orders step~(2) before step~(5)'s retirement; CLM-L and CLM-CO retire only from the zero
+vector; idempotence under the cause-derived identifier at every step. The loss is the fall
+in CLM-CO's mark and nothing besides.
+\emph{One default, one door, one figure per master: the algebra the per-netting-set claim
+units were made first-class to carry.}
 
 % ===================== drafts/ch10_virtual.tex (inlined) =====================
 \section{Virtual Ledgers, Strategies, and the Total Return Swap}
@@ -5484,6 +5596,95 @@ branch too: \texttt{prop\_firedMatchesOneEdge} confirms the partial confirmation
 successor on its declared node, and \texttt{prop\_actionEqualsRecorded} confirms the split
 transaction equals the partial edge's declared action.
 
+\paragraph{Close-out nets within a master, and refuses across masters.} Every leg of a
+close-out transaction must name one master agreement unit, read from each unit's declared
+terms (Chapter~\ref{ch:collateral}); a leg naming a second master is refused at the door. A
+generator that only ever defaults a counterparty under a single master never exercises the
+refusal, so the cross-master branch is constructed by hand.
+
+\begin{lstlisting}
+prop_crossMasterRefused :: History -> Property
+prop_crossMasterRefused h = isCloseOut h ==>
+      admitted h ==> Set.size (mastersNamed (closeOutTx h)) === 1
+  -- every admitted close-out names exactly one master across all its legs; the net is a
+  -- projection WITHIN one master, never across -- typing is not needed, the door decides.
+
+genMultiMasterDefault :: Gen History  -- draw a cross-master flag with rate r; when it fires,
+  -- the defaulted counterparty faces two masters M1, M2, each with its own member claims;
+  -- propose ONE close-out transaction whose legs name BOTH M1 and M2 -> refused at the door.
+  -- (the lawful path fires one close-out per master, each leg naming only its own master.)
+prop_crossMaster_fires =                 -- the refusal witness, asserted, not hoped
+  checkCoverage $ cover 1.0 isCrossMasterCloseOut
+    "one close-out transaction naming two masters -> refused" genMultiMasterDefault
+\end{lstlisting}
+
+When the flag fires the generator builds a two-master close-out by construction, and the
+refusal is witnessed on at least $1\%$ of runs (\S 2). The lawful history fires one close-out
+per master, each netting only the members whose declared terms name it; the cross-master
+transaction writes nothing, so no figure can net across masters --- the per-agreement identity
+of the claim units, enforced at the door rather than carried in every type.
+
+\paragraph{The close-out figure is recomputable from the record.} The net and CLM-CO's par are
+a projection: recompute them from the recorded determination observations and the master's
+declared valuation convention, and the result equals the recorded figure to the minor unit.
+The oracle recomputes independently of the minted claim it checks.
+
+\begin{lstlisting}
+prop_closeOutRecomputable :: History -> Property
+prop_closeOutRecomputable h = isCloseOut h ==>
+      recomputedNet h === recordedCLM_CO_par h    -- equal to the minor unit
+  where recomputedNet h =
+          sum [ takerValue (determination h m) (convention h master) | m <- members h master ]
+          - collateralApplied h master
+        master = masterOf (closeOutTx h)
+  -- inputs: the recorded determination observations and the declared close-out-mechanics
+  -- convention (TA-TERMS) -- both on the record; nothing improvised at default.
+
+genCloseOutHistory :: Gen History  -- draw a default-flag with rate r; when it fires, default a
+  -- counterparty under a master with >=1 member claim and posted collateral, record the
+  -- determination prints, and mint CLM-CO at the net -> the recompute branch.
+prop_closeOutRecompute_fires =            -- the firing witness, asserted, not hoped
+  checkCoverage $ cover 1.0 isCloseOut
+    "counterparty default: net + CLM-CO par recomputed from the record" genCloseOutHistory
+\end{lstlisting}
+
+When the default-flag fires the generator records the determination and mints CLM-CO by
+construction, and the branch is witnessed (\S 2). On every close-out history the recomputed
+net --- taker-state member values less collateral applied, under the declared convention ---
+equals the recorded CLM-CO par to the minor unit; a design that prices a member on the wrong
+side, or improvises the convention at default, is caught as a divergence. This is the
+regime-bit lesson of Chapter~\ref{ch:collateral} carried onto the close-out figure: the
+convention is declared data, so two readers of one log compute one figure.
+
+\paragraph{Members retire from the zero vector, markers first.} No member claim retires on a
+nonzero vector, and no owned extinguishment is admitted while collateral marker mass still
+stands --- the coverage ordering (Invariant~\ref{inv:coverage}) of the knock while pledged
+(\S\ref{sec:knockpledged}), now over close-out histories. The property is metamorphic:
+reorder the close-out so a member retirement is proposed before the marker clears, and the
+door refuses it.
+
+\begin{lstlisting}
+prop_closeOutOrdering :: History -> Property
+prop_closeOutOrdering h = isCloseOut h ==> conjoin
+  [ all (\c -> retires c h ==> vectorBefore c h === zeroVector) (members h)  -- zero-vector only
+  , markerMassStands h ==> not (ownedExtinguishmentAdmitted h) ]             -- markers clear first
+
+genCloseOutReorder :: Gen History  -- draw a reorder-flag with rate r; when it fires, take a
+  -- close-out with posted collateral still on the marker plane and PROPOSE the member-claim
+  -- retirement (an owned extinguishment) BEFORE the marker-clearing transaction -> refused.
+  -- (the lawful order clears the marker first, then retires the member from the zero vector.)
+prop_closeOutOrdering_fires =             -- the refusal witness, asserted, not hoped
+  checkCoverage $ cover 1.0 isPrematureRetirement
+    "member retirement proposed while collateral marker mass stands -> refused" genCloseOutReorder
+\end{lstlisting}
+
+When the reorder-flag fires the generator proposes the premature retirement by construction,
+and the refusal is witnessed (\S 2). Clear the marker first and the identical retirement
+admits, taking the member claim's vector to zero; the ordering is forced by coverage, not
+chosen, exactly as it is at step~6 of the knock while pledged. Together with the two
+properties above, these pin the close-out algebra: one figure per master, recomputable from
+the record, retired in the order coverage compels.
+
 \paragraph{The position-state collection: two entitlements in flight, each retiring alone.}
 PositionState holds a collection keyed by the cause-derived identifier
 (Chapter~\ref{ch:homes}): two entitlements can be live on one (wallet, unit) pair at once,
@@ -6415,11 +6616,17 @@ Two registers live here: open design questions, and parked constitutional confli
 
 \paragraph{The open-problems index.} The constitution requires that implementation
 questions be named and left, not silently dropped; each is carried in full in the
-\emph{Open-Problems and Escalation Register} companion. The top open risk is close-out and
-netting algebra: per-netting-set claim units are first-class
-(Chapter~\ref{ch:collateral}) precisely so close-out is representable, yet the algebra
-that values each claim at close-out, nets per netting set, and decouples recovery from the
-figure is not yet designed --- named here so it cannot be improvised. Two items named here
+\emph{Open-Problems and Escalation Register} companion. The close-out and netting
+algebra, named the top open risk since v15.0 --- per-netting-set claim units were made
+first-class (Chapter~\ref{ch:collateral}) precisely so close-out is representable --- is
+designed by the ruled Phase~A memo and discharged in v16.0 at Chapter~\ref{ch:collateral}
+(Section~\ref{sec:closeout}): the default routes to the master agreement unit's own contract,
+the netting set is the units whose declared terms name that master, the net is a projection
+refused across masters at the door, the net mints as one claim (CLM-CO), each member retires
+from the zero vector by close-out compensation, recovery decouples as the claim's mark walks
+to a defaulted recoverability, and the par-minus-recoverable gap is recognised as lawful loss
+on the supervised write-off path (C-8.4), never as error repair. It is kept named, not erased
+--- an open risk that vanished without trace would be indistinguishable from one never worked. Two items named here
 at the 2026-07-13 consistency review are now closed and kept named, not erased. The
 \textbf{right-of-use gate on collateral re-use} --- open through v15 and \emph{live and
 blocking}, because the coverage net bounded re-posting by possession alone and so admitted
