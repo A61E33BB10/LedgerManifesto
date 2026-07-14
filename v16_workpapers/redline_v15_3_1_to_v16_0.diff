@@ -1,0 +1,693 @@
+--- Ledger_Spec_v15.3/ledger/ledger_v15_3.tex	2026-07-14 07:42:35.036353063 +0100
++++ Ledger_Spec_v16.0/ledger/ledger_v16_0.tex	2026-07-14 23:08:26.349570333 +0100
+@@ -6,6 +6,11 @@
+ \usepackage[T1]{fontenc}
+ \usepackage{lmodern}              % must follow fontenc
+ \usepackage{microtype}            % finer line-breaking; no content change (declared, v15.3)
++% OWNER'S RULING (2026-07-14): hard page cap raised 100 -> 110. The headroom is for
++% NORMATIVE MINIMA AND THEIR WORKED EPISODES ONLY -- new invariants, guards, obligations,
++% properties, and the episodes that exercise them. Elaboration, background, and operational
++% detail still route to companions. CONCORDIA certifies against 110; drawing the headroom
++% for anything but normative content is a veto ground.
+ \input{glyphtounicode}\pdfgentounicode=1
+ \AtBeginDocument{%
+   \DeclareFontShape{T1}{lmr}{m}{scit}{<->ssub*lmr/m/sc}{}%
+@@ -55,7 +60,7 @@
+ }
+ 
+ \title{The Ledger\\[6pt]
+-\large Specification, Version 15.3}
++\large Specification, Version 16.0}
+ \author{R.\ Delloye}
+ \date{July 2026}
+ 
+@@ -2307,7 +2312,11 @@
+ contracts that must fire on it, total at registration: a kind cannot register without a
+ router. ``Fires the responsible contract'' (Chapter~\ref{ch:machines}) is thereby a
+ declared fact, not an assumption. One cause may route to many units --- one ACME dividend,
+-one firing per referencing unit --- separated by the cause-derived identifier. Closed and
++one firing per referencing unit --- separated by the cause-derived identifier. The worked
++instance of a routed lifecycle event is \texttt{COUNTERPARTY-DEFAULT}: its router names the
++master agreement unit's own smart contract, one firing per master referencing the defaulted
++counterparty, the members under that master separated by the same cause-derived identifier
++(Chapter~\ref{ch:collateral}). Closed and
+ declared, the event-kind set is the alphabet of the paths that could have occurred: what
+ makes the generated-event universe and the simulation sample space well defined (C-2.8).
+ 
+@@ -2751,7 +2760,7 @@
+ 
+ \section{Collateral, Margin, and Lending}\label{ch:collateral}
+ 
+-This chapter discharges constitution clauses C-4.10--C-4.11 (the coordinate discipline: mass-only marker planes under named agreements, jointly with Chapter~\ref{ch:objects}) and C-8.6--C-8.9 (the three inflow regimes), and C-6.5 (every right or obligation a unit) for the agreement units it introduces.
++This chapter discharges constitution clauses C-4.10--C-4.11 (the coordinate discipline: mass-only marker planes under named agreements, jointly with Chapter~\ref{ch:objects}) and C-8.6--C-8.9 (the three inflow regimes, C-8.8's no-re-use of segregated collateral enforced by the right-of-use gate of Chapter~\ref{ch:invariants}), and C-6.5 (every right or obligation a unit) for the agreement units it introduces.
+ 
+ \subsection{One representation, keyed by declared regime}
+ 
+@@ -2839,9 +2848,11 @@
+ (posted, $G$) coordinates of Section~\ref{sec:coordinate-vector} is bounded by
+ possession, with the same bound for lent. The sign convention is
+ \emph{received-negative} --- collateral posted out enters positive, collateral
+-received in enters negative --- so mass received offsets mass re-posted and re-use
+-of received collateral is bounded by possession; the $-40$ chain and the refused
+-over-re-post are worked once under that invariant. The signed net is the right
++received in enters negative --- so mass received \emph{under a right-of-use agreement}
++offsets mass re-posted, and re-use of such collateral is bounded by possession, while
++received mass a segregation withholds from use grants no offset (the right-of-use gate,
++Chapter~\ref{ch:invariants}); the $-40$ chain, the refused segregated re-post, and the
++refused over-re-post are worked once under that invariant. The signed net is the right
+ quantity \emph{here}, where the question is whether the wallet can deliver; it is
+ the wrong quantity for the encumbrance report, where the question is how much is
+ encumbered, which reads the per-agreement coordinates gross
+@@ -3027,6 +3038,23 @@
+ \emph{The regime is a declared term of the agreement unit; the machine is the
+ same.}
+ 
++\medskip\noindent\textbf{Episode: the segregated inflow and the refused re-post.}
++Wallet W-SEG receives \USD{100} of USD as variation margin under agreement G-SEG,
++whose declared regime is custody and whose declared terms grant \emph{no} right of use ---
++a security interest withholding use (\S8 case 3, the third row above); the regime and the
++right-of-use term are two declared bits, not one. The inflow writes marker mass on the posted plane:
++W-SEG's posted coordinate under G-SEG is $-100$, received-negative, owned untouched.
++\emph{The attempted re-post.} W-SEG proposes to re-pledge \USD{60} under a second
++agreement G2, a move carrying G-SEG as its source-agreement reference
++(Chapter~\ref{ch:reporting}). \emph{The door.} The coverage check reads G-SEG's
++declared right-of-use term through that reference. G-SEG grants none, so its received
++$-100$ contributes zero to the gated net (Invariant~\ref{inv:coverage}): the net is
++$60+0=+60>\max(0,0)=0$ and the re-post is \emph{refused}. Nothing is written. Had the
++same \USD{100} arrived under a right-of-use agreement, that $-100$ would count, the net
++would read $60-100=-40\le 0$, and the identical re-pledge would be \emph{admitted}
++within the coverage bound. One declared bit --- the source agreement's right of use ---
++decides, and no new unit or type marks the mass: collateral is a role, read at the door.
++
+ \medskip
+ The regime is one declared bit carrying the largest balance-sheet consequence
+ in this chapter, and its misdeclaration is a class of error the recomputation
+@@ -3260,6 +3288,117 @@
+ without the voluntary agreement machinery, and never silent. The centrepiece's
+ step~6 needs the voluntary machinery; a book that cannot run it runs this one.
+ 
++\subsection{Close-out and the netting algebra}\label{sec:closeout}
++
++A counterparty default is the one lifecycle event that must value every claim and
++obligation under a master agreement at once, net them to a single figure, and turn the
++residue into a recovery claim. The machinery is already built: the event-kind registry
++(Chapter~\ref{ch:marketdata}), the claim priced by the taker, the coverage-forced
++ordering of \S\ref{sec:knockpledged}, retirement from the zero vector, and the supervised
++write-off path above. This section is their assembly. It adds one unit --- the
++\textbf{close-out amount claim} (CLM-CO) --- and nothing else.
++
++\emph{The event and its router.} \texttt{COUNTERPARTY-DEFAULT} is a registered event kind
++(Chapter~\ref{ch:marketdata}, Section~\ref{sec:registry}) whose routing names the master
++agreement unit's own smart contract --- the settlement-obligation pattern of
++Chapter~\ref{ch:settlement}, the master's contract the one legal writer of the close-out.
++It fires once per master referencing the defaulted counterparty; the members under that
++master are separated by the cause-derived identifier, one leg each; the default notice
++enters as a moveless observation-recording transaction. Routing to the master is what makes
++``net within a master'' a fact of \emph{which} contract fires: no contract spans two
++masters, so no firing can net across them.
++
++\emph{Taker-state valuation under the declared convention.} Each member is valued at the
++close-out determination through the ordinary state-parameterised pricing layer (\S8),
++priced by the taker --- the claim-for-equivalent rule of this chapter, generalised from one
++claim to the netting set. The valuation convention --- the side (bid, offer, or mid), the
++method (market quotation, loss, or dealer poll), and the termination currency --- is
++declared data on the master agreement unit's close-out-mechanics terms, transcribed once
++from the executed agreement and never improvised at default. It is boundary data under
++TA-TERMS (Chapter~\ref{ch:requirements}, B7): a misdeclaration is a perimeter
++reconciliation, not an internal break, and the declared convention keeps the figure
++recomputable from the record.
++
++\emph{The netting set, and the refusal across masters.} The netting set is the set of units
++whose declared terms name one master agreement unit; the net is a projection over those
++units, never a stored figure. Cross-master netting is refused at the door, not made
++unrepresentable: every leg of one close-out transaction must name one master, read from each
++unit's declared terms, and a transaction whose legs name two masters is refused --- a door
++check of coverage's shape (Invariant~\ref{inv:coverage}). Typing the master into every unit
++would contradict the per-agreement-via-declared-terms design of this chapter and add
++machinery the refusal already supplies.
++
++\emph{One figure, one claim, recovery decoupled.} The net mints as a single unit, CLM-CO:
++the surviving party positive, the defaulter's estate negative, par the net figure. Each
++member claim retires from the zero vector by close-out compensation --- the declared
++\S14.1 fallback the redelivery and margin obligations already carry. Recovery then decouples
++exactly as the claim-for-equivalent decouples on a taker default: CLM-CO's UnitStatus walks
++to \emph{defaulted}, and its mark tracks recoverability, not par. Two marks across one status
++transition on one immutable unit are the loss recognised by construction (C-8.4) --- the fall
++in the mark \emph{is} the fall in NAV, and no second copy of a realised loss is kept beside
++it.
++
++\emph{The write-down is lawful loss, not error repair.} The par-minus-recoverable gap is
++recognised on the \textbf{supervised write-off path} above --- person-authorised, evidenced,
++recorded, and open. It is a lawful economic loss by construction (C-8.4), not the forward
++repair of a wrong recorded event: C-12.4's discipline --- human authorisation and evidence
++--- is borrowed for the authorisation, but the write-down corrects nothing, because nothing
++was recorded wrong.
++
++\emph{The ordering, forced by coverage.} The admitted transactions run in one sequence, and
++the order is forced, not preferred: the default notice, moveless, routed to the master; the
++marker planes clear, because coverage refuses extinguishing owned while posted mass stands
++(the ordering of \S\ref{sec:knockpledged}); the determination observations, moveless;
++net-and-mint, each member claim retired from the zero vector and CLM-CO minted at the net;
++the recovery decoupling to \emph{defaulted}; the authorised write-down. Marker clearing
++precedes member retirement because a member claim is an owned holding, and coverage refuses
++its extinguishment while collateral marker mass still stands.
++
++\emph{Close-out is itself an obligation} (\S14.1): its deadline is the declared close-out
++period, its discharge predicate is the amount determined and CLM-CO claimed, and its fallback
++is the supervised write-off. A stalled close-out is a visible, overdue item on the record,
++never silence and never a dead unit in the liveness queue.
++
++\medskip\noindent\textbf{Episode (close-out): the borrower defaults mid-loan.}
++The loan of the previous episode stands: W-LEND lent $1{,}000$ SIGMA to W-BORR under master
++agreement~L, holding CLM-L (W-LEND $+1{,}000$, W-BORR $-1{,}000$), priced by the borrower's
++state. W-BORR has posted \USD{41,000} of cash collateral under L's security-interest terms
++\emph{without} right of use --- posted-plane marker, received-negative (W-LEND $-41{,}000$,
++W-BORR $+41{,}000$), W-BORR's owned untouched. L's close-out-mechanics terms declare
++offer-side market quotation in USD. SIGMA now prints $44.00$, and W-BORR defaults.
++
++\emph{The walk.} Seven admitted transactions, each through the one door:
++\begin{enumerate}[label=(\arabic*),nosep]
++\item the \texttt{COUNTERPARTY-DEFAULT} notice is recorded, moveless, and routes to L's
++  contract; the members cascade by the cause-derived identifier, and a duplicate notice
++  proposes nothing;
++\item the collateral marker clears first --- posted(USD) $\pm 41{,}000$ (W-BORR, W-LEND)
++  $\to 0$, and owned(USD) \USD{41,000} W-BORR $\to$ W-LEND --- one coverage-ordered
++  transaction enforcing the security interest;
++\item the determination print $44.00$ is recorded, moveless; CLM-L, priced at the taker's
++  (W-BORR's) state, values at $1{,}000 \times 44.00 = \USD{44,000}$;
++\item net within L: CLM-L's close-out value --- the projection over L's netting set,
++  \USD{44,000} --- less the \USD{41,000} collateral applied at step~(2), leaves
++  $\USD{3,000}$ owed to W-LEND; the projection and the collateral offset are two
++  operations, exactly as the recomputation property reads them
++  (Chapter~\ref{ch:testability});
++\item CLM-CO is minted at par \USD{3,000} (W-LEND $+3{,}000$, W-BORR's estate $-3{,}000$),
++  and CLM-L retires from the zero vector by close-out compensation, its declared \S14.1
++  fallback;
++\item CLM-CO's UnitStatus walks to \emph{defaulted}, decoupling its mark from par --- the
++  claim-for-equivalent decoupling generalised;
++\item the authorised write-down records the evidenced recovery of $40\%$ on the supervised
++  write-off path, so CLM-CO marks at $0.40 \times 3{,}000 = \USD{1,200}$ and NAV falls by
++  \USD{1,800} --- the loss, by construction (C-8.4), with no second copy booked.
++\end{enumerate}
++
++\emph{The door.} Conservation per (unit, coordinate) on every paired-leg move; coverage
++orders step~(2) before step~(5)'s retirement; CLM-L and CLM-CO retire only from the zero
++vector; idempotence under the cause-derived identifier at every step. The loss is the fall
++in CLM-CO's mark and nothing besides.
++\emph{One default, one door, one figure per master: the algebra the per-netting-set claim
++units were made first-class to carry.}
++
+ % ===================== drafts/ch10_virtual.tex (inlined) =====================
+ \section{Virtual Ledgers, Strategies, and the Total Return Swap}
+ \label{ch:virtual}
+@@ -3785,7 +3924,7 @@
+ -- The settlement-obligation unit (S5.6): an instructed-but-unsettled trade is a
+ -- delivery-versus-payment obligation, so it is a unit like any other.
+ data SettlementObligation = SettlementObligation
+-  { deliveryLeg   :: (WalletId, UnitId, Quantity)    -- the security the seller owes the buyer
++  { deliveryLeg   :: (WalletId, UnitId, Quantity)    -- Q, the security the seller owes the buyer
+   , paymentLeg    :: (WalletId, UnitId, MinorUnits)  -- the cash the buyer owes the seller
+   , dueDate       :: Date
+   , dischargePred :: Predicate  -- satisfied by settlement confirmation on the external register
+@@ -3794,6 +3933,10 @@
+ --   instructed --confirmed--> settled     the ordinary walk; the unit retires unless a
+ --                                          record date straddles the settled node (see below)
+ --   instructed --fails------> failed      the fails-cascade obligation (S9.3): the SAME unit, later node
++--   instructed --partial(q_s)-> SPLIT     on a partial confirmation 0 < q_s < Q (= deliveryLeg
++--                                          quantity): mint a settled leg (q_s, at settled) and a
++--                                          failed-residual leg (q_r = Q - q_s, at instructed); the
++--                                          parent retires from the zero vector, q_s + q_r = Q
+ --   at INSTRUCTED, a CUM trade across a record date raises the market-claim leg (deliverer -,
+ --     cum-buyer +), valued at par, discharged by the deliverer's receipt of the distribution.
+ --   at SETTLED, an EX trade across a record date raises the MIRROR market-claim leg, signs
+@@ -3822,6 +3965,11 @@
+ No distribution reaches any wallet except by a recorded move against a determined
+ entitlement or the discharge of a market-claim leg --- direct or mirror --- of the
+ settlement-obligation unit.
++On a partial fill the settlement-obligation unit splits into a settled leg and a
++failed-residual leg, each a settlement-obligation unit at its own node, so the four
++quadrants apply leg-wise: a cum sale part-settled across the record date raises the
++market-claim leg on the unsettled quantity alone. The proposition is thereby total over
++partial fills, with no new routing logic.
+ \end{proposition}
+ 
+ \medskip\noindent\textbf{Worked micro-example (dividend).} Stock ACME pays a cash
+@@ -3896,18 +4044,63 @@
+ contract (Chapter~\ref{ch:marketdata}), admitted through the one door as a moveless
+ observation-recording transaction, or the due-date watch firing and finding the cumulative
+ confirmed settled quantity short of the instructed quantity by the deadline. The
+-second trigger reads quantity, not mere presence, so a partial settlement --- some
+-delivered, a residual failed --- fires it on the unmet residual rather than passing
+-silently; the quantity-aware splitting of the settlement-obligation unit into a
+-settled leg and a failed residual leg is a named open problem (Chapter~\ref{ch:scope}),
+-and until it is settled the residual is carried on the single \texttt{failed} node with
+-its recorded shortfall quantity. In both cases the Transaction Executor admits the
++second trigger reads quantity, not mere presence, and a partial settlement is not
++carried on one overloaded node: it walks a declared \textbf{partial edge} that splits
++the unit. On a partial confirmation --- cumulative confirmed quantity $q_s$ with
++$0 < q_s < Q$, where $Q$ is the instructed quantity --- the edge's action mints two
++successor settlement-obligation units of the same product graph and retires the parent:
++a \textbf{settled leg} at the \texttt{settled} node carrying $q_s$, and a
++\textbf{failed-residual leg} carrying $q_r = Q - q_s$, at \texttt{instructed} until its
++deadline and then walked \texttt{instructed}$\to$\texttt{failed} on the residual alone.
++Each leg carries the parent's identity and its own cause-derived txid; the split is one
++paired-leg transaction that moves the parent's delivery and payment mass into the legs,
++so $q_s + q_r = Q$ on the delivery coordinate, the payment is pro-rated across the two,
++and the parent leaves the ledger from the zero vector (\S4) --- its mass conserved, none
++created and none destroyed. The fails cascade then fires on the residual leg's $q_r$
++only; the settled leg is untouched. The split adds no machinery: each leg is a
++settlement-obligation unit at its own node, so the four-quadrant routing below applies
++leg-wise and stays total over partial fills --- and a further partial confirmation on the
++residual leg splits it again by the same edge, recursively, each round conserving its own
++$q_s + q_r$. In both cases the Transaction Executor admits the
+ transition like any other transaction; no other machine writes the node, and no
+ \texttt{failed} node exists without one of the two triggers on the record. The settlement-obligation unit's market-claim leg carries
+ a deadline, a discharge predicate, and a fallback (\S14.1); by its deadline it is
+ discharged, compensated, or declared defaulted --- a failed distribution is a
+ visible, overdue item, never a silent balance edit.
+ 
++\medskip\noindent\textbf{Worked micro-example (partial fill across the record date).}
++Same cast, same dividend: W-ALPHA sells its $10{,}000$ ACME to W-BETA, instructed
++2026-05-14, due 2026-05-16, and the $1.50$ dividend has record date 2026-05-15. On
++2026-05-15, before the record snapshot, the external register confirms $6{,}000$ of the
++$10{,}000$ settled. The settlement-obligation unit walks its partial edge and splits: a
++settled leg SO-s carrying $q_s = 6{,}000$ at \texttt{settled}, and a failed-residual leg
++SO-r carrying $q_r = 4{,}000$ at \texttt{instructed}. $6{,}000 + 4{,}000 = 10{,}000$, and
++the parent retires from the zero vector.
++
++\emph{Record date --- determination, leg-wise.} The watch fires on each leg. Determination
++reads the owned plane --- W-BETA owns $10{,}000$, title having moved at instruction --- and
++records the full entitlement $10{,}000 \times 1.50 = \USD{15{,}000}$ to W-BETA in
++PositionState. Routing then splits by leg:
++\begin{enumerate}[label=(\arabic*),nosep]
++\item SO-s is \emph{cum, settled}: the register shows W-BETA for its $6{,}000$, who is
++entitled, so the paying agent credits W-BETA the $6{,}000 \times 1.50 = \USD{9{,}000}$
++directly and no leg arises (quadrant (ii));
++\item SO-r is \emph{cum, unsettled}: the register still shows the deliverer W-ALPHA for its
++$4{,}000$, so the market-claim leg MC-r is raised on the unsettled quantity alone,
++$4{,}000 \times 1.50 = \USD{6{,}000}$: move owned(MC-r) $600{,}000$ (minor units,
++$=\USD{6{,}000}$), W-ALPHA $\to$ W-BETA --- W-ALPHA $-600{,}000$, W-BETA $+600{,}000$
++(quadrant (i)).
++\end{enumerate}
++The two paths sum to W-BETA's \USD{15{,}000}: \USD{9{,}000} credited directly, \USD{6{,}000}
++by the claim. The claim is on $4{,}000$, not $10{,}000$, because only $4{,}000$ is unsettled
++at the record date.
++
++\emph{Due date --- the residual fails.} On 2026-05-16 SO-r's cumulative confirmed quantity
++is still $0$ against its $4{,}000$, so its contract walks it
++\texttt{instructed}$\to$\texttt{failed} on the $4{,}000$; SO-s, already \texttt{settled}, is
++untouched. The fails cascade carries the $4{,}000$ residual as a recorded obligation, and
++MC-r stands to its deadline. Nothing is reversed, and every quantity is conserved.
++
+ \medskip\noindent\textbf{Load-bearing, not a reporting axis.} The settlement-obligation
+ unit's lifecycle node is therefore a correctness input, not a presentation dimension. A
+ design that read owned alone would instruct the venue to pay the buyer directly --- an
+@@ -4038,11 +4231,13 @@
+ Actual re-use is read from re-pledge moves, each carrying a source-agreement reference
+ beside its governing reference (Chapter~9), so received, re-used, and available project as
+ per-(unit, agreement) actuals. Collateral received \emph{without} right of use
+-(Constitution~C-8.8, segregated included) must not be re-used, and the coverage net does
+-not yet gate re-use by the right-of-use term --- it would admit a re-post of segregated
+-mass. That gap is a named open problem (Chapter~\ref{ch:scope}), stated in the open;
+-until the gate is built, an implementation must not enable collateral re-use --- live and
+-blocking, not a label.
++(Constitution~C-8.8, segregated included) cannot be re-used, and that is not a projection
++convention but an admission bound: the coverage invariant is gated by the source
++agreement's right-of-use term (Chapter~\ref{ch:invariants}, the right-of-use gate), so
++received mass under a no-right-of-use agreement contributes zero to the coverage net and a
++re-post of segregated mass is refused at the door. The projection therefore reports re-use
++only where the door admitted it --- there is no re-use it could report that the gate did
++not already permit.
+ 
+ \emph{Fungible received mass.} Title-transfer received cash and securities land
+ on owned, commingled with proprietary holdings of the same unit. The record
+@@ -4502,7 +4697,12 @@
+ balance cells its moves touch and the three homes' targets its other changes touch, and
+ it reads more --- a marker move at $(w,u)$ is admitted against the coverage net over
+ \emph{all} agreements (Invariant~\ref{inv:coverage}), so its read-set takes the whole
+-$(w,u)$ posted and lent fibres with $(w,u)$ owned, and an owned reduction symmetrically
++$(w,u)$ posted and lent fibres with $(w,u)$ owned, \emph{and the declared right-of-use
++term of every agreement those fibres range over} --- the gate reads $\mathrm{rou}(G)$
++from each source agreement's ProductTerms, so those terms are in the read-set too, and a
++terms change amending an agreement's right of use shares a footprint element with every
++guarded move under it: amend-then-re-post and re-post-then-amend reach different states,
++and the shared footprint keeps that reorder forbidden. An owned reduction symmetrically
+ reads the marker fibres it must not breach. Two moves on one $(w,u)$ under different
+ agreements therefore never have disjoint footprints, though their cells differ --- the
+ rehypothecation chain is order-sensitive for exactly this reason. Two adjacent admitted
+@@ -4819,30 +5019,45 @@
+ uses both.
+ 
+ \begin{invariant}[Possession coverage]\label{inv:coverage}
+-No wallet delivers what it neither owns nor holds. On every admission, per wallet
+-$w$ and unit $u$, net over agreements $G$,
++No wallet delivers what it neither owns nor holds, and no wallet re-posts received
++mass its source agreement does not release. On every admission, per wallet $w$ and
++unit $u$,
+ \[
+-\sum_{G}\ \mathrm{bal}_{\mathrm{posted},G}(w,u)\ \le\ \max\bigl(\mathrm{bal}_{\mathrm{owned}}(w,u),\,0\bigr).
++\sum_{G}\ \max\bigl(\mathrm{bal}_{\mathrm{posted},G}(w,u),\,0\bigr)
++\;+\!\!\!\sum_{G:\,\mathrm{rou}(G)}\!\!\!\min\bigl(\mathrm{bal}_{\mathrm{posted},G}(w,u),\,0\bigr)
++\ \le\ \max\bigl(\mathrm{bal}_{\mathrm{owned}}(w,u),\,0\bigr).
+ \]
+ The sign convention on the posted coordinate is \emph{received-negative}:
+ collateral posted \emph{out} enters with positive sign, collateral received
+ \emph{in} enters with negative sign (the received ray, poster $+Q$, taker $-Q$;
+-Chapter~\ref{ch:collateral}). The analogue holds with lent in place of posted.
++Chapter~\ref{ch:collateral}). Posted-out mass --- the positive part --- always
++counts; received mass --- the negative part --- offsets, and so grants re-posting
++headroom, only under an agreement whose declared terms grant a right of use,
++$\mathrm{rou}(G)$ read at the door from the source agreement $G$ like every other
++declared term. Received mass under a no-right-of-use agreement --- a segregation,
++Constitution~C-8.8 --- contributes zero: it grants no headroom and cannot be
++re-posted. This is \textbf{the right-of-use gate} --- not a second guard beside
++coverage but the one coverage net read under one qualifier. The analogue holds
++with lent in place of posted.
+ \end{invariant}
+ 
+-The sum over signed balances lets received mass offset re-posted mass. Worked once,
+-for citation from Chapter~\ref{ch:collateral}: take a wallet with owned $0$. It
+-receives $100$ under one agreement, so its posted coordinate there is $-100$; it
+-re-posts $60$ under another, coordinate $+60$; the net is $60-100=-40\le\max(0,0)=0$,
+-within the bound, so a rehypothecation chain passes and is bounded by possession.
+-Had the same wallet re-posted $200$ instead, the net would be $200-100=+100>\max(0,0)=0$
+---- refused at the door: a wallet may re-post no more than it received plus what it
+-owns. The $\max$ binds only the posting direction, so a negative-owned
+-wallet with nothing posted --- an issuer wallet that conservation itself creates,
+-a plain short --- is admissible, while a poster with owned $-5{,}000$ attempting to
+-post $5{,}000$ is refused at the door. Coverage is never lawfully false, because a
+-transaction is atomic and possession is instantaneous within it: that is what
+-makes it an invariant.
++The gated net lets received mass offset re-posted mass \emph{only where the source
++agreement releases it}. Worked once, for citation from
++Chapter~\ref{ch:collateral}: take a wallet with owned $0$. It receives $100$ under a
++right-of-use agreement, so its posted coordinate there is $-100$ and, the agreement
++granting use, that $-100$ counts; it re-posts $60$ under another, coordinate $+60$;
++the net is $60-100=-40\le\max(0,0)=0$, within the bound, so a rehypothecation chain
++passes and is bounded by possession. Had the same wallet re-posted $200$ instead, the
++net would be $200-100=+100>\max(0,0)=0$ --- refused at the door: a wallet may re-post
++no more than it received under a releasing agreement plus what it owns. Had the $100$
++instead arrived under a \emph{no-right-of-use} agreement --- a segregation (C-8.8) ---
++that received $-100$ contributes zero, so re-posting even the same $60$ gives a net
++$60+0=+60>0$ and is refused: segregated mass grants no headroom. The $\max$ binds
++only the posting direction, so a negative-owned wallet with nothing posted --- an
++issuer wallet that conservation itself creates, a plain short --- is admissible,
++while a poster with owned $-5{,}000$ attempting to post $5{,}000$ is refused at the
++door. Coverage is never lawfully false, because a transaction is atomic and
++possession is instantaneous within it: that is what makes it an invariant.
+ 
+ Coverage binds \emph{instructed} ownership, and the qualifier is load-bearing. Owned is
+ booked at instruction --- trade-date (Chapter~\ref{ch:collateral}) --- so a wallet may
+@@ -4868,7 +5083,7 @@
+ \toprule
+ Guard & Statement & Lawfully false? & Kind \\
+ \midrule
+-Possession coverage & $\sum_G \mathrm{bal}_{\mathrm{posted},G} \le \max(\mathrm{bal}_{\mathrm{owned}},0)$ & never (atomic, instantaneous) & invariant, checked at the door \\
++Possession coverage & $\sum_G \mathrm{bal}_{\mathrm{posted},G} \le \max(\mathrm{bal}_{\mathrm{owned}},0)$, received mass offsetting only under right of use (the right-of-use gate) & never (atomic, instantaneous) & invariant, checked at the door \\
+ Value sufficiency & collateral value $\ge$ exposure & intraday, routinely & obligation: deadline, discharge predicate, close-out as compensation \\
+ \bottomrule
+ \end{tabular}
+@@ -5153,11 +5368,15 @@
+ prop_coverageSignConvention h w u =
+   admitted h ==> coverageNet h w u <= max (ownedBal h w u) 0
+   where coverageNet h w u = sum [ postedG h w u g | g <- agreements h ]
+-  -- received IN contributes NEGATIVE, posted OUT contributes POSITIVE.
++  -- received IN contributes NEGATIVE, posted OUT contributes POSITIVE; here every received
++  -- coordinate is under a right-of-use agreement, so this plain sum equals the gated net of
++  -- Invariant 14.6 (no-right-of-use received mass would instead contribute 0; see the gate below).
+ 
+ genOverRepost :: Gen History  -- draw a re-post-flag with rate r; when it fires, take a
+-  -- wallet with owned 0, receive 100 of u under G1 (bal_posted,G1 = -100), then attempt
+-  -- to re-post 200 of u under G2 (bal_posted,G2 = +200): net +100 > max(0,0)=0, REFUSED.
++  -- wallet with owned 0, receive 100 of u under a RIGHT-OF-USE agreement G1 (bal_posted,G1 = -100;
++  -- the gate lets it count), then attempt to re-post 200 of u under G2 (bal_posted,G2 = +200):
++  -- net +100 > max(0,0)=0, REFUSED. (G1 must grant use, else -100 contributes 0 and the
++  -- sign-convention inversion below has nothing to invert.)
+ prop_coverageSign_fires =                 -- the refusal witness, asserted, not hoped
+   checkCoverage $ cover 1.0 isOverRepostOnZeroOwned
+     "owned 0, received 100, re-post 200 -> net +100, refused" genOverRepost
+@@ -5167,8 +5386,74 @@
+ --- owned $0$, received $100$, re-post attempt $200$ --- and its refusal witness asserts
+ the branch (\S 2). Flip the convention to received-positive and the refused net $+100$ reads
+ $-100 \le 0$ and admits: \texttt{prop\_coverageSignConvention} reports exactly that
+-inversion, while the lawful chain of Invariant~\ref{inv:coverage} --- received $100$,
+-re-post $60$, net $-40 \le 0$ --- stays admitted.
++inversion, while the lawful chain of Invariant~\ref{inv:coverage} --- received $100$
++\emph{under a right-of-use agreement}, re-post $60$, gated net $-40 \le 0$ --- stays admitted.
++
++\paragraph{The right-of-use gate refuses a no-right-of-use re-post.}
++The coverage net offsets a re-post by received mass, but only received mass whose
++source agreement grants a right of use (Invariant~\ref{inv:coverage}). Received mass
++under a segregation contributes zero, so a re-post the plain sum would ``cover'' is
++refused. The property asserts the gated net at the door.
++
++\begin{lstlisting}
++prop_rouGateRefusesSegregated :: History -> Wallet -> Unit -> Property  -- Invariant 14.6, gated
++prop_rouGateRefusesSegregated h w u =
++  admitted h ==> gatedNet h w u <= max (ownedBal h w u) 0
++  where gatedNet h w u = sum [ contrib g | g <- agreements h ]
++        contrib g | b >= 0        = b            -- posted OUT: always counts
++                  | rou (agmt g)  = b            -- received under right-of-use: offsets
++                  | otherwise     = 0            -- received under segregation: NO headroom
++                  where b = postedG h w u g
++
++genSegregatedRepost :: Gen History  -- draw a gate-flag with rate r; when it fires: owned 0, receive
++  -- 100 of u under a CUSTODY (no-right-of-use) agreement G_seg (bal_posted,G_seg = -100), then attempt
++  -- to re-post 60 under G2 (+60): gated net = 60 + 0 = +60 > max(0,0)=0, REFUSED at the door.
++prop_rouGate_fires =                  -- the refusal witness, asserted, not hoped
++  checkCoverage $ cover 1.0 isSegregatedRepostOnZeroOwned
++    "owned 0, received 100 segregated, re-post 60 -> gated net +60, refused" genSegregatedRepost
++\end{lstlisting}
++
++When the gate-flag fires the generator builds the segregated re-post by construction ---
++owned $0$, received $100$ under custody, re-post attempt $60$ --- and the refusal is
++witnessed on at least $1\%$ of runs (\S 2). Flip the mass to a right-of-use agreement and
++the identical $60$ admits: the declared bit alone decides.
++
++\paragraph{The right-of-use gate admits a bounded re-use.}
++Under a right-of-use agreement the received $-100$ counts, so a re-post within the bound
++is admitted --- the certified $-40$ chain, now explicitly under a releasing agreement.
++
++\begin{lstlisting}
++prop_rouReuseAdmittedBounded :: History -> Wallet -> Unit -> Property
++prop_rouReuseAdmittedBounded h w u =
++  admitted h ==> gatedNet h w u <= max (ownedBal h w u) 0
++  -- same door invariant; here the received coordinate IS under a right-of-use agreement.
++
++genRouReuse :: Gen History  -- owned 0, receive 100 of u under a FINANCING (right-of-use) agreement G1
++  -- (bal_posted,G1 = -100), re-post 60 under G2 (+60): gated net = 60 - 100 = -40 <= 0, ADMITTED.
++prop_rouReuse_fires =              -- the admission witness, asserted, not hoped
++  checkCoverage $ cover 1.0 isRouReuseWithinBound
++    "owned 0, received 100 RoU, re-post 60 -> gated net -40, admitted" genRouReuse
++\end{lstlisting}
++
++The same $60$ re-post carries opposite verdicts under the two regimes --- $-40$ admitted
++under right of use, $+60$ refused under segregation --- and only the declared right-of-use
++term differs; the admission branch fires on at least $1\%$ of runs (\S 2).
++
++\paragraph{A refused re-post leaves the re-use projection unchanged.}
++A refusal appends nothing to the log, and the Chapter~\ref{ch:reporting} re-use figures
++fold committed state alone. So a refused segregated re-post cannot move any re-use figure:
++there is no second computation to disagree, and the check needs no oracle.
++
++\begin{lstlisting}
++prop_refusedReuseNoWrite :: History -> Property  -- refused = no write; projections read committed state
++prop_refusedReuseNoWrite h =
++  reuseProjection h === reuseProjection (h `afterAttempting` segregatedRepost)
++  -- the attempt is refused at the gate, writes nothing, so the re-use figure is byte-identical.
++\end{lstlisting}
++
++The projection is invariant under a refused attempt by construction: refusal writes no
++transaction, and a fold over an unchanged log returns an unchanged figure --- the property
++is oracle-independent (\S 2).
+ 
+ Carried onto this surface are the four properties of the product-graph consistency invariant
+ (Invariant~\ref{inv:graph-consistency}, defined in Chapter~\ref{ch:objects}), stated here as
+@@ -5274,6 +5559,143 @@
+ the registered buyer --- the reflection, across the settlement node, of the cum-unsettled
+ market claim.
+ 
++\paragraph{The partial fill: the split into legs, and the pro-rated claim.} A generator that
++only ever confirms the whole instructed quantity never walks the partial edge, so the split
++is unwitnessed. Branch~5 draws a partial-flag with rate $r$; when it fires it confirms $q_s$
++with $0 < q_s < Q$ before the record date, so the settlement-obligation unit splits into a
++settled leg ($q_s$, node \texttt{settled}) and a failed-residual leg ($q_r = Q - q_s$, node
++\texttt{instructed}), with a cum record date in the gap.
++
++\begin{lstlisting}
++genSettlementHistory :: Gen History   -- (extended)
++-- 5. draw a partial-flag with rate r; when it fires, confirm q_s with 0 < q_s < Q before the
++--    record date, so the unit walks its partial edge: mint a settled leg (q_s, node settled)
++--    and a failed-residual leg (q_r = Q - q_s, node instructed); a CUM record date sits in the
++--    gap, so the residual leg raises the market claim on q_r and later walks instructed->failed.
++
++prop_splitConservation :: History -> Property   -- (i) q_s + q_r = Q across the split's changes
++prop_splitConservation h = isPartialFill h ==> conjoin
++  [      settledLegQty h + residualLegQty h === instructedQty h   -- delivery: q_s + q_r = Q
++    .&&. settledLegPay h + residualLegPay h === instructedPay h   -- payment: pro-rata, conserved
++    .&&. nodeOf (settledLeg  h) === Settled                       -- both legs' UnitStatus nodes
++    .&&. nodeOf (residualLeg h) === Instructed                    --   are the split's targets
++    .&&. parentVector h === zeroVector ]                          -- parent retired from the zero vector
++
++prop_proRatedClaim :: History -> Property   -- (ii) claim == entitlement on the UNSETTLED qty
++prop_proRatedClaim h = isPartialFill h ==>
++       claimMinted h === residualLegQty h * ratePerShare h        -- 4,000 * 1.50 = 6,000
++   .&&. claimMinted h =/= instructedQty  h * ratePerShare h       -- NOT the full 10,000 * 1.50
++  -- oracle: entitlement recomputed from the record-date holdings on the unsettled quantity
++  -- alone -- independent of the minted claim it checks.
++
++prop_split_fires =                     -- the firing witness, asserted, not hoped
++  checkCoverage $ cover 1.0 isPartialFill
++    "settlement-obligation unit splits: settled leg q_s + failed-residual leg q_r = Q"
++    genSettlementHistory
++\end{lstlisting}
++
++When the partial-flag fires the generator confirms a strict part before the record date by
++construction, so the unit splits and the residual raises its claim on $q_r$ alone;
++\texttt{prop\_split\_fires} asserts the branch at $\ge 1\%$ (\S 2). On every partial-fill
++history the two legs' quantities sum to the instructed $Q$, both legs' UnitStatus nodes are
++the split's targets, and the parent's coordinate vector is zero --- the retirement of \S4.
++The pro-rated claim equals the entitlement on the unsettled quantity, computed by an oracle
++from the record-date holdings, and the property fails any design that raises the claim on the
++whole instructed quantity or carries the residual on one overloaded node. The four properties
++of Invariant~\ref{inv:graph-consistency}, already on this surface, now run over the partial
++branch too: \texttt{prop\_firedMatchesOneEdge} confirms the partial confirmation lands each
++successor on its declared node, and \texttt{prop\_actionEqualsRecorded} confirms the split
++transaction equals the partial edge's declared action.
++
++\paragraph{Close-out nets within a master, and refuses across masters.} Every leg of a
++close-out transaction must name one master agreement unit, read from each unit's declared
++terms (Chapter~\ref{ch:collateral}); a leg naming a second master is refused at the door. A
++generator that only ever defaults a counterparty under a single master never exercises the
++refusal, so the cross-master branch is constructed by hand.
++
++\begin{lstlisting}
++prop_crossMasterRefused :: History -> Property
++prop_crossMasterRefused h = isCloseOut h ==>
++      admitted h ==> Set.size (mastersNamed (closeOutTx h)) === 1
++  -- every admitted close-out names exactly one master across all its legs; the net is a
++  -- projection WITHIN one master, never across -- typing is not needed, the door decides.
++
++genMultiMasterDefault :: Gen History  -- draw a cross-master flag with rate r; when it fires,
++  -- the defaulted counterparty faces two masters M1, M2, each with its own member claims;
++  -- propose ONE close-out transaction whose legs name BOTH M1 and M2 -> refused at the door.
++  -- (the lawful path fires one close-out per master, each leg naming only its own master.)
++prop_crossMaster_fires =                 -- the refusal witness, asserted, not hoped
++  checkCoverage $ cover 1.0 isCrossMasterCloseOut
++    "one close-out transaction naming two masters -> refused" genMultiMasterDefault
++\end{lstlisting}
++
++When the flag fires the generator builds a two-master close-out by construction, and the
++refusal is witnessed on at least $1\%$ of runs (\S 2). The lawful history fires one close-out
++per master, each netting only the members whose declared terms name it; the cross-master
++transaction writes nothing, so no figure can net across masters --- the per-agreement identity
++of the claim units, enforced at the door rather than carried in every type.
++
++\paragraph{The close-out figure is recomputable from the record.} The net and CLM-CO's par are
++a projection: recompute them from the recorded determination observations and the master's
++declared valuation convention, and the result equals the recorded figure to the minor unit.
++The oracle recomputes independently of the minted claim it checks.
++
++\begin{lstlisting}
++prop_closeOutRecomputable :: History -> Property
++prop_closeOutRecomputable h = isCloseOut h ==>
++      recomputedNet h === recordedCLM_CO_par h    -- equal to the minor unit
++  where recomputedNet h =
++          sum [ takerValue (determination h m) (convention h master) | m <- members h master ]
++          - collateralApplied h master
++        master = masterOf (closeOutTx h)
++  -- inputs: the recorded determination observations and the declared close-out-mechanics
++  -- convention (TA-TERMS) -- both on the record; nothing improvised at default.
++
++genCloseOutHistory :: Gen History  -- draw a default-flag with rate r; when it fires, default a
++  -- counterparty under a master with >=1 member claim and posted collateral, record the
++  -- determination prints, and mint CLM-CO at the net -> the recompute branch.
++prop_closeOutRecompute_fires =            -- the firing witness, asserted, not hoped
++  checkCoverage $ cover 1.0 isCloseOut
++    "counterparty default: net + CLM-CO par recomputed from the record" genCloseOutHistory
++\end{lstlisting}
++
++When the default-flag fires the generator records the determination and mints CLM-CO by
++construction, and the branch is witnessed (\S 2). On every close-out history the recomputed
++net --- taker-state member values less collateral applied, under the declared convention ---
++equals the recorded CLM-CO par to the minor unit; a design that prices a member on the wrong
++side, or improvises the convention at default, is caught as a divergence. This is the
++regime-bit lesson of Chapter~\ref{ch:collateral} carried onto the close-out figure: the
++convention is declared data, so two readers of one log compute one figure.
++
++\paragraph{Members retire from the zero vector, markers first.} No member claim retires on a
++nonzero vector, and no owned extinguishment is admitted while collateral marker mass still
++stands --- the coverage ordering (Invariant~\ref{inv:coverage}) of the knock while pledged
++(\S\ref{sec:knockpledged}), now over close-out histories. The property is metamorphic:
++reorder the close-out so a member retirement is proposed before the marker clears, and the
++door refuses it.
++
++\begin{lstlisting}
++prop_closeOutOrdering :: History -> Property
++prop_closeOutOrdering h = isCloseOut h ==> conjoin
++  [ all (\c -> retires c h ==> vectorBefore c h === zeroVector) (members h)  -- zero-vector only
++  , markerMassStands h ==> not (ownedExtinguishmentAdmitted h) ]             -- markers clear first
++
++genCloseOutReorder :: Gen History  -- draw a reorder-flag with rate r; when it fires, take a
++  -- close-out with posted collateral still on the marker plane and PROPOSE the member-claim
++  -- retirement (an owned extinguishment) BEFORE the marker-clearing transaction -> refused.
++  -- (the lawful order clears the marker first, then retires the member from the zero vector.)
++prop_closeOutOrdering_fires =             -- the refusal witness, asserted, not hoped
++  checkCoverage $ cover 1.0 isPrematureRetirement
++    "member retirement proposed while collateral marker mass stands -> refused" genCloseOutReorder
++\end{lstlisting}
++
++When the reorder-flag fires the generator proposes the premature retirement by construction,
++and the refusal is witnessed (\S 2). Clear the marker first and the identical retirement
++admits, taking the member claim's vector to zero; the ordering is forced by coverage, not
++chosen, exactly as it is at step~6 of the knock while pledged. Together with the two
++properties above, these pin the close-out algebra: one figure per master, recomputable from
++the record, retired in the order coverage compels.
++
+ \paragraph{The position-state collection: two entitlements in flight, each retiring alone.}
+ PositionState holds a collection keyed by the cause-derived identifier
+ (Chapter~\ref{ch:homes}): two entitlements can be live on one (wallet, unit) pair at once,
+@@ -6205,17 +6627,32 @@
+ 
+ \paragraph{The open-problems index.} The constitution requires that implementation
+ questions be named and left, not silently dropped; each is carried in full in the
+-\emph{Open-Problems and Escalation Register} companion. The top open risk is close-out and
+-netting algebra: per-netting-set claim units are first-class
+-(Chapter~\ref{ch:collateral}) precisely so close-out is representable, yet the algebra
+-that values each claim at close-out, nets per netting set, and decouples recovery from the
+-figure is not yet designed --- named here so it cannot be improvised. Named alongside it: the \textbf{right-of-use gate on collateral re-use} --- C-8.8 forbids
+-re-use of no-right-of-use collateral, yet the coverage net
+-(Chapter~\ref{ch:invariants}) bounds re-posting by possession alone, so a segregated
+-inflow is representable as deliverable; \emph{live and blocking} --- no implementation
+-enables re-use until the gate is built; and the \textbf{quantity-aware
+-settlement-obligation unit} --- a partial settlement leaves a settled quantity and a failed
+-residual the single lifecycle node cannot yet split into legs. Named further: the correction
++\emph{Open-Problems and Escalation Register} companion. The close-out and netting
++algebra, named the top open risk since v15.0 --- per-netting-set claim units were made
++first-class (Chapter~\ref{ch:collateral}) precisely so close-out is representable --- is
++designed by the ruled Phase~A memo and discharged in v16.0 at Chapter~\ref{ch:collateral}
++(Section~\ref{sec:closeout}): the default routes to the master agreement unit's own contract,
++the netting set is the units whose declared terms name that master, the net is a projection
++refused across masters at the door, the net mints as one claim (CLM-CO), each member retires
++from the zero vector by close-out compensation, recovery decouples as the claim's mark walks
++to a defaulted recoverability, and the par-minus-recoverable gap is recognised as lawful loss
++on the supervised write-off path (C-8.4), never as error repair. It is kept named, not erased
++--- an open risk that vanished without trace would be indistinguishable from one never worked. Two items named here
++at the 2026-07-13 consistency review are now closed and kept named, not erased. The
++\textbf{right-of-use gate on collateral re-use} --- open through v15 and \emph{live and
++blocking}, because the coverage net bounded re-posting by possession alone and so admitted
++a re-post of segregated mass --- is discharged in v16.0: the coverage invariant
++(Chapter~\ref{ch:invariants}) is gated by the source agreement's right-of-use term,
++received mass under a no-right-of-use agreement contributes zero to the net, and a re-post
++of segregated collateral is refused at the door --- C-8.8 enforced by construction, not
++left to an implementation. The \textbf{quantity-aware
++settlement-obligation unit} --- a partial settlement leaving a settled quantity and a failed
++residual the single lifecycle node could not split into legs --- is settled in v16.0 by the
++partial edge that splits the unit into a settled leg and a failed-residual leg
++(Chapter~\ref{ch:settlement}), each a settlement-obligation unit at its own node, so the
++four-quadrant routing stays total over partial fills. Each closure keeps its history --- an
++open item that vanished without trace would be indistinguishable from one never worked.
++Named further: the correction
+ algebra beyond the single compensating transaction; inter-ledger federation and
+ eliminations; \textbf{behavioural-event generation} --- a generator reaching the events
+ that are \emph{decisions} (default, elective exercise, merger election) must model the
