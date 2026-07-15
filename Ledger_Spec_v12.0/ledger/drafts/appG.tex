@@ -1,0 +1,58 @@
+\section{Available Inventory Identity: Eight-Scenario Verification}
+\label{sec:appG}
+
+The available-inventory identity (P20, \ref{inv:P20})
+\[
+  \mathrm{avail} \;=\; \mathrm{own} - \mathrm{onloan} + \mathrm{borr}
+\]
+is verified across eight scenarios, each exercising a distinct combination of the six stored coordinates own, onl, borr, c\_p ($\mathrm{coll\_post}$), c\_r ($\mathrm{coll\_recv}$), c\_rh ($\mathrm{coll\_rehyp}$). Available inventory is never stored: it is computed on read from three of those coordinates (own, onl, borr), so the identity cannot be violated by construction.
+
+\begin{center}\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{l r r r r r r l}
+\toprule
+\textbf{Entity (unit)} & own & onl & borr & c\_p & c\_r & c\_rh & $\mathrm{avail}=\mathrm{own}-\mathrm{onl}+\mathrm{borr}$ \\
+\midrule
+\endhead
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{A. Alice buys 1{,}000 AAPL outright.}} \\
+Alice (AAPL) & 1000 & 0 & 0 & 0 & 0 & 0 & $1000-0+0=1000$ \checkmark \\
+Virtual & $-1000$ & --- & --- & --- & --- & --- & (issuance counterpart) \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{B. Alice owns 1{,}000 VOD, lends 400 to Bob.}} \\
+Alice (VOD) & 1000 & 400 & 0 & 0 & 0 & 0 & $1000-400+0=600$ \checkmark \\
+Bob (VOD) & 0 & 0 & 400 & 0 & 0 & 0 & $0-0+400=400$ \checkmark \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{C. Bob lends 1{,}000 NVDA to Alice, Alice sells 500.}} \\
+Bob (NVDA) & 1000 & 1000 & 0 & 0 & 0 & 0 & $1000-1000+0=0$ \checkmark \\
+Alice (NVDA) & $-500$ & 0 & 1000 & 0 & 0 & 0 & ${-}500-0+1000=500$ \checkmark \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{D. Swap desk holds 5Y EUR IRS (non-lendable).}} \\
+Desk (IRS) & $+1$ & 0 & 0 & 0 & 0 & 0 & N/A (non-lendable; $\mathrm{own}=1$) \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{E. Bob lends 1{,}000 NVDA, Alice sells all 1{,}000.}} \\
+Bob (NVDA) & 1000 & 1000 & 0 & 0 & 0 & 0 & $1000-1000+0=0$ \checkmark \\
+Alice (NVDA) & $-1000$ & 0 & 1000 & 0 & 0 & 0 & ${-}1000-0+1000=0$ \checkmark \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{F. Alice holds 1{,}000 AAPL, lends 400 to Bob, Bob sells 200.}} \\
+Alice (AAPL) & 1000 & 400 & 0 & 0 & 0 & 0 & $1000-400+0=600$ \checkmark \\
+Bob (AAPL) & $-200$ & 0 & 400 & 0 & 0 & 0 & ${-}200-0+400=200$ \checkmark \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{G. Rehypothecation chain: Alice lends 600 MSFT to Bob, Bob re-lends 300 to Charlie.}} \\
+Alice (MSFT) & 1000 & 600 & 0 & 0 & 0 & 0 & $1000-600+0=400$ \checkmark \\
+Bob (MSFT) & 0 & 300 & 600 & 0 & 0 & 0 & $0-300+600=300$ \checkmark \\
+Charlie (MSFT) & 0 & 0 & 300 & 0 & 0 & 0 & $0-0+300=300$ \checkmark \\
+\midrule
+\multicolumn{8}{@{}p{\dimexpr\textwidth-2\tabcolsep\relax}@{}}{\textit{H. Alice lends 400 AAPL to Bob under security interest; Bob posts 200 MSFT as pledge.}} \\
+Bob (MSFT) & 0 & 0 & 0 & 200 & 0 & 0 & $0-0+0=0$ \checkmark \\
+Alice (MSFT) & 0 & 0 & 0 & 0 & 200 & 0 & $0-0+0=0$ \checkmark \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\begin{remark}[Rehypothecation defeats the naive identity]
+For intermediary re-lender Bob (G), $\mathrm{own}=0 \neq \mathrm{avail}+\mathrm{onl}=300+300$: the identity $\mathrm{own}=\mathrm{avail}+\mathrm{onloan}$ fails. The correct projection $\mathrm{avail}=\mathrm{own}-\mathrm{onl}+\mathrm{borr}$ holds because it credits borrowed shares.
+\end{remark}
+
+\begin{remark}[Pledge preserves economic ownership]
+Under pledge (H), Bob retains economic ownership of posted collateral; the regime difference surfaces in PnL projection, where Bob's MSFT PnL is $c_p(200)\times P$, not $\mathrm{own}(0)\times P$.
+\end{remark}

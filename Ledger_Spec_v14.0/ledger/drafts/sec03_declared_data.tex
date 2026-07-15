@@ -1,0 +1,294 @@
+\section{Declared Data}\label{sec:data}
+
+A contract reads two things and nothing else: declared data and stamped
+observations. This section is about the first. Declared data is the part of the
+log that is authored deliberately, ahead of the events that consume it --- the
+terms of an instrument, the way each of its fields reacts to a corporate action,
+the kinds of observation the system will accept, and the operators that carry an
+old number across a boundary into a new frame. The discipline throughout is the
+same one the door already showed: fix the answer in advance, as data, so that no
+event has to improvise.
+
+\subsection{Terms, and versions that only ever append}
+
+Every unit has \emph{ProductTerms}: the terms of the instrument, recorded as a
+non-empty, append-only list of versions. The first version is written when the
+unit is registered; a unit that is registered but has no terms is not a state the
+types allow. There is no operation that edits a terms version, and --- this is the
+part that matters for corporate actions --- an adjustment never edits terms
+either. When a split halves a strike, it does not overwrite the strike field; it
+\emph{appends} a new terms version carrying the halved strike, tagged with the
+boundary that caused it. The old version stays exactly as it was written. Terms
+are declared data, and declared data, like everything in the log, grows only by
+appending.
+
+\subsection{Four dimensions, and how a field reacts}
+
+Why does a split halve a strike but not a coupon, and halve a cash-per-share
+dividend but not a percentage one? Because a field's reaction to a corporate
+action is fixed entirely by \emph{what kind of quantity the field is}, and there
+are only four kinds. Every terms field declares, at the point it is defined,
+exactly one \emph{dimension}:
+
+\begin{itemize}[leftmargin=1.5em]
+\item a \textbf{quantity} of the unit --- a share count, a number of contracts;
+\item a \textbf{price} in the unit's basis --- a strike, a stored reference spot;
+\item a \textbf{cash} amount --- a fixed coupon, a notional;
+\item a \textbf{dimensionless} value --- a ratio, a percentage, a participation.
+\end{itemize}
+
+The dimension is the field's constructor: a field with no dimension is not
+invalid, it is unconstructible. A corporate action declares a quantity factor
+$f \neq 0$ and a per-share cash amount $c$, and each dimension has one default action,
+the same for every product:
+
+\[
+  \text{quantity } q \mapsto q \cdot f, \qquad
+  \text{price } p \mapsto (p - c)/f, \qquad
+  \text{cash and dimensionless: unchanged.}
+\]
+
+The factor is nonzero, so the boundary is invertible: a datum carried across it
+can be carried back. That is the whole of the constraint, and it is why $f = 0$ is
+refused --- a zero factor is non-invertible, collapsing every quantity to zero with
+no way to recover the count it came from, so a datum read across such a boundary
+could never be transported in either direction. A negative factor is well-formed;
+only zero is refused.
+
+Check the arithmetic against intuition. A two-for-one split is $f = 2$, $c = 0$: a
+holding of 1{,}000 becomes 2{,}000, a strike of \EUR{100} becomes \EUR{50}, a fixed
+coupon in cash is untouched. The price action earns its keep on market data at an
+ordinary dividend. An ordinary \EUR{2} dividend is $f = 1$, $c = 2$; a market price
+printed at \EUR{102} the instant before the stock goes ex, read across the
+boundary, becomes $(102 - 2)/1 = \EUR{100}$ --- exactly the print going
+ex-dividend. That is the map doing its one job on a datum in the price dimension.
+
+A price that is a \emph{terms field} --- a stored strike or reference spot on the
+instrument itself --- is a different object, and under an ordinary dividend it does
+not move: it stands at \EUR{102}. The arithmetic is the same; what differs is that
+applying it to a terms field here would pay the same cash twice, and the next
+subsection makes that precise. The dimensional action is where a field starts; the
+schedule, developed there, is what holds a price field fixed exactly where moving
+it would double-count.
+
+The reason one rule suffices for every product is a small theorem about these four
+dimensions, and it is the load-bearing fact of the whole adjustment machinery.
+
+\begin{theorem}[Dimension invariance]\label{thm:dim-invariance}
+For a quantity $q$ and a price $p$ crossing a boundary $(f, c)$,
+\[
+  (q \cdot f)\cdot\frac{p - c}{f} \;=\; q\cdot p - q\cdot c .
+\]
+The marked value after the boundary equals the value before, less exactly the cash
+the same boundary paid out.
+\end{theorem}
+
+The identity holds field by field, for every product, at every boundary on the
+menu, because it is quantified over the four dimensions once and not over products
+or event types. A product registered next year adds fields with dimensions; it
+adds no cases to this theorem. That is the sense in which the declarations
+\emph{relocate} the expert judgement rather than removing it: someone must still
+say, correctly, which dimension each field of each product has --- but having said
+it once, they never write another adjustment rule, and $N$ products crossing $M$
+kinds of corporate action need $N$ sets of field declarations, not $N \times M$
+hand-written cases.
+
+\subsection{The adjustment schedule and its three layers}
+
+Declaring dimensions gives every field a \emph{default} reaction. But real term
+sheets deviate. A specific note may say its strike adjusts on a special dividend
+only above a threshold; a specific determination may be left to a calculation
+agent to fix later. So every unit's terms carry, from the first version, an
+\emph{adjustment schedule}: for every class of corporate action and every terms
+field, exactly one entry saying how that field reacts. An entry comes from exactly
+one of three layers, most specific winning:
+
+\begin{enumerate}[leftmargin=1.5em]
+\item the \textbf{class default} --- fixed once, in this specification, per class
+and dimension: quantities scale by $f$, cash and dimensionless fields stand, and a
+price terms field moves to $(p-c)/f$ under every class \emph{except} an ordinary
+dividend, where it stands. That one exception is neither market custom imported nor a
+consequence of Theorem~\ref{thm:dim-invariance} alone. The re-expression
+$p \mapsto (p-c)/f$ preserves value only when the same transaction pays the holder of
+the shifted field the matching cash leg $q \cdot c$; a market quote crossing the seam
+has that pairing, because the shareholder is paid, but a stored strike has no holder
+being paid, so the theorem by itself licenses no strike shift in either class. What
+decides the default is what the strike already contains. An ordinary, anticipated
+dividend sits in the forward the strike was struck against, so the strike stands ---
+shifting it would create option value equal to the cash the boundary has already paid
+the shareholder, one distribution counted twice in the system's value accounting. A
+special dividend sits in no forward, so a standing strike would impose exactly that
+unpriced transfer in the opposite direction, and the strike moves to $(p-c)/f$ to hold
+the contracted position invariant. One principle yields both: a price terms field
+shifts by precisely the part of the distribution not already embedded in the reference
+it was struck against --- zero for an ordinary dividend, all of $c$ for every other
+class. The rule is read off that principle, not copied from a convention.
+\item a \textbf{declared override} --- a rule in a closed, first-order language
+that reads the boundary's parameters and the field's value and evaluates, with no
+recursion and no partial operations, to exactly one value. This is where a
+bespoke term sheet writes down its deviation.
+\item \textbf{designated discretion} --- the schedule names who owes a
+determination; until that party's attested \emph{resolved terms} arrive
+referencing the boundary, the affected fields have no adjusted value, the boundary
+is pending for them, and any attempt to consume them is quarantined.
+\end{enumerate}
+
+Adjusted terms enter the log from these two sources --- the schedule's evaluator
+applying a declared entry, and the resolved terms of a designated party --- and
+from nowhere else.
+
+What makes this safe rather than merely organised is a totality gate. A
+registration, and every later terms append, is admitted only if the schedule
+yields exactly one well-formed entry for every pair of (corporate-action class,
+field) in the version being written; an append that introduces a new field must
+extend the schedule in the same transaction, or it is refused. The set of
+corporate-action classes is closed and finite --- eight members: split, ordinary
+dividend, special dividend, spin-off, stock merger, elective merger, termination,
+and rebalance --- so the gate is a finite check, and it is strict. An ill-formed
+override is refused, never quietly defaulted. The consequence is a strong one:
+past the moment a unit is registered, ``the framework does not know how to handle
+this event for this product'' is not a state the system can reach. Either every
+class $\times$ field pair has an answer, or the version was never admitted.
+
+The eight are closed by design, and closed does not mean incomplete: an event that
+looks like a ninth usually decomposes onto a member. A rights issue is the standing
+example. It is a spin-off --- the right is a tradable series distributed to holders
+and registered as the child unit --- not a new class of its own. A notice that
+genuinely falls outside the eight is refused, fail-closed; the taxonomy is widened
+only by changing this specification, never by an incoming datum.
+
+A word on where the schedule is evaluated, because it decides what the door can and
+cannot catch. The schedule's language is one definition, fixed once here, but it is
+executed at three distinct sites. The door executes it to check \emph{totality} ---
+that exactly one well-formed entry exists for every class $\times$ field pair --- and
+nothing more; it never evaluates an entry down to a resolved value. The
+corporate-action processor executes it to \emph{produce} the resolved terms at a
+boundary. And an independent recomputation, run later against the committed log,
+executes it a third time to \emph{verify} those terms. The door's evaluation proves
+an answer exists and is unique; it does not compute the answer, and it does not
+check the number the processor appended. That is precisely why a processor that
+appends a wrong resolved value --- a perfectly well-formed terms version carrying
+the wrong strike --- passes the door and is caught only afterward, by the
+recomputation re-running the same evaluation and comparing.
+
+\subsection{The datum-kind registry}
+
+Observations from the outside --- a settlement price, a dividend forecast, a
+barrier fixing --- enter the log as \emph{stamped observations}. But not any
+observation may enter. Each \emph{kind} of consumable datum is registered once,
+before any datum of that kind can be recorded, and the registration fixes the
+kind's identity and declares a dimension for each of its components. A datum is an
+observation, never a holding, so its components draw on three dimensions --- price,
+cash, dimensionless --- but never quantity.
+
+The reason a datum is registered per component, rather than named as a single
+number, is that one datum's components can have different fates under the same
+operator. A dividend forecast is a good example. Suppose a forecast lists two
+components. The first is an amount of \EUR{3.00} per share; being quoted in the share's price
+dimension, it takes the price action under a split, and it is declared in the
+\emph{price} dimension. The second is a proportional part, $1\%$ of price, declared
+\emph{dimensionless}. A two-for-one split applies $f = 2$ to the whole datum, but
+the two components react by their own dimensions: the per-share amount halves to
+\EUR{1.50}, the $1\%$ stands. And both contributions are invariant, which is the
+point ---
+$1{,}000 \times 3 = 2{,}000 \times 1.50 = \EUR{3{,}000}$ on the cash component, and
+$1\% \times 100 \times 1{,}000 = 1\% \times 50 \times 2{,}000 = \EUR{1{,}000}$ on
+the proportional one. A forecast settles nothing; it feeds a valuation. Had the
+proportional component been mis-declared as a price, the split would have halved it to
+$0.5\%$ and contributed \EUR{500} to the mark where \EUR{1{,}000} is correct ---
+half the datum's contribution, from one wrong word in a declaration. This is
+exactly why each registry entry must carry a mandatory invariance witness, and it
+is worth saying precisely what the witness checks. It takes each component's
+declared dimension and a scale boundary $(f, c)$ and tests the value-invariance
+identity for that dimension: the quantity the component delivers must be the same
+before and after the boundary once the component is carried across by the map its
+declared dimension fixes. A component declared per-share in the price dimension
+satisfies $1{,}000 \times p = 2{,}000 \times (p/2)$ under a two-for-one; a component
+declared as an absolute cash amount is left unscaled and satisfies the identity only
+if it truly is a flat amount that does not depend on the share count. A per-share
+amount wrongly declared as absolute cash --- or a flat amount wrongly declared as
+per-share --- fails its identity under the replayed boundary, and the entry is
+refused at registration. The declaration is a trust assumption, and the witness
+bounds that trust to precisely its own width: a dimension that would misbehave under
+a scale cannot be registered in the first place.
+
+A kind that was never registered is unconsumable: the door refuses it outright, as
+an unregistered kind, returning the payload with the refusal but admitting nothing. This is distinct
+from a registered kind that a particular boundary's declaration simply does not
+mention --- that datum enters the log and is stopped only when it tries to cross
+that boundary. A registry entry, like a terms version, is immutable; a wrong
+declaration is corrected by registering a new kind and retiring the old one to new
+ingestion, never by editing the entry in place.
+
+\subsection{Operators: one declaration, two consumers}
+
+The last piece of declared data is the operator that carries a number across a
+boundary. When a corporate action is recorded, its declaration is a finite map
+from datum kinds to \emph{operators}, drawn from a closed menu:
+
+\begin{lstlisting}
+data OpSpec
+  = Scale     Rational  -- multiply a quantity/price by a nonzero factor
+  | Shift     Rational  -- subtract a per-share cash amount from a price
+  | Subst     UnitId Rational -- succeed into another unit at a declared ratio
+  | Recompose Basket    -- resolve onto a basket of successor units
+  | AId                 -- identity, declared -- never assumed
+  | Pending             -- boundary known, parameter not yet published
+  | Terminal            -- the series ends; no conversion either way
+\end{lstlisting}
+
+The menu is closed: a declaration naming anything outside it is refused at the
+door, and widening the menu is a change to this specification, not something data
+can do. The menu is closed as an alphabet, not as a grammar: a declaration may
+bind a datum kind to a composite of menu operators --- a succession at a declared
+ratio with a per-share cash leg is $\texttt{Subst}(Q, f) \circ \texttt{Shift}(-c)$,
+the interpretation of the single declared pair $(f, c)$ as the price action
+$p \mapsto (p - c)/f$ --- and closure means no operator outside the menu, never that
+members cannot compose. Two features of it repay attention. First, identity is a declared member,
+\texttt{AId}, and is never assumed. A declaration that omits a datum kind does not
+pass that kind through unchanged; it provides no conversion for it, and the door
+fails closed. The two-case function is exactly this:
+
+\begin{lstlisting}
+convert :: Maybe OpSpec -> Datum -> Either Refusal Datum
+convert Nothing   _ = Left NoDeclaration   -- omission is refusal
+convert (Just op) d = apply op d           -- AId is a `Just`, and is identity
+\end{lstlisting}
+
+The difference between \texttt{Nothing} and \texttt{Just AId} is the difference
+between ``no answer, stop'' and ``the declared answer is: do nothing''. Only the
+second lets a datum cross. Second, the declaration is an operator, not a name. A
+name like ``two-for-one split'' would have to be interpreted, identically, by
+every consumer forever; an operator like \texttt{Scale 2} is simply applied. This
+is what lets one declaration serve two consumers.
+
+A boundary's declared operators are, in fact, consumed twice. They are consumed
+once at the boundary's effective time, by the corporate-action contract that
+produces the boundary's one-time transaction; and then they stand forever after
+at the read seam, converting every pre-boundary datum that is later read across
+the boundary. An example makes the two uses concrete. This read-seam application is
+the one generic computation the thesis of Section~\ref{sec:thesis} named. Consider a
+single day. The log already holds May's \EUR{2} ordinary dividend, recorded as
+\texttt{Shift} $-2$. At 09:59 a vendor prints a price of 100, stamped in the basis
+current at that moment --- the pre-split frame, which the 10:00 split will leave one
+boundary back. At 10:00 a two-for-one split takes effect, and the
+corporate-action processor consumes the declaration \texttt{Scale 2} \emph{once}:
+it moves 1{,}000 shares to 2{,}000, sets the new basis, appends the strike from
+\EUR{100} to \EUR{50} and the stored reference spot from \EUR{100} to \EUR{50},
+each tagged with the boundary. At 10:03 someone reads the 09:59 print in the new
+frame, and now the same \texttt{Scale 2} is consumed a \emph{second} time, at the
+read seam: the stale 100 is converted to $100/2 = 50$, and only then is it allowed
+to meet the 2{,}000-share count. The ledger did not price anything and did not
+interpret the split; it applied the declared operator, and that is the whole of
+the generic work it does.
+
+The composition of operators across several boundaries is a computation, not a
+choice. A May print of 102 read across both the dividend and the split composes in
+effective order: $(102 - 2)/2 = 50$. The reverse order, $102/2 - 2 = 49$, is not a
+valid conversion: no pair of bases stands in that relation, and the declared data
+offers no way to assemble it, so the arrival order of a datum can never change the
+number it converts to.
+Between any two bases on one chain there is at most one conversion per datum kind,
+and it exists exactly where every intervening declared conversion does. The
+\EUR{50} is not the ledger's opinion. It is the only number the declared data
+admits.

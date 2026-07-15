@@ -1,0 +1,61 @@
+\section*{Roadmap and Reading Guidance}
+\addcontentsline{toc}{section}{Roadmap and Reading Guidance}
+
+Each audience has a shortest route to a working understanding. The table below gives
+that route, the sections to add for more depth, and the sections a first pass may skip
+without loss.
+
+\begin{longtable}{@{}p{0.16\textwidth}p{0.30\textwidth}p{0.28\textwidth}p{0.18\textwidth}@{}}
+\toprule
+\textbf{Audience} & \textbf{Minimal path} & \textbf{Then if needed} & \textbf{May skip on first pass} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Audience} & \textbf{Minimal path} & \textbf{Then if needed} & \textbf{May skip on first pass} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Regulator &
+\S\ref{sec:intro}, the conservation core of \S\ref{sec:ledger}, \S\ref{sec:regulatory}, \S\ref{sec:scope-limitations} &
+\S\ref{sec:settlement}, \S\ref{sec:faq}, \S\ref{sec:conclusion}, App.~\ref{app:reconciliation}, App.~\ref{app:eu-sbl-example}, App.~\ref{app:us-sbl-example} &
+the Haskell, \S\ref{sec:states} construction detail, \S\ref{sec:contracts}, \S\ref{sec:futures} detail, \S\S\ref{sec:temporal}--\ref{sec:invariants} internals \\
+\addlinespace
+Implementer &
+\S\S\ref{sec:ledger}--\ref{sec:states}, \S\ref{sec:contracts}, \S\ref{sec:lifecycle}, \S\ref{sec:implementation}, \S\ref{sec:invariants} &
+\S\ref{sec:futures}, \S\ref{sec:settlement}, \S\ref{sec:cdm} + App.~\ref{app:cdm-walkthrough}, \S\ref{sec:temporal} incl.\ \S\ref{sec:processor-contract}, \S\ref{sec:gpm}, App.~\ref{app:cdm-mapping}/\ref{app:properties}/\ref{app:avail-identity} &
+\S\ref{sec:valuation} profit-and-loss derivations, \S\ref{sec:managed}, \S\ref{sec:substantiation}, \S\ref{sec:regulatory}, worked examples \\
+\addlinespace
+Quant &
+\S\ref{sec:ledger}, \S\ref{sec:valuation}, \S\ref{sec:substantiation}, App.~\ref{app:pricing-coordination} &
+\S\ref{sec:futures}, \S\ref{sec:gpm}, \S\ref{sec:state-basis} &
+\S\ref{sec:unit-store}, \S\ref{sec:implementation}, \S\ref{sec:settlement}, \S\S\ref{sec:cdm}--\ref{sec:temporal} mechanics, \S\ref{sec:regulatory} \\
+\addlinespace
+Market-data integrator &
+\S\ref{sec:basis-contract} (the whole boundary contract: obligations, direction of flow, datum classes, operating modes), App.~\ref{app:pricing-coordination} &
+the rest of \S\ref{sec:state-basis}, \S\ref{sec:lifecycle} &
+everything outside \S\ref{sec:state-basis} on a first pass \\
+\addlinespace
+Risk manager &
+\S\ref{sec:ledger}, \S\ref{sec:valuation}, \S\ref{sec:lifecycle}, \S\ref{sec:managed}, \S\ref{sec:substantiation}, \S\ref{sec:gpm} &
+\S\ref{sec:regulatory}, App.~\ref{app:reconciliation} &
+\S\ref{sec:unit-store}, \S\ref{sec:contracts} internals, \S\ref{sec:implementation}, \S\S\ref{sec:cdm}--\ref{sec:temporal}, the Haskell \\
+\bottomrule
+\end{longtable}
+
+The scalar wallet balance carries the whole argument through Parts~I--IV. The
+six-coordinate position vector and securities lending enter only in Part~V, once
+obligations are established.
+
+One reading aid recurs throughout. Where a concept is introduced, a short note headed
+\textsc{Mental model} offers a concrete, picturable image---water sealed in pipes, a
+ledger written in ink, a cloakroom ticket---whose behaviour mirrors the behaviour the
+concept fixes. These notes are aids to intuition and nothing more: no definition, proof,
+or condition rests on one, and none is cross-referenced. Deleting every such note would
+leave the specification complete and unchanged.
+
+\clearpage
+
+%==============================================================================
+% BODY — organised into parts
+%==============================================================================

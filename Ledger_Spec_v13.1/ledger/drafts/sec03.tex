@@ -1,0 +1,312 @@
+\section{The Closed Ledger System}
+\label{sec:ledger}
+%==============================================================================
+
+The ledger is built from four primitives: \emph{wallet}, \emph{unit}, \emph{move}, and \emph{transaction}. Everything else is a projection of the move stream they generate: balances, valuation, profit and loss, lifecycle state, reports. This section establishes the primitives, the conservation law that closes the system, and the structural consequence that internally inconsistent states are unreachable. It is the spine on which the remainder of the specification stands.
+
+\subsection{Wallets and Units}
+
+A wallet is a named place inside the ledger where quantities sit. Its entire state is one signed number per unit; the sign carries direction, so a short position needs no separate machinery.
+
+\begin{definition}[Wallet]
+A wallet $w$ is a named account within the ledger holding quantities of units. It is a logical partition of position space---not a bank account, a custody account, or a legal entity. Let $\mathcal{W}$ denote the set of all wallets and $\mathcal{U}$ the set of all units. A wallet state at time $t$ is a function
+\[
+w_t : \mathcal{U} \to \mathbb{R},
+\]
+mapping each unit $u$ to a quantity $w_t(u)$. A negative balance $w_t(u) < 0$ is a short position or obligation.
+\end{definition}
+
+Units include currencies, securities (identified by ISIN), commodities, derivatives, over-the-counter (OTC) instruments, swaps, loans, and any other contractual obligation. $\mathcal{U}$ is extensible: a new instrument type is a new element of $\mathcal{U}$, not a change to existing infrastructure. The Unit Store (Section~\ref{sec:unit-store}) manages $\mathcal{U}$ concretely: identification, validation, registration. The mapping from wallets to external accounts (custody, settlement, regulatory) belongs to the settlement layer (Section~\ref{sec:settlement}), not to the wallet.
+
+\subsection{Ownership as Balance}
+
+What a wallet owns is the number standing in its balance, nothing more. There is no separate register of title to keep in step with the holding.
+
+\begin{principle}[Ownership]
+Economic ownership is the wallet balance: to own 100 shares of a stock is for that wallet's balance in that stock to be $100$. Where ownership and possession diverge---nominee structures, securities lending, repo, pledged collateral---the generalised position model (Section~\ref{sec:gpm}) extends the scalar balance to a vector distinguishing economic ownership from operational state.
+\end{principle}
+
+This eliminates the internal reconciliation problem at its root. Conventionally, ownership is recorded in several systems: trading, back-office, custodian, general ledger. Reconciliation then verifies their agreement. Here there is one record. The ledger is the canonical internal record of economic positions. External authorities (CSDs, registrars, legal documentation) maintain independent records at the boundary, where reconciliation remains necessary (Section~\ref{sec:substantiation}).
+
+\subsection{Atomic Moves}
+
+A move is the one way any balance ever changes. It takes a positive quantity out of one wallet and puts the same quantity into another, in a single indivisible step.
+
+\begin{definition}[Move]
+An atomic move $m$ is an indivisible transfer of a positive quantity $q$ of a unit $u$ from a source wallet $w_s$ to a destination wallet $w_d$ at timestamp $t$, tagged with a source contract identifier $s$ and metadata (event description, external references). Its semantics are
+\[
+w_s(u) \mathrel{-}= q, \qquad w_d(u) \mathrel{+}= q.
+\]
+\end{definition}
+
+External references include counterparty identifiers and message identifiers under ISO~20022, the financial-messaging standard. The source $s$ names the smart contract or component that generated the move.
+
+Every change to the ledger is an explicit, time-stamped event; nothing happens off the record.
+
+\begin{principle}[Atomicity]
+Every ledger change occurs as a discrete, time-stamped move. There are no implicit adjustments or retrospective calculations.
+\end{principle}
+
+The move is the additive operation of the position algebra. A quantity is an element of an additive abelian group. A move subtracts an element from one wallet and adds the same element to another. In Haskell the group is \texttt{Qty}, where \texttt{<>} is addition, \texttt{mempty} the zero position, and \texttt{negQty} the additive inverse. Quantities are exact \texttt{Integer} minor units, never floating point. Conservation and deterministic replay are arithmetic facts; floating point would forfeit them. The listing realises this algebra: the group, the move, and the one function that applies a move to the ledger.
+
+\begin{lstlisting}[language=Haskell]
+-- Qty: the additive abelian group of exact minor units.
+-- A negative Qty is a short position; the group must host it, so Qty is unsigned-free.
+newtype Qty = Qty Integer deriving (Eq, Ord)
+
+instance Semigroup Qty where Qty a <> Qty b = Qty (a + b)   -- addition
+instance Monoid    Qty where mempty = Qty 0                 -- the zero position
+
+negQty :: Qty -> Qty                                        -- the additive inverse
+negQty (Qty n) = Qty (negate n)
+--   negQty q <> q == mempty      -- the group's inverse axiom, for every q
+
+newtype WalletId  = WalletId  String  deriving (Eq, Ord, Show)
+newtype UnitId    = UnitId    String  deriving (Eq, Ord, Show)
+newtype Timestamp = Timestamp Integer deriving (Eq, Ord, Show)
+newtype SourceId  = SourceId  String  deriving (Eq, Ord, Show)
+
+-- A move transfers a *positive* magnitude; direction is carried by (from,to).
+-- Illustrative form, local to this section: the reference (reference/Ledger.hs)
+-- carries the magnitude as PosQty -- positive by type, sole door mkPosQty
+-- (sec:futures) -- so positivity is a type guarantee there; here it is the
+-- guard in `move`, and the mini-ledger below is this section's own.
+data Move = Move
+  { mFrom :: !WalletId, mTo  :: !WalletId, mUnit   :: !UnitId
+  , mQty  :: !Qty,      mTime:: !Timestamp, mSource:: !SourceId } deriving (Eq, Show)
+
+-- `move` is the sole ingest path; it is the parse boundary that rejects a
+-- non-positive magnitude (Qty itself stays signed, to hold balances).
+move :: WalletId -> WalletId -> UnitId -> Qty -> Timestamp -> SourceId -> Maybe Move
+move ws wd u q t s | q > mempty = Just (Move ws wd u q t s)
+                   | otherwise  = Nothing
+
+-- The per-wallet deltas a move induces; their sum is the conservation witness.
+moveDelta :: Move -> [(WalletId, Qty)]
+moveDelta (Move s d _ q _ _) = [(s, negQty q), (d, q)]   -- negQty q <> q = mempty
+
+-- The ledger: each wallet maps units to quantities. An unread balance is the
+-- group identity, so `balance` is total; `adjust` adds a (possibly negative) dq.
+type Ledger = Map WalletId (Map UnitId Qty)
+
+balance :: WalletId -> UnitId -> Ledger -> Qty
+balance w u = maybe mempty (Map.findWithDefault mempty u) . Map.lookup w
+
+adjust :: WalletId -> UnitId -> Qty -> Ledger -> Ledger
+adjust w u dq = Map.insertWith (Map.unionWith (<>)) w (Map.singleton u dq)
+
+-- applyMove realises  w_s -= q ;  w_d += q  as one act.
+applyMove :: Move -> Ledger -> Ledger
+applyMove (Move ws wd u q _ _) = adjust wd u q . adjust ws u (negQty q)
+\end{lstlisting}
+
+\texttt{Qty} and its group instances are the same definitions the reference of Section~\ref{sec:states} uses; that reference abbreviates the inverse \texttt{negQty} as \texttt{qneg}. The \texttt{Move} and mini-ledger of this listing are illustrative. In the reference, \texttt{Move} carries its magnitude as \texttt{PosQty}, so positivity is a type guarantee rather than a guard; the reference form in Section~\ref{sec:states} is the verbatim one.
+
+\subsection{Transactions and the Conservation Law}
+
+One economic event is recorded as one transaction. Its moves carry every balance change; a state delta carries everything else the event writes.
+
+\begin{definition}[Transaction]
+\label{def:transaction}
+A transaction $\tau$ is the one atomic event recorded in the log: an ordered list of moves $[m_1,\ldots,m_n]$ together with the non-balance state delta they ride with---per-wallet bookkeeping (accumulated cost, high-water mark, entry NAV), shared unit-status writes, and a product-terms introduction or append. The moves carry every balance change; the delta carries everything else. When several transactions share a timestamp, the move stream assigns a total order (by sequence number within the timestamp) for deterministic replay. Conservation holds regardless of order; intermediate balances, margin, and lifecycle state depend on it.
+\end{definition}
+
+Because every move removes from one wallet exactly what it adds to another, no transaction changes the total quantity of any unit held across the whole system.
+
+\begin{principle}[Conservation Law]
+\label{cond:conservation}
+For any transaction $\tau$ and any unit $u \in \mathcal{U}$, the net change in total quantity across all wallets is zero.
+\end{principle}
+
+Conservation follows from the move semantics. Each move contributes $-q + q = 0$ to the total for its unit, so the sum over the transaction is zero. This is not a runtime check. It is an algebraic consequence of the additive-group structure: adding an element's inverse to one wallet and the element to another nets to the group identity.
+
+The Haskell makes this exact. \texttt{foldMap} over a transaction's moves is the unique homomorphism from the free monoid of moves into \texttt{Qty}. It maps each move to its contribution and combines the results with \texttt{<>}. Every move's contribution is already \texttt{negQty q <> q = mempty}, so the fold lands at \texttt{mempty} by the monoid laws alone. The empty move list is \texttt{mempty}, so a move-less event is conserved for free; a registration or a preserving amendment is such an event, carrying only a state delta. Conservation is therefore a property of the type, not a checked side-condition. There is no separate validation step and no unconserved transaction to reject.
+
+\begin{lstlisting}[language=Haskell]
+-- Illustrative Qty form; the reference weave of sec:states is the verbatim one
+-- (magnitude PosQty, read through unPosQty).
+-- The ONE atomic event: the conserved economic flow (txMoves, in edge form)
+-- PLUS the non-balance state delta it rides with. A balance changes ONLY via a
+-- Move -- there is no balance writer in the per-wallet rows -- so "a balance
+-- change without a conserving move" is unrepresentable, and conservation needs
+-- no validation gate. txIntroduce = Just marks the introduction of txUnit
+-- (registration); Nothing operates on an existing unit (trade/settlement).
+data Transaction = Transaction
+  { txUnit      :: UnitId                            -- the unit this event concerns
+  , txMoves     :: [Move]                            -- conserved flow as edges (by construction)
+  , txRows      :: Map WalletId [SomeWrite]          -- non-balance bookkeeping (ac/hwm/entryNav)
+  , txStatus    :: [StatusWrite]                     -- shared UnitStatus writes
+  , txIntroduce :: Maybe (TermsVersion, UnitStatus)  -- Just => introduce txUnit (registration)
+  , txAppend    :: Maybe TermsVersion                -- Just => append a version (amendment)
+  , txBoundary  :: Maybe BoundaryEvent               -- Just => declare a corporate-action
+  } deriving (Show)                                  --   boundary on txUnit (Sec. state-basis)
+
+-- Conservation, per unit. Each move's contribution to the system-wide total of
+-- its unit is  negQty q <> q = mempty;  foldMap over the moves is therefore
+-- mempty -- conservation by the monoid laws, not by a runtime sum. The empty
+-- move list (registration, amendment) folds to mempty too: conserved for free.
+unitDelta :: UnitId -> Transaction -> Qty
+unitDelta u tx =
+    foldMap (\m -> if mUnit m == u
+                     then negQty (mQty m) <> mQty m
+                     else mempty) (txMoves tx)
+--   unitDelta u tau == mempty      -- for every unit u and
+--   transaction tau  (this is P1's premise)
+\end{lstlisting}
+
+This is the type-level statement of the Conservation Law (Principle~\ref{cond:conservation}). System Closure (Theorem~\ref{inv:P1}) is its consequence over the whole stream: balances start at zero, every transaction nets to zero, so the system-wide total of every unit stays at zero.
+
+\begin{theorem}[System Closure]
+\label{inv:P1}
+If every transaction satisfies the conservation law, then
+\[
+\sum_{w \in \mathcal{W}} w_t(u) = 0 \qquad \forall u \in \mathcal{U},\ \forall t.
+\]
+\end{theorem}
+
+\begin{proof}
+By induction on transactions. At $t=0$ all balances are zero, so $Q(u) \equiv \sum_{w} w_t(u) = 0$. Each transaction preserves $Q(u) = 0$ by the conservation law. Hence $Q(u) = 0$ at all $t$.
+\end{proof}
+
+System Closure (Property~P1) is the closed double-entry invariant: units in real wallets (assets) are exactly offset by units in virtual wallets (liabilities). No move creates or destroys units. Every move transfers between wallets. The property is stated with the other invariants in Section~\ref{sec:invariants}.
+
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.4mm]},
+    pan/.style={draw, rounded corners, align=center, font=\small,
+                minimum width=30mm, minimum height=14mm},
+  ]
+  % --- the one move, stated above the beam ---
+  \node[font=\small, align=center] at (0,2.6)
+    {one move $m$: transfer quantity $q$ of unit $u$ from $A$ to $B$};
+  \draw[->] (-2.3,2.0) -- node[above, font=\scriptsize]{$q$} (2.3,2.0);
+
+  % --- balance beam, level: the two entries are equal and opposite ---
+  \fill[gray!25] (-0.45,0) -- (0.45,0) -- (0,0.95) -- cycle;
+  \draw          (-0.45,0) -- (0.45,0) -- (0,0.95) -- cycle;
+  \draw[very thick] (-4,0.95) -- (4,0.95);
+  \draw (-3.3,0.95) -- (-3.3,0.35);
+  \draw ( 3.3,0.95) -- ( 3.3,0.35);
+
+  % --- the two equal and opposite entries ---
+  \node[pan] (a) at (-3.3,-0.45)
+    {wallet $A$ (debit)\\[2pt]$w_A(u)\mathrel{-}=q$\\[2pt]entry $-q$};
+  \node[pan] (b) at ( 3.3,-0.45)
+    {wallet $B$ (credit)\\[2pt]$w_B(u)\mathrel{+}=q$\\[2pt]entry $+q$};
+
+  % --- the sum ---
+  \node[font=\small, align=center] at (0,-1.9)
+    {$(-q) + (+q) = 0$\quad(quantities of unit $u$)};
+\end{tikzpicture}
+\caption{Conservation of quantity, per unit $u$. A move records two equal and opposite
+entries---a debit of $q$ in wallet $A$ and a credit of $q$ in wallet $B$---which sum to
+zero, so $\sum_{w} w(u) = 0$ holds for every unit. What is conserved is \emph{quantity},
+not market value: prices move and so does value, and across optionality value is not
+conserved (\S\ref{sec:intro}). The beam weighs units, not money.}
+\label{fig:conservation}
+\end{figure}
+
+\begin{mentalmodel}
+Picture the quantity of one unit as an incompressible fluid filling a system of sealed pipes that joins every wallet. A move is a transfer along one pipe: the litres leaving the source arrive, to the litre, at the destination, and no pipe opens to anything outside, so the total volume in the system never changes. What the pipes seal in is volume, not worth---the price of the fluid is posted on a sheet outside the seal, and unlike the volume, that value is neither held constant nor conserved.
+\end{mentalmodel}
+
+
+\subsection{Virtual Wallets}
+
+Closure requires that every move have both a source and a destination. The framework therefore represents every external counterparty (market maker, exchange, clearinghouse, custodian) as a virtual wallet alongside the real positions.
+
+\begin{definition}[Real vs Virtual Wallets]\hfill
+\begin{itemize}[nosep]
+\item \textbf{Real wallets} ($\mathcal{W}_{\mathrm{real}} \subset \mathcal{W}$): the firm's own portfolio positions; changes affect financial position and PnL.
+\item \textbf{Virtual wallets} ($\mathcal{W}_{\mathrm{virtual}} \subset \mathcal{W}$): external counterparties and market entities; their balances track external positions for reconciliation but do not affect portfolio value.
+\end{itemize}
+\end{definition}
+
+\begin{mentalmodel}
+Extend the pipework: the counterparty is the tank at the far end of every pipe, standing inside the plumbing rather than beyond it, so no pipe ever opens to the outside and the loop stays sealed. Its level moves exactly opposite to the firm's own vessels---a litre out of the portfolio is a litre into the tank---so reading the tank against the counterparty's own gauge is a reconciliation. Unlike the firm's own vessels, the tank's level is no part of what the firm holds; it closes the loop and invites comparison, and counts toward no portfolio value.
+\end{mentalmodel}
+
+A virtual wallet serves three purposes. First, it gives every move a counterparty, keeping the system closed. Second, its balance records the firm's position with that counterparty, for direct comparison against external statements. Third, the metadata trail through it connects each internal position to its external origin. The external world is thus inside the ledger: within its scope the ledger has no outside. This is the architectural step that makes System Closure (Theorem~\ref{inv:P1}) hold.
+
+A share purchase realises the construction. Buying 500 AAPL at \$100 through a broker is one transaction of two moves against the broker's virtual wallet:
+
+\begin{lstlisting}[language=Haskell]
+-- A trade carries moves and no introduction (txIntroduce = Nothing); the broker's
+-- virtual wallet is the counterparty that keeps the system closed.
+buyAAPL :: Transaction
+buyAAPL = Transaction
+  { txUnit  = UnitId "AAPL"
+  , txMoves =
+      [ Move portfolio      brokerVirtual (UnitId "USD")  (Qty 50000) t (SourceId "broker")
+      , Move brokerVirtual  portfolio     (UnitId "AAPL") (Qty 500)   t (SourceId "broker") ]
+  , txRows      = Map.empty
+  , txStatus    = []
+  , txIntroduce = Nothing       -- operates on already-registered units
+  , txAppend    = Nothing
+  , txBoundary  = Nothing }
+
+--   unitDelta (UnitId "USD")  buyAAPL == Qty 0     -- cash conserved
+--   unitDelta (UnitId "AAPL") buyAAPL == Qty 0     -- shares conserved
+-- after replaying both legs onto the empty ledger:
+--   balance portfolio     (UnitId "AAPL") l == Qty 500
+--   balance brokerVirtual (UnitId "AAPL") l == Qty (-500)   -- totals to 0
+\end{lstlisting}
+
+\begin{figure}[ht]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    wallet/.style={draw, rounded corners, minimum width=3.2cm, minimum height=1.8cm, align=center, font=\small},
+    real/.style={wallet, fill=blue!8, thick},
+    virtual/.style={wallet, fill=gray!15, dashed},
+    move/.style={-{Stealth[length=3mm]}, thick},
+    label/.style={font=\footnotesize, midway, fill=white, inner sep=1.5pt},
+  ]
+  \node[real]    (port)   at (0,0) {Our Portfolio\\$w_{\text{portfolio}}$\\[2pt]\footnotesize\texttt{USD: 10\,000}\\[-1pt]\footnotesize\texttt{AAPL: 0}};
+  \node[virtual] (broker) at (8,0) {Broker (Virtual)\\$w_{\text{broker}}$\\[2pt]\footnotesize\texttt{USD: 0}\\[-1pt]\footnotesize\texttt{AAPL: 500}};
+  \draw[move, color=red!70!black]
+    ($(port.east)+(0,0.4)$) -- node[label, above=1pt] {Move 1: \textbf{50\,000 USD}} ($(broker.west)+(0,0.4)$);
+  \draw[move, color=green!50!black]
+    ($(broker.west)+(0,-0.4)$) -- node[label, below=1pt] {Move 2: \textbf{500 AAPL}} ($(port.east)+(0,-0.4)$);
+  \node[font=\footnotesize\itshape, text width=7cm, align=center] at (4,-2.2)
+    {Conservation: $\Delta\text{USD}_{\text{total}} = -50{,}000 + 50{,}000 = 0$;\quad $\Delta\text{AAPL}_{\text{total}} = +500 - 500 = 0$};
+  \node[font=\scriptsize, color=blue!60!black] at (0,1.4) {\textsc{Real Scope}};
+  \node[font=\scriptsize, color=gray!60!black] at (8,1.4) {\textsc{Virtual Scope}};
+\end{tikzpicture}%
+}
+\caption{A share purchase: 500 AAPL at \$100. Cash moves from the real portfolio wallet to the virtual broker wallet; shares move the opposite way. Both moves execute atomically as one transaction; each unit's total across all wallets is conserved.}
+\label{fig:wallet-flow}
+\end{figure}
+
+\noindent\textbf{Initialisation.} At inception all wallets start at zero, so $Q(u)=0$ holds trivially. Opening positions are ordinary conservation-preserving moves from a virtual wallet to a real one: seeding 1{,}000 AAPL is a move of 1{,}000 AAPL from the custodian's virtual wallet to the portfolio, paired with its cash leg. No \texttt{set\_balance} primitive exists. Conservation is never violated, not even at inception. Where the system starts mid-life, the initialisation moves capture the state at migration time $t_{\text{init}}$. The move stream begins at $t_{\text{init}}$; pre-migration history resides in legacy systems.
+
+\subsection{Books and Reference Wallets}
+
+Firms group activity into \emph{books} for reporting and governance. A book is associated with one or more real wallets, and often with a distinguished \emph{reference wallet} that holds the book's positions and cash. This grouping is a reporting convention: every definition and smart contract operates at the wallet level. The managed-account contracts (Section~\ref{sec:managed}) act on reference wallets whether classified real or virtual.
+
+\subsection{The Self-Consistency Principle}
+
+The move stream is the one record the system keeps. Every balance, valuation, and report is that same stream read through a different lens, never a second copy stored alongside it.
+
+\begin{principle}[Self-Consistency]
+The ledger's conservation law, atomic transactions, and canonical event log make internally inconsistent states structurally unreachable, not merely detectable after the fact. Internal reconciliation---comparing two independent records of the same reality within the firm---is a symptom of a multi-source-of-truth architecture. In a self-consistent system the balance sheet \emph{is} the ledger viewed through an accounting lens; within the ledger there is no second record to reconcile against. External systems---custodians, CSDs, counterparties, regulators---maintain independent records, and reconciliation at the boundary remains necessary.
+\end{principle}
+
+Three of the most damaging reconciliation failures are thereby unreachable within scope:
+
+\begin{itemize}[nosep]
+\item \textbf{Trading system / general ledger divergence.} The trade and its accounting entry are one object: a transaction in the move stream. There is no second system to diverge from.
+\item \textbf{Profit and loss (PnL) / balance sheet mismatch.} $\mathrm{PnL} = V_{t_1} - V_{t_0}$ is a theorem (Section~\ref{sec:valuation}); both values derive from the same position set and price vector. There is no separate PnL system.
+\item \textbf{Inter-entity breaks.} An inter-entity move is a single atomic event recorded once; within a shared ledger, disagreement is impossible.
+\end{itemize}
+
+The guarantee is scoped. During any migration in which legacy systems run in parallel, it covers only activity recorded in the ledger. Activity remaining in legacy systems retains the legacy failure modes.
+
+The remaining failure modes are boundary conditions where the external world is an independent actor: custodian breaks, nostro/vostro discrepancies, counterparty disputes. The architecture cannot prevent an external custodian from disagreeing. It makes disagreement detectable (virtual-wallet comparison) and narrowly scoped (ISO~20022 feedback at the boundary).
+
+\noindent\textbf{Settlement timing.} The atomic transaction records the \emph{economic intent} of simultaneous settlement. Legs settle asynchronously in practice. Foreign-exchange (FX) currency legs settle in different time zones. CLS provides payment-versus-payment within a window, not instantaneous atomicity. The framework records the trade as an atomic transaction at trade time and tracks per-leg settlement progress as unit state (Section~\ref{sec:states}) or move metadata. Between trade and settlement the residual is an unsettled receivable in the counterparty's virtual wallet. The receivable represents Herstatt risk; recording it does not eliminate it. The settlement interface that consumes this state is Section~\ref{sec:settlement}.
+
+\clearpage
+%==============================================================================
+

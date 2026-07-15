@@ -1,0 +1,368 @@
+\section{US SBL Worked Example: SEC Rule 15c3-3 with Cash Collateral}
+\label{app:us-sbl-example}
+
+This appendix is a regulatory correctness witness for the US securities-lending regime. It covers cash collateral, rebate mechanics, and the rehypothecation cap of SEC Rule~15c3-3~\cite{sec15c33}, and maps FINRA SLATE reporting at each step. It is the counterpart to the European title-transfer example (App.~\ref{app:eu-sbl-example}). Title transfer is not pledge. The two regimes exercise the same Ledger primitives under different law.
+
+\subsection{Participants and Setup}
+
+Three parties take part: a mutual fund lends, a broker-dealer borrows, and an agent lender manages the loan for the fund.
+
+\begin{center}\small
+\begin{tabular}{l l p{7.5cm}}
+\toprule
+\textbf{Entity} & \textbf{Role} & \textbf{Description} \\
+\midrule
+FIDELITY & Lender (beneficial owner) & US mutual fund. Holds 1{,}000{,}000 shares of NVIDIA (NVDA, ISIN US67066G1040). Agent lender: State~Street. \\
+MORGAN\_STANLEY & Borrower & US broker-dealer. Borrows NVDA to cover a client short. Subject to Rule~15c3-3. \\
+STATE\_STREET & Agent lender & Acts for FIDELITY; negotiates and manages the loan. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Loan terms.} 1{,}000{,}000 NVDA, open loan, cash collateral (USD), margin 102\%. Cash rebate: Fed Funds Effective Rate minus 25~bps. Take Fed Funds $= 5.25\%$, so rebate rate $= 5.00\%$. The lender reinvests the cash collateral and earns the spread between reinvestment return and rebate paid. As in App.~\ref{app:eu-sbl-example}, intermediate quantities are computed in exact integer minor units. The fractional cash figures shown below (rebates, spreads) are display roundings; round-half-to-even (IEEE~754) is applied only at the settlement-instruction projection boundary.
+
+\medskip
+\noindent\textbf{Legal regime} \texttt{US\_15C3\_3}. The regime fixes three things: where the cash goes, how much may be rehypothecated, and how posted collateral enters PnL.
+\begin{itemize}[nosep]
+\item Cash collateral transfers from Morgan~Stanley to Fidelity/State~Street, who reinvest it.
+\item Rehypothecation of customer securities is capped at 140\% of the customer's debit balance (Rule~15c3-3(b)(3)).
+\item The poster's PnL includes $\mathrm{coll\_post}$: $V_e^{\mathrm{15c3}} = \sum_u (\vec{w}_e(u)[\mathrm{own}] + \vec{w}_e(u)[\mathrm{coll\_post}]) \cdot P_t(u)$.
+\end{itemize}
+
+\medskip
+\noindent\textbf{Locate precondition (Reg~SHO Rule~203(b)(1))~\cite{regsho}.} Before the client's short sale executes, Morgan~Stanley satisfies the locate obligation, either by holding the borrow or by a locate confirmation against inventory. The locate is pre-trade validation. No move occurs, no coordinate changes, and conservation is not engaged until the borrow executes.
+
+\subsection{Step 1: Loan Initiation (Day 0)}
+\label{sec:us-step1}
+
+NVDA price \$875.00. Loan value and required collateral:
+\[
+\mathrm{LV} = 1{,}000{,}000 \times 875 = \$875{,}000{,}000, \qquad
+\mathrm{RCV} = 875{,}000{,}000 \times 102\% = \$892{,}500{,}000.
+\]
+Cash is always owned. The collateral leg writes $\mathrm{own}$ on the poster and $\mathrm{coll\_recv}$ on the receiver; $\mathrm{coll\_recv}$ is the earmark that must be returned at close.
+
+\noindent Each $\tau$ below is a single Transaction carrying moves, with $\mathtt{txIntroduce}=\textsc{Nothing}$ and $\mathtt{txAppend}=\textsc{Nothing}$: neither a registration nor an amendment. Its move list is the conserved flow, so conservation holds by construction from the signed edge-sum. The trailing comment names the economic role; it is not a type field on the core Transaction.
+
+\medskip
+\noindent Initiation is one transaction with two conserved legs: the shares go on loan, and the cash collateral moves against them.
+
+\begin{lstlisting}
+tau_1 = Transaction(day 0):  -- securities-loan settlement
+  -- Securities leg (unit: NVDA)
+  Move 1: FIDELITY        onloan    += 1,000,000    [onloan]
+  Move 2: MORGAN_STANLEY  borr      += 1,000,000    [borr]
+  -- Cash collateral leg (unit: USD)
+  Move 3: MORGAN_STANLEY  own       -= 892,500,000  [own]
+  Move 4: FIDELITY        coll_recv += 892,500,000  [coll_recv]
+\end{lstlisting}
+
+\noindent\textbf{Units.} NVDA (equity), USD (cash). Position vector
+\[(\mathrm{own},\,\mathrm{onloan},\,\mathrm{borr},\,\mathrm{coll\_post},\,\mathrm{coll\_recv},\,\mathrm{coll\_rehyp}),\]
+abbreviated own, onl, borr, c\_p, c\_r, c\_rh.
+
+\noindent Fidelity keeps ownership of the shares and gains the cash earmark; Morgan~Stanley records the borrow and the cash outflow.
+
+\begin{center}\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+FIDELITY & NVDA & 1{,}000{,}000 & 1{,}000{,}000 & 0 & 0 & 0 & 0 & 0 \\
+FIDELITY & USD & 0 & 0 & 0 & 0 & 892{,}500{,}000 & 0 & 0 \\
+\midrule
+MORGAN\_STANLEY & NVDA & 0 & 0 & 1{,}000{,}000 & 0 & 0 & 0 & 1{,}000{,}000 \\
+MORGAN\_STANLEY & USD & $-892{,}500{,}000$ & 0 & 0 & 0 & 0 & 0 & $-892{,}500{,}000$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{P18 check.} Fidelity $\vec{w}(\text{NVDA})[\mathrm{own}] = 1{,}000{,}000$, unchanged. \checkmark\quad
+\textbf{SLATE.} New Loan Event: FINRA Loan ID, Client Loan ID, execution timestamp, ISIN/CUSIP, quantity, collateral type (Cash), collateral amount, rebate rate, term type (Open), borrower/lender LEI.
+
+\subsection{Step 2: Rebate Mechanics and Cash Reinvestment}
+\label{sec:us-step2}
+
+Fidelity reinvests the \$892{,}500{,}000 in approved money-market instruments. It earns the money-market yield (take $= 5.25\%$) and pays Morgan~Stanley the rebate ($5.00\%$). The reinvestment transforms the cash earmark into MMF units (see \S\ref{sec:sbl-reinvestment}):
+
+\begin{lstlisting}
+tau_reinvest = Transaction(day 0):  -- cash reinvestment
+  -- Deploys the cash into MMF units; the USD coll_recv tables below
+  -- carry the unchanged return obligation, with the MMF overlay separate.
+  Move 1: FIDELITY  coll_recv -= 892,500,000  [coll_recv, USD]
+  Move 2: FIDELITY  own       += 892,500       [own, MMF_UNIT]
+  Move 3: MMF_FUND  own       -= 892,500       [own, MMF_UNIT]
+  Move 4: MMF_FUND  own       += 892,500,000   [own, USD]
+\end{lstlisting}
+
+\noindent The reinvestment deploys the cash, but the \$892.5M return obligation persists in the loan unit state (\texttt{collateral\_amount}): the collateral must be returned in full at close. The position-vector tables that follow therefore carry $\mathrm{coll\_recv}$ (USD) at the collateral \emph{obligation} amount throughout --- the cash-equivalent Fidelity owes back. The 892{,}500 MMF units are held and tracked in a separate unit. The margin-call (Step~4) and release (Steps~6--7) moves accordingly act on the obligation amount shown. Fidelity now bears reinvestment risk. Conservation holds in each unit independently.
+
+\medskip
+\noindent\textbf{Daily economics.} The lender's income is the spread between what the cash earns and the rebate it pays.
+\begin{align*}
+\text{Reinvestment income} &= 892{,}500{,}000 \times 5.25\% / 360 = \$130{,}104.17 \\
+\text{Rebate payable} &= 892{,}500{,}000 \times 5.00\% / 360 = \$123{,}958.33 \\
+\text{Lending spread} &= 130{,}104.17 - 123{,}958.33 = \$6{,}145.83
+\end{align*}
+
+\noindent Billing here is monthly. Rebate at Day~30: $892{,}500{,}000 \times 5.00\% \times 30/360 = \$3{,}718{,}750$.
+
+\begin{lstlisting}
+tau_rebate = Transaction(day 30):  -- rebate (fee settlement)
+  Move 1: FIDELITY        own -= 3,718,750   [own, USD]
+  Move 2: MORGAN_STANLEY  own += 3,718,750   [own, USD]
+\end{lstlisting}
+
+\noindent Reinvestment over the month $= \$3{,}903{,}906$; rebate paid $= \$3{,}718{,}750$; net $= \$185{,}156$, the lending spread.
+
+\subsection{Step 3: Rehypothecation Constraints under Rule 15c3-3}
+\label{sec:us-step3}
+
+Rule~15c3-3(b)(3) permits Morgan~Stanley to use customer securities only up to 140\% of the customer's aggregate debit balance. The contrast with the title-transfer regime of App.~\ref{app:eu-sbl-example} is legal: who owns the collateral determines what the receiver may do with it.
+
+\begin{center}\small
+\begin{tabular}{l p{5cm} p{5cm}}
+\toprule
+& \textbf{European (GMSLA~2010 TT)} & \textbf{US (Rule 15c3-3)} \\
+\midrule
+Rehypothecation & Receiver rehypothecates collateral freely & Borrower faces a regulatory cap \\
+Legal basis & Title transfer: receiver \emph{owns} collateral & Pledge/control: customer retains ownership interest \\
+Cap & None (SFTR Art.~15 documentation only) & 140\% of customer debit balance \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Pre-condition enforcement (P19).} The SBL contract validates a rehypothecation request before any move commits. The \texttt{legal\_regime} field selects the path:
+
+\begin{lstlisting}
+validate_rehypothecation(entity, unit, quantity, regime):
+  if regime == US_15C3_3:
+    max_rehyp     = customer_debit_balance(entity) * 1.40
+    current_rehyp = sum(entity.coll_rehyp[u] for u in units)
+    if current_rehyp + quantity * price(unit) > max_rehyp:
+      REJECT("15c3-3 rehypothecation cap exceeded")
+  elif regime == TITLE_TRANSFER:
+    if not sftr_art15_documented(entity): REJECT("SFTR Art 15 missing")
+    PERMIT()
+\end{lstlisting}
+
+\noindent A request exceeding the cap is rejected, never committed. P19 is a pre-condition, so the illegal state is unreachable rather than reached and rolled back.
+
+\subsection{Step 4: Daily Mark-to-Market (Day 5)}
+\label{sec:us-step4}
+
+NVDA rises to \$910.00.
+\[
+\mathrm{RCV}_5 = 1{,}000{,}000 \times 910 \times 102\% = \$928{,}200{,}000,
+\]
+\[
+\Delta C = 928{,}200{,}000 - 892{,}500{,}000 = \$35{,}700{,}000.
+\]
+
+\noindent The price rise raises the required collateral; Morgan~Stanley posts the shortfall.
+
+\begin{lstlisting}
+tau_2 = Transaction(day 5):  -- margin call
+  Move 1: MORGAN_STANLEY  own       -= 35,700,000   [own, USD]
+  Move 2: FIDELITY        coll_recv += 35,700,000   [coll_recv, USD]
+\end{lstlisting}
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh \\
+\midrule
+FIDELITY & NVDA & 1{,}000{,}000 & 1{,}000{,}000 & 0 & 0 & 0 & 0 \\
+FIDELITY & USD & 0 & 0 & 0 & 0 & 928{,}200{,}000 & 0 \\
+\midrule
+MORGAN\_STANLEY & NVDA & 0 & 0 & 1{,}000{,}000 & 0 & 0 & 0 \\
+MORGAN\_STANLEY & USD & $-928{,}200{,}000$ & 0 & 0 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{P13 check.} Collateral held $= \$928{,}200{,}000 =$ required. \checkmark\quad
+\textbf{SLATE.} Modification: collateral amount and value updated.
+
+\subsection{Step 5: FINRA SLATE Reporting}
+\label{sec:us-step5}
+
+Rule~10c-1a~\cite{sec10c1a} (adopted January 2024) and the FINRA Rule~6500 Series~\cite{finra6500} (effective 2025) require every covered securities loan to be reported to SLATE. Each lifecycle event has one SLATE counterpart.
+
+\begin{center}\small
+\begin{tabular}{l l p{6cm}}
+\toprule
+\textbf{Lifecycle Event} & \textbf{SLATE Event} & \textbf{Key Data Elements} \\
+\midrule
+Loan initiation (Day~0) & New Loan & FINRA Loan ID, Client Loan ID, timestamp, ISIN US67066G1040, quantity 1{,}000{,}000, collateral type Cash, amount \$892.5M, rebate 5.00\%, term Open, borrower/lender LEI \\
+\midrule
+Margin call (Day~5) & Modification & Collateral amount $\to$ \$928.2M; timestamp \\
+\midrule
+Partial return (Day~15) & Modification & Quantity $\to$ 500{,}000; collateral reduced \\
+\midrule
+Full return (Day~25) & Modification & Quantity $\to$ 0; loan closed \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Deadlines.} Loans effected on a business day from 12:00am~ET through 7:45pm~ET report same day before 8:00pm~ET. Loans after 7:45pm~ET report next business day before 8:00pm~ET.
+
+\noindent\textbf{Dual identifiers.} Each loan carries a FINRA Loan ID (assigned by SLATE) and a Client Loan ID (the firm's $\mathrm{loan\_id}$ in the SBL unit state).
+
+\noindent\textbf{Unsettled Loan Flag (Field~\#44).} Set when the loan has not settled on the reporting day. The SBL settlement status (\S\ref{sec:sbl-state-machine}) maps directly: \texttt{PENDING}~$\to$~Unsettled, \texttt{ACTIVE}~$\to$~Settled.
+
+\begin{remark}
+The SBL settlement status is a projection of the event log, rebuilt by replay, never an authoritative store; the lifecycle authority is \S\ref{sec:lifecycle}.
+\end{remark}
+
+\subsection{Step 6: Partial Recall and Return (Day 15)}
+\label{sec:us-step6}
+
+Fidelity recalls 500{,}000 shares; NVDA \$920.00.
+\[
+\mathrm{RCV}_{15} = 500{,}000 \times 920 \times 102\% = \$469{,}200{,}000,
+\]
+\[
+C_{\mathrm{release}} = 928{,}200{,}000 - 469{,}200{,}000 = \$459{,}000{,}000.
+\]
+
+\noindent Half the loan unwinds: the shares return, and the collateral in excess of the remaining requirement is released.
+
+\begin{lstlisting}
+tau_3 = Transaction(day 15):  -- partial return
+  -- Securities return (unit: NVDA)
+  Move 1: MORGAN_STANLEY  borr      -= 500,000      [borr]
+  Move 2: FIDELITY        onloan    -= 500,000      [onloan]
+  -- Cash collateral release (unit: USD)
+  Move 3: FIDELITY        coll_recv -= 459,000,000  [coll_recv]
+  Move 4: MORGAN_STANLEY  own       += 459,000,000  [own]
+\end{lstlisting}
+
+\begin{center}\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+FIDELITY & NVDA & 1{,}000{,}000 & 500{,}000 & 0 & 0 & 0 & 0 & 500{,}000 \\
+FIDELITY & USD & 0 & 0 & 0 & 0 & 469{,}200{,}000 & 0 & 0 \\
+\midrule
+MORGAN\_STANLEY & NVDA & 0 & 0 & 500{,}000 & 0 & 0 & 0 & 500{,}000 \\
+MORGAN\_STANLEY & USD & $-469{,}200{,}000$ & 0 & 0 & 0 & 0 & 0 & $-469{,}200{,}000$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{P15 check.} Loan quantity $1{,}000{,}000 \to 500{,}000$, monotonically non-increasing. \checkmark\quad
+\textbf{P18 check.} Fidelity $\vec{w}(\text{NVDA})[\mathrm{own}] = 1{,}000{,}000$, unchanged. \checkmark
+
+\noindent Pro-rated rebate on the returned portion: $459{,}000{,}000 \times 5.00\% \times 15/360 = \$956{,}250$.
+
+\begin{lstlisting}
+tau_3b = Transaction(day 15):  -- pro-rated rebate (fee settlement)
+  Move 1: FIDELITY        own -= 956,250    [own, USD]
+  Move 2: MORGAN_STANLEY  own += 956,250    [own, USD]
+\end{lstlisting}
+
+\subsection{Step 7: Full Return and Close-Out (Day 25)}
+\label{sec:us-step7}
+
+Remaining 500{,}000 NVDA returned; NVDA \$905.00. The close-out mirrors the partial return: the remaining shares come back, and all remaining collateral is released.
+
+\begin{lstlisting}
+tau_4 = Transaction(day 25):  -- full return
+  -- Securities return (unit: NVDA)
+  Move 1: MORGAN_STANLEY  borr      -= 500,000       [borr]
+  Move 2: FIDELITY        onloan    -= 500,000       [onloan]
+  -- Cash collateral release (unit: USD)
+  Move 3: FIDELITY        coll_recv -= 469,200,000   [coll_recv]
+  Move 4: MORGAN_STANLEY  own       += 469,200,000   [own]
+\end{lstlisting}
+
+\noindent Final rebate: $469{,}200{,}000 \times 5.00\% \times 10/360 = \$651{,}666.67$.
+
+\begin{lstlisting}
+tau_4b = Transaction(day 25):  -- final rebate (fee settlement)
+  Move 1: FIDELITY        own -= 651,666.67   [own, USD]
+  Move 2: MORGAN_STANLEY  own += 651,666.67   [own, USD]
+\end{lstlisting}
+
+\noindent The loan unit is disposed: $\vec{w}_F(u_{\mathrm{loan}})[\mathrm{own}] = \vec{w}_M(u_{\mathrm{loan}})[\mathrm{own}] = 0$; SBL state RETURNED.
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+FIDELITY & NVDA & 1{,}000{,}000 & 0 & 0 & 0 & 0 & 0 & 1{,}000{,}000 \\
+FIDELITY & USD & $-1{,}607{,}917$ & 0 & 0 & 0 & 0 & 0 & $-1{,}607{,}917$ \\
+\midrule
+MORGAN\_STANLEY & NVDA & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+MORGAN\_STANLEY & USD & $+1{,}607{,}917$ & 0 & 0 & 0 & 0 & 0 & $+1{,}607{,}917$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Fidelity's negative USD is the total rebate paid ($956{,}250 + 651{,}666.67 = \$1{,}607{,}917$). Reinvestment income (\S\ref{sec:us-step2}) offsets it but accrues in the separate MMF unit, not in the USD position shown. Fidelity's net loan income is reinvestment return minus rebate paid.
+
+\medskip
+\noindent\textbf{Conservation.}
+\begin{itemize}[nosep]
+\item NVDA: $1{,}000{,}000_F + 0_M + \text{virtual}(-1{,}000{,}000) = 0$. \checkmark
+\item USD: $(-1{,}607{,}917)_F + 1{,}607{,}917_M = 0$ (plus virtual offsets for the original collateral movements). \checkmark
+\end{itemize}
+
+\noindent\textbf{SLATE.} Final Modification, quantity~$=0$, closing the loan.
+
+\subsection{Cross-Jurisdictional Comparison}
+\label{sec:sbl-comparison}
+
+The two worked examples differ only in three places: the \texttt{legal\_regime} field of the SBL unit state, the smart-contract pre-conditions (P19), and the PnL projection. The six-coordinate position vector, the Single-Coordinate Move Principle, and the conservation law are identical across regimes.
+
+\begin{center}\small
+\begin{longtable}{p{3.2cm} p{5.2cm} p{5.2cm}}
+\toprule
+\textbf{Aspect} & \textbf{European (GMSLA~2010 TT)} & \textbf{US (Rule 15c3-3)} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Aspect} & \textbf{European (GMSLA~2010 TT)} & \textbf{US (Rule 15c3-3)} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Collateral ownership & Title transfers to receiver, who \emph{owns} collateral. & Pledge: poster retains economic ownership; receiver holds under control. \\
+\midrule
+Collateral type & Non-cash (German Bunds); haircut/margin on collateral market value. & Cash (USD); 102\% of loan value posted. \\
+\midrule
+Rehypothecation & Unrestricted under title transfer; SFTR Art.~15 documentation required. & Capped at 140\% of customer debit balance (Rule 15c3-3(b)(3)); contract blocks excess. \\
+\midrule
+Fee structure & Lending fee (25~bps on loan value); borrower pays lender. & Rebate (Fed Funds $-$ 25~bps); lender pays borrower on cash, earns reinvestment spread. \\
+\midrule
+Collateral coordinate & $\mathrm{own}$ for poster, $\mathrm{coll\_recv}$ for receiver. & $\mathrm{own}$ for poster, $\mathrm{coll\_recv}$ for receiver. \\
+\midrule
+PnL formula & $V_e = \sum_u \vec{w}_e(u)[\mathrm{own}] \cdot P_t(u)$ & $V_e = \sum_u (\vec{w}_e(u)[\mathrm{own}] + \vec{w}_e(u)[\mathrm{coll\_post}]) \cdot P_t(u)$ \\
+\midrule
+Regulatory reporting & SFTR (NEWT, MODI, VALU, ETRM); dual-sided; UTI per ESMA waterfall. & FINRA SLATE (New Loan, Modification); single-sided (lender reports). \\
+\midrule
+Manufactured dividends & French withholding-tax treatment. & US tax-treaty provisions (IRC \S871(m)). \\
+\midrule
+Settlement discipline & CSDR: daily cash penalties for fails; auto-partial (IBP-125). & Reg~SHO Rule~204: close-out by T+3; FINRA Rule~4320. \\
+\midrule
+Governing agreement & GMSLA~2010 (title transfer); ISLA Best Practice Handbook. & Master Securities Loan Agreement; SEC/FINRA rules. \\
+\midrule
+Position vector & Identical six coordinates. & Identical six coordinates. \\
+\midrule
+Conservation law & $\sum_e \vec{w}_e(u)[\text{coord}] = 0$. & Identical. \\
+\midrule
+Smart contract & Same SBL contract; \texttt{legal\_regime} selects validation. & Same SBL contract; \texttt{legal\_regime} selects validation. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\noindent The Ledger engine, conservation law, and move primitive are jurisdiction-neutral. Title transfer versus pledge, unrestricted versus capped rehypothecation, and lending fee versus rebate are encoded as SBL unit-state parameters and enforced by P19 pre-conditions. Only the PnL projection and the pre-condition logic differ, as derived in \S\ref{sec:sbl-title-transfer}.
+
+
+%==============================================================================
+% REFERENCES (only the externally-cited regulatory sources; other external
+% mentions are pinned inline as footnotes in house style)
+%==============================================================================

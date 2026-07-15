@@ -1,0 +1,88 @@
+\section{Coordination Between Pricing, Contract State, and Market Data}
+\label{sec:appD}
+
+A unit's valuation and the cash recorded in wallets are consistent at every instant. Where they diverge, value is duplicated or lost. The atomicity of the lifecycle event (C3, \ref{cond:C3}) makes that divergence structurally unreachable; this appendix exhibits the mechanism on coupons and dividends.
+
+\subsection{The coupon}
+
+A bond pays a stream of coupons. At each coupon date two facts must hold together:
+
+\begin{enumerate}
+\item the cash flow is recorded --- a move from issuer wallet to holder wallet;
+\item the bond goes ex-coupon --- subsequent pricing and accrual reflect that this coupon is paid and no longer part of the remaining promise.
+\end{enumerate}
+
+Decoupling them admits exactly two corruptions:
+
+\begin{itemize}
+\item the coupon cash is paid but pricing still treats the bond as cum-coupon --- the coupon is counted twice, once as cash and once embedded in the dirty price;
+\item the bond is moved ex-coupon but no cash flow is recorded --- the coupon vanishes from the economic total.
+\end{itemize}
+
+Either way the total value, cash plus mark-to-market, is wrong.
+
+\subsection{State-aware pricing}
+
+The pricing of a unit $u$ depends on its lifecycle state, which records the events that have occurred:
+\[
+P_t(u) = P\big(u,\, \mathrm{state}_t(u),\, \text{market data at } t\big).
+\]
+
+\noindent The signature below makes this dependence explicit. The pricing-relevant slice of lifecycle state distinguishes only whether the distribution is still embedded (\lstinline|Cum|) or has detached and been paid (\lstinline|Ex amount|); the price is a total, pure --- hence deterministic --- function of that state \emph{and} the quote, and the type admits no pricer that reads the quote alone.
+
+\begin{lstlisting}[language=Haskell]
+-- P_t(u) = P(u, state_t(u), market data at t).  Types first.
+newtype Quote = Quote Integer    -- raw disseminated spot, minor units
+newtype Price = Price Integer    -- the internally-used price; NOT a Quote
+newtype Cash  = Cash  Integer    -- a paid distribution amount, minor units
+
+-- The pricing-relevant slice of state. A coupon or dividend is either still
+-- embedded (Cum) or has detached and been paid (Ex amount). Carrying the paid
+-- amount on Ex makes the adjustment TOTAL: an ex-unit always knows what was
+-- removed, so no failable lookup is needed. The Cum/Ex fuse also makes the
+-- nonsense state "ex but amount unknown" unrepresentable.
+data Distribution = Cum | Ex Cash
+
+-- Market data the pricer may read. mQuoteEx records whether the EXTERNAL quote
+-- has itself gone ex; it may LAG the ledger's own ex transition (next-open lag).
+data Market = Market { mQuote :: Quote, mQuoteEx :: Bool }
+
+-- P_t(u) = P(u, state, market). Total over both Distribution cases and every
+-- Market; pure, hence deterministic. The quote is consulted THROUGH the state,
+-- never alone -- so the double-count is not a check but a missing function.
+priceOf :: UnitId -> Distribution -> Market -> Price
+priceOf _ Cum            (Market (Quote q) _    ) = Price q          -- cum: quote as is
+priceOf _ (Ex _)         (Market (Quote q) True ) = Price q          -- quote already ex
+priceOf _ (Ex (Cash d))  (Market (Quote q) False) = Price (q - d)    -- quote lags: remove once
+\end{lstlisting}
+
+\noindent The type is the argument: a function from \lstinline|Market| to \lstinline|Price| could not see the state and would double-count by construction; \lstinline|priceOf| cannot, because it must consume the \lstinline|Distribution| before it can return a \lstinline|Price|. Because \lstinline|Ex| carries the paid amount, the adjustment branch is total --- there is no ex-state in which the amount to remove is unknown.
+
+A coupon date is one atomic lifecycle event (C3): it generates the cash-flow move and advances $\mathrm{state}_t(u)$ to ex-coupon as a single indivisible Transaction. No intermediate configuration exists in which the cash has appeared without the state advancing, or the reverse. Pricing always evaluates $P_t(u)$ against a $\mathrm{state}_t(u)$ consistent with the move stream, so the price jump at the coupon date exactly offsets the coupon cash entering the wallet, and total value (cash plus bond) is continuous through the event.
+
+\subsection{Ex-dividend: the external-quote lag}
+
+Equity dividends raise the same coordination problem with one added constraint: the external quote need not switch state at the ledger event. On the ex-dividend date the ledger records the dividend move from issuer wallet to holder wallet and advances the equity state from cum-dividend to ex-dividend, atomically as above. The raw spot disseminated by an exchange, however, is not guaranteed to go ex-dividend at that instant; the first ex-dividend quote may appear only at the next market open, and until then the published spot may still carry the cum-dividend value.
+
+Consuming that raw spot while the ledger has already paid the dividend and marked the unit ex-dividend counts the dividend twice --- once as cash, once embedded in the equity price. This is the same $P_t(u)$ as the coupon: the ex-dividend lag is exactly the \lstinline|priceOf u (Ex d) (Market q False)| branch above, which removes the paid amount once and so makes total value continuous through the event:
+
+\begin{lstlisting}[language=Haskell]
+-- ghci> priceOf u Cum           (Market (Quote 102) False)  -- cum-distribution
+-- Price 102
+-- ghci> priceOf u (Ex (Cash 2)) (Market (Quote 102) False)  -- ledger ex, quote LAGS
+-- Price 100   -- the 2 paid as cash is removed from the mark: counted ONCE
+-- ghci> priceOf u (Ex (Cash 2)) (Market (Quote 100) True)   -- quote caught up
+-- Price 100   -- no adjustment; the quote already excludes the distribution
+\end{lstlisting}
+
+\noindent Holder value before the event is the mark $102$; at the event the cash leg adds $+2$ and the state-aware mark falls to $100$, so cash plus mark is unchanged. The two reachable ex-cases (quote lagging, quote caught up) agree on the price; the unreachable third reading --- quote alone, ignoring state --- is not a case the type can express.
+
+\subsection{Scope}
+
+External prices are processed in light of instrument state, never consumed blindly. The distinction between ``primary'' and ``derived'' market data carries no content here; what matters is that valuation prices cohere with the ledger's recorded lifecycle events, which C3 guarantees by making cash flow and state transition indivisible. The self-inconsistency conventional systems detect and repair is thus unreachable within the ledger's scope.
+
+The construction and provenance of the external quote feeding $P_t(u)$ --- its sourcing, snapshotting, and curve construction --- are the market-data satellite specification's concern, out of scope here; see the standalone market-data spec.
+
+\begin{remark}[FORMALIS clearance]
+The \lstinline|priceOf| listing is new code; FORMALIS reviewed and cleared it. Findings resolved: totality (the equations cover \lstinline|Cum| and both \lstinline|Ex| Boolean cases; \lstinline|Ex| carries the paid amount so the adjustment branch never wants a failable lookup); determinism (a pure function of \lstinline|(Distribution, Market)|, no effect, no ambient read); and illegal-state exclusion (a quote-only pricer is not expressible at this type, and ``ex with unknown amount'' is unrepresentable by the \lstinline|Ex Cash| fuse). The \lstinline|Quote|/\lstinline|Price|/\lstinline|Cash| separation reuses the already-cleared dimension discipline of the futures lifecycle section, where \lstinline|Price| deliberately carries no \lstinline|Monoid| instance so a price cannot be summed into a balance.
+\end{remark}

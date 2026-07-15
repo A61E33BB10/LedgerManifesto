@@ -1,0 +1,117 @@
+\section{Glossary}
+\label{sec:appE}
+\label{app:glossary}
+%==============================================================================
+
+Terms carry these meanings throughout. A defined term is used thereafter without
+re-explanation. Property identifiers $\mathrm{P}1$--$\mathrm{P}23$ and condition
+identifiers $\mathrm{C}1$--$\mathrm{C}12$ are stated where they are established and
+referenced by identifier elsewhere.
+
+\begin{description}[style=nextline]
+
+\item[Accumulated cost] Per-wallet signed sum $\sum_i(-\mathrm{qty}_i\times\mathrm{price}_i\times\mathrm{mult})$ over the trades of a futures position: negative net-long, positive net-short, zero when flat. A conserved field.
+
+\item[Atomic move] The indivisible primitive: transfer of a positive quantity of one unit from a source wallet to a destination---the edge presentation of a conserved flow (\S\ref{sec:ledger}).
+
+\item[CDM] ISDA Common Domain Model: a standardised, machine-executable model of financial products and lifecycle events.
+
+\item[Clone\_at($t$)] Reconstruction of ledger state as of historical time $t$ by replaying the move stream and the logged state changes up to $t$.
+
+\item[Conservation law] The total quantity of each unit across all wallets is zero at all times: $Q(u)=0$ (P1).
+
+\item[Conserved field] A \textbf{PositionState} field whose per-event-class deltas, $\sum_w\Delta f(w,u)=0$, sum to zero across wallets, established per handler with a vacuous zero-holder base case (C2, C9). Net quantity, accumulated cost, and variation margin are conserved fields.
+
+\item[Coordinate] A component of the position vector; a position type in the wallet model. Each coordinate passes the physical-action test: a distinct physical action modifies it and only it.
+
+\item[Dual valuation] Two price functions---mark-to-market and mark-to-model---over the same position set.
+
+\item[Encumbrance] Owned but not freely deployable: $\mathrm{encumb}=\mathrm{onloan}+\mathrm{coll\_post}$.
+
+\item[Event sourcing] All state is a projection of an append-only log of events (moves).
+
+\item[Forgetful mapping] The CDM-to-ledger map $F$, which preserves economic substance while forgetting business intent and workflow lineage.
+
+\item[Idempotency] Applying the same operation twice has no incremental effect beyond the first application.
+
+\item[Lifecycle event] A state transition on a unit (coupon, margin call, exercise, reset) expressed as a transaction.
+
+\item[Managed account] An internal book treated as a virtual portfolio with periodic cash settlement of accumulated PnL.
+
+\item[Monotone carrier] A state carrier whose accessor commutes with replay---meaning the value rebuilt from the first $k$ events, then advanced by the rest, equals the value rebuilt from all events. Replay is therefore a single fold with no order dependence (C1; discharges P8).
+
+\item[Move stream] The immutable, append-only log of all atomic moves: the canonical internal record.
+
+\item[Obligation] A recorded commitment to perform a move by a stated time. Discharged when a matching committed transaction appears; liveness is read by a total discharge predicate (\S\ref{sec:sec14}).
+
+\item[Option accessor] The position read $\mathrm{position}(w,u)$ returns an optional value: \emph{None} until the first event touches $(w,u)$, a value thereafter. No row is fabricated on read (C1).
+
+\item[Own] First coordinate of the position vector, $\vec{w}_e(u)[\mathrm{own}]$: economic ownership, maintained by buy/sell, determines PnL.
+
+\item[Ownership consistency] $\mathrm{avail}=\mathrm{own}-\mathrm{onloan}+\mathrm{borr}$ for lendable securities. A definitional identity under the six-coordinate model (P20).
+
+\item[PnL] Profit and loss, $V_{t_1}-V_{t_0}$: depends only on initial and final portfolio states (P10).
+
+\item[Position vector] $\vec{w}_e(u)\in\mathbb{R}^6$: $(\mathrm{own},\mathrm{onloan},\mathrm{borr},\mathrm{coll\_post},\mathrm{coll\_recv},\mathrm{coll\_rehyp})$. Available inventory $\mathrm{avail}=\mathrm{own}-\mathrm{onloan}+\mathrm{borr}$ is a projection computed on read. For non-lendable instruments the vector degenerates to a scalar (\S\ref{sec:sec16}).
+
+\item[PositionState] Per-$(\text{wallet},\text{unit})$ economic state: the third state home, holding conserved fields (accumulated cost, high-water mark, entry NAV). All per-$(w,\text{mandate})$ economic state lives here; no flat per-wallet scalars (C12). Read through the \textbf{Option accessor} (\S\ref{sec:sec04}).
+
+\item[PosQty] The position-side quantity carried in a \textbf{PositionState}, a type distinct from trade \textbf{Qty}, cash, and price so the four cannot be combined by mistake; converted only at the futures-lifecycle boundary (\S\ref{sec:sec08}).
+
+\item[ProductTerms] The first state home: a unit's contractual terms, immutable, versioned, and append-only---a non-empty list of term versions, written first at registration (C6, C7) and never mutated in place. Amendment is two-track (C8).
+
+\item[Property-based testing] Checking invariants against randomly generated inputs.
+
+\item[Purity] Lifecycle functions produce identical outputs for identical inputs, with no side effects (P9).
+
+\item[$Q(u)$] Total quantity of unit $u$ across all wallets, $Q(u)=\sum_{w\in\mathcal{W}}w_t(u)$. Zero by the conservation law, the framework being a closed double-entry system.
+
+\item[Real wallet] A wallet representing an actual portfolio position; changes affect PnL.
+
+\item[Reclassification] A move between wallets of the same entity with different position types (e.g.\ rehypothecation, $\mathrm{coll\_recv}\to\mathrm{coll\_rehyp}$).
+
+\item[Registration] Introduction of a unit, recorded as a move-less \textbf{Transaction} that writes the first \textbf{ProductTerms} version and the \textbf{UnitStatus} default together (C5, C7). Vacuously conserved, its move list being empty; re-registration of an existing identifier is a hard error (C10). It is the move-less instance of the one event type, not an operation standing outside it (\S\ref{sec:sec04}).
+
+\item[Self-consistency] Internally inconsistent states are structurally unreachable within the ledger's scope, not merely detectable.
+
+\item[Single-Coordinate Move Principle] An atomic move modifies exactly one coordinate of one unit in the position vectors of the entities it connects.
+
+\item[Smart contract] A deterministic program mapping inputs and state to sequences of atomic moves.
+
+\item[State-sufficiency] Portfolio value depends only on current balances and prices, not on transaction history.
+
+\item[Time travel] Reconstruction of the ledger at any historical date and re-execution of lifecycle logic; the read side of \textbf{Clone\_at}.
+
+\item[Transaction] The one atomic event recorded in the log: an ordered list of moves together with the state delta they carry---per-wallet bookkeeping (accumulated cost, high-water mark, entry NAV), shared \textbf{UnitStatus} writes, and either a \textbf{ProductTerms} introduction (registration) or an append (preserving amendment). Conservation holds by construction from the signed edge-sum of the moves; the empty move list is conserved for free, so a move-less event needs no check (P1). Applied whole or rejected whole through the single operation \texttt{applyTx} (P2, C3); there is no separate validation step and no unconserved transaction to reject.
+
+\item[Transfer] A move between wallets of different entities.
+
+\item[TRS] Total return swap: a contract converting virtual ledger performance into real cash flows.
+
+\item[Unit] Any tradable or bookable object: currency, security, derivative, contract.
+
+\item[UnitStatus] The second state home: one value per unit, shared---read identically by every holder. Its value changes over time, but UnitStatus is not a separate source of truth: the immutable event log is. Every change is caused by a logged event; the stored value is overwritten in place only as a read cache. Replaying the events up to any point rebuilds the exact value that held then, so nothing is lost by overwriting and there is no other way to change the value. A value exists from registration onward, product-declared defaults applied there (C5; \S\ref{sec:sec04}). It is the sole home of unit-level shared state.
+
+\item[Virtual ledger] A separate instance of the same framework in which every wallet is virtual, used for strategy simulation.
+
+\item[Virtual wallet] A wallet representing an external counterparty; exists to close the system for conservation.
+
+\end{description}
+
+\paragraph{The twelve conditions.}
+Each renders a class of illegal state unrepresentable; established in \S\ref{sec:sec04} (C7 and C10 in \S\ref{sec:unit-store}) and cross-referenced from the invariant hub (\S\ref{sec:sec15}).
+
+\begin{description}[style=nextline]
+\item[C1] Option accessor and monotone carrier, both.
+\item[C2] Handler-level conservation, per event class, with a vacuous base case.
+\item[C3] Atomic \textbf{Transaction} across the three state homes; partial application rejected.
+\item[C4] Capability-scoped reads; cross-$(w,u)$ overlay reads forbidden; strategy exports flow only through \textbf{UnitStatus}.
+\item[C5] \textbf{UnitStatus} registration-total; product-declared defaults applied at Unit Store registration.
+\item[C6] \textbf{ProductTerms} versioned, append-only; no in-place mutation.
+\item[C7] \textbf{ProductTerms} registration-total; first write at registration.
+\item[C8] Amendment two-track: a product-declared fungibility predicate decides \emph{Preserving} (append a term version) versus \emph{Breaking} (allocate a fresh unit, with \texttt{SupersededBy}).
+\item[C9] Handlers on zero-holder units discharge $\sum=0$ vacuously; the per-class proof obligation includes the empty case.
+\item[C10] Re-registration of a unit identifier is a hard error, never a silent reset.
+\item[C11] Each \textbf{PositionState} field is tagged with the canonical set of writers permitted to write it.
+\item[C12] All per-$(\text{wallet},\text{mandate})$ economic state lives in \textbf{PositionState}; no flat per-wallet scalars. Enforced by schema.
+\end{description}

@@ -1,0 +1,77 @@
+\section{Frequently Asked Questions}
+\label{sec:faq}
+%==============================================================================
+
+Each answer states its own content and points to the section that establishes the result.
+
+\subsection*{Q1: Are move-less lifecycle events valid, and must the executor accept them?}
+
+Yes. A lifecycle event may produce a state change with an empty move list. The transaction is recorded in the move stream as a state-change entry carrying the full CDM event payload. The audit trail and time travel are preserved. Conservation holds trivially: the empty sum is zero for every unit in every wallet.
+
+Such events are not optional records. A barrier knock-out on a product where the owner holds no position transitions the unit from \texttt{ACTIVE} to \texttt{TERMINATED} and emits no moves. Without the recorded state change, \texttt{clone\_at($t$)} for $t$ after the knock-out cannot distinguish ``terminated by barrier breach'' from ``active with zero holders''. The two states are economically distinct: the first carries zero contingent liability, the second a potentially large one. Under IFRS~9 the fair-value liability drops to zero on termination, not on payment. The state change records \emph{why} the liability disappeared.
+
+Further instances: out-of-the-money expiry whose position-closing move has zero economic effect, suspension and delisting events, and intraday futures trades that update unit state without cash moves (Section~\ref{sec:futures}). The futures lifecycle already establishes state-only transactions. The principle applies to all product types, and the executor must not reject them.
+
+\begin{remark}
+The state a lifecycle event changes is held in UnitStatus, a shared per-unit read cache of the event log (\S\ref{sec:states-unitstatus}). ``Move-less'' therefore names a transaction that overwrites this cache without altering any wallet balance.
+\end{remark}
+
+\subsection*{Q2: Does the Ledger guarantee Delivery-versus-Payment atomicity?}
+
+Internally, yes, by construction (Section~\ref{sec:settlement-dvp}). Conservation alone does not deliver DvP: a single-leg transfer balances quantities across wallets and is conservation-preserving. The guarantee is the conjunction of two properties. \textbf{Transaction atomicity}: the executor commits all moves of a transaction together or not at all (Definition~\ref{def:transaction}). \textbf{Contract correctness}: the trade contract emits both legs, cash and securities, in the same transaction (Section~\ref{sec:contracts}). External settlement atomicity is provided independently by the CSD (Section~\ref{sec:settlement-dvp}).
+
+\subsection*{Q3: How does the framework settle physical delivery under lot-size constraints?}
+
+By the lot-split construction of Section~\ref{sec:contracts}. The construction delivers as many whole lots as the exercised quantity contains and cash-settles what remains. One atomic transaction delivers the whole-lot quantity $N_{\text{deliver}} = L\lfloor N/L\rfloor$ against strike cash and cash-settles the residual at intrinsic value. The construction is property-testable for conservation, lot compliance ($N_{\text{deliver}} \bmod L = 0$), and economic equivalence (total value transferred equals the payoff for any lot split).
+
+Boundary cases follow from the formula. Exercise below one lot ($N<L$) delivers zero and cash-settles entirely. Exercise an exact multiple of $L$ leaves zero residual and no cash adjustment. Odd-lot markets set $L=1$, so the residual is always zero. DvP (Q2) applies at both Ledger and CSD level.
+
+\subsection*{Q4: Why is securities lending inside the Ledger rather than in a companion system?}
+
+Because a companion system reintroduces the TOCTOU race that enables double-lending. With it come four further failures: unprovable cross-boundary conservation, invisible collateral (breaking P13), a two-system exposure join, and a ``reserved'' bucket that discards load-bearing information. The full argument is in Section~\ref{sec:sbl-contract}.
+
+\subsection*{Q5: Why is \texttt{own} a stored coordinate while \texttt{avail} is a projection?}
+
+One coordinate records a physical fact; the other is arithmetic over recorded facts. $\mathrm{own}$ passes the physical-action test and is not derivable from the five operational coordinates. $\mathrm{avail}$ fails the test and is fixed by the identity $\mathrm{avail} = \mathrm{own} - \mathrm{onloan} + \mathrm{borr}$, so storing it would be a cache, not a fact (Section~\ref{sec:position-vector}).
+
+\subsection*{Q6: Is a scalar balance sufficient for cash, including cash collateral in securities lending?}
+
+Yes. A cash position is one number. For any cash unit, the six-coordinate position vector of Section~\ref{sec:position-vector} degenerates to $(q,0,0,0,0,0)$: the scalar $q$ (\S\ref{sec:degeneration}). Cash is not a lendable security: ownership and possession never diverge, so the lending-specific coordinates ($\mathrm{onloan}$, $\mathrm{borr}$, $\mathrm{coll\_post}$, $\mathrm{coll\_rehyp}$) are never populated for cash. Only $\mathrm{own}$ and $\mathrm{coll\_recv}$ are engaged, and $\mathrm{coll\_recv}$ is itself scalar per cash unit. Receipt, reinvestment, and return of cash collateral are ordinary atomic moves over these two coordinates; the return obligation is held in the SBL loan unit state (Sections~\ref{sec:sbl-title-transfer} and~\ref{sec:sbl-reinvestment}; Appendix~\ref{app:us-sbl-example}). The rehypothecation cap (140\,\% of customer debit balance, US Rule~15c3-3, P19) constrains \emph{securities} rehypothecation, not cash reinvestment.
+
+The scalar cash balance, the scalar $\mathrm{coll\_recv}$ coordinate, and the SBL loan unit state jointly represent all cash-collateral operations under both GMSLA~2010 title transfer and US Rule~15c3-3 / MSLA pledge. No extension to the cash model is required.
+
+\subsection*{Q7: What does the Ledger require of market-data providers, and who tracks corporate actions?}
+
+The Ledger does. Everything at this boundary is one contract, the market-data
+contract (\S\ref{sec:basis-contract}). Its parts answer the five forms the
+question takes.
+
+\emph{Minimum requirements}. A provider owes a value, an observation time, a
+signed source id, and a resolvable unit reference --- nothing more (obligation
+O1). In particular it owes no corporate-action awareness (O3): a pre-adjusting
+source and a lagging source are both representable.
+
+\emph{How incoming data are reconciled with internal state}. The datum does not
+say whether it reflects a corporate action. The ledger attaches a basis stamp
+at the ingest door. The stamp is computed from the read-only basis projection
+and the source basis convention on file for the (unit, source) pair (O2/O4). A datum
+whose basis cannot be determined is quarantined, never guessed (O5).
+
+\emph{Scope beyond dividends}. One table covers spot and quotes; implied-vol
+observations; index levels, compositions, weights, and divisors; fixings and
+benchmarks; and derived curves. For implied-vol observations, the
+basis-sensitivity of their coordinates is declared data; no vol model enters.
+
+\emph{Direction of flow}. Exactly two arrows: the projection out, stamped
+observations in. The market-data layer never writes ledger state.
+
+\emph{Operating modes}. Real-time, end-of-day batch, and multi-vendor feeds face
+the same door. The stamp is a pure function of pinned recorded data, so mode
+cannot enter the result. No corporate-action logic exists outside the Ledger:
+the projection is arithmetic-free, and adjustment arrows are declared once, in
+the log.
+
+The one-step pedagogical case, a quote lagging one ex-dividend boundary, is
+Appendix~\ref{app:pricing-coordination}.
+
+\clearpage

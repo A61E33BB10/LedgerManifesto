@@ -1,0 +1,200 @@
+\section{Lifecycle Management}
+\label{sec:sec07}
+\label{sec:lifecycle}
+
+A lifecycle event is a transaction. A coupon payment, a dividend, a margin call, a barrier hit, an exercise, a reset, and a rebalancing step are each a contractual obligation becoming due, realised as value moving between wallets together with a change of contract state. From the ledger's perspective executing a trade and processing a lifecycle event are the same operation: a finite list of atomic moves, possibly accompanied by unit registrations and state changes, obeying conservation. There is no separate lifecycle engine, data format, or pipeline per product type; every product type uses the move and the state transition.
+
+This identity has four consequences.
+
+\begin{enumerate}[nosep]
+\item \textbf{Uniformity.} Trade execution, coupon payments, margin flows, conversions, and rebalancing are one primitive---a transaction carrying moves and optional state updates.
+\item \textbf{Conservation.} Every transaction satisfies the conservation law of \S\ref{sec:ledger}; lifecycle events preserve closed-system integrity by construction.
+\item \textbf{Auditability.} The evidence of a lifecycle event is the transaction: dated moves with origin and metadata, plus explicit state changes.
+\item \textbf{Composability.} Lifecycle events sequence and simulate exactly as trades do. ``Execute a trade, process a coupon, settle a margin call'' is three transactions applied in order, each conserving.
+\end{enumerate}
+
+\subsection{The Transition Function}
+
+A lifecycle event is computed from the present, not from history. It reads the unit, that unit's current state, and the observed market data, and returns the moves to make together with the next state. It commits nothing.
+
+A lifecycle event is a pure function
+
+\[
+f : (\text{unit},\ \text{state}_t(u),\ \text{market\_data}) \;\to\; (\text{moves},\ \text{state}').
+\]
+
+It mutates nothing, reads no hidden global, and returns a description: a list of wallet-to-wallet moves and the next state. The function is local to the unit and the event---it requires no knowledge of other units, wallets, or pending events. \texttt{applyTx} commits its output atomically.
+
+Lifecycle is therefore state-transition logic plus a collection of moves, defined without assuming a pricing model exists. This generality is required: the ledger carries convertible bonds, margin loans with bespoke collateral rules, and rule-based strategies whose economics live in state transitions rather than closed-form prices. Each is handled at the lifecycle level on the same footing as a plain-vanilla instrument, because the framework demands only the transition function above.
+
+\noindent In code $f$ is \texttt{handle}: it reads the ledger (which supplies $\text{state}_t(u)$), takes the event (which carries the unit and any market datum), and returns the proposal as a \texttt{Transaction}---the moves and the state delta they ride with---never a changed ledger.
+
+\begin{lstlisting}[language=Haskell]
+-- A lifecycle event is a pure function of the current state: it reads and
+-- proposes, it commits nothing. The proposal is a Transaction (sec.4) -- the one
+-- atomic event: the moves plus the non-balance state delta they ride with -- not
+-- a changed Ledger.
+handle :: Event -> Ledger -> Either LedgerError Transaction
+
+-- The concrete Event type is given per product family: the three-home model
+-- (sec.4) and the futures lifecycle (sec.8). The Transaction it builds carries
+--   * txMoves : the conserved flow in edge form, each leg debiting one wallet and
+--               crediting another by the same magnitude, so the signed per-unit
+--               sum is mempty BY CONSTRUCTION (conservation, C2/C9);
+--   * the state delta : the status / stage writes the event causes (txStatus,
+--               txRows, txIntroduce, txAppend).
+-- Market data enters only inside the Event, as a logged observation (e.g. a
+-- settlement price), so handle stays pure -- a fresh replay reproduces the same
+-- moves bit for bit.
+\end{lstlisting}
+
+\subsection{Idempotence}
+
+A lifecycle event that has already taken effect does nothing when applied again: the second application reads a state that already records the first, so it proposes no moves and no change of state.
+
+\begin{principle}[Idempotence]
+\label{prin:idempotence}
+Applying the same lifecycle event twice to the same state has no additional economic effect.
+\end{principle}
+
+Idempotence holds because moves are derived from $(\text{state}_t(u),\ \text{event})$, not from history. The state records which events have occurred; if it already shows the coupon at date $T$ paid, $f$ produces no moves and no state change. Paying a coupon twice at the same date pays it once.
+
+\input{drafts/fig_lifecycle}
+
+\subsection{The Single Door}
+
+One function changes the ledger; nothing else does. A lifecycle function only proposes a transaction, and that proposal becomes part of the ledger only when this one function commits it.
+
+\begin{principle}[Single door]
+\label{prin:executor}
+\texttt{applyTx} is the only function permitted to change the ledger.
+\end{principle}
+
+The Transaction returned by a lifecycle function is a proposal; it takes effect only when \texttt{applyTx} commits it. Conservation is not checked at this boundary---it is a property of the Transaction type, since the signed edge-sum of the moves is \texttt{mempty} by construction (\S\ref{sec:ledger}, C2/C9), so there is no unconserved Transaction to reject. \texttt{applyTx} requires that the unit be registered, inserts or updates rows and never deletes one, and commits the whole Transaction atomically to the immutable event log of \S\ref{sec:ledger}. Product guards---sufficient source balance, stage legality---live in \texttt{handle}, which builds the proposal.
+
+Confining mutation to one door has three consequences. Conservation holds in exactly one place, the Transaction type, so a defective contract cannot corrupt the ledger: there is no unconserved proposal for \texttt{applyTx} to admit, and a balance moves only via a conserving \texttt{Move}. Lifecycle functions stay pure---they compute a proposal and cannot alter state, so they are testable, composable, and replaceable. The audit trail is complete: every state change passes through \texttt{applyTx} and is logged. The attack surface for state corruption is bounded to this single door, whose properties P1--P10 are stated and tested in \S\ref{sec:invariants}. The role is that of an operating-system kernel: all privileged operations pass through one narrow, auditable interface.
+
+\begin{lstlisting}[language=Haskell]
+-- handle PROPOSES a Transaction and commits nothing; applyTx (sec.4) is the SOLE
+-- door that returns a changed Ledger. The step stops at the first error (the bind):
+step :: Event -> Ledger -> Either LedgerError Ledger
+step ev l = handle ev l >>= \tx -> applyTx tx l
+
+-- There is no separate validate gate. Conservation is a property of
+-- the Transaction type -- the signed edge-sum of txMoves is mempty BY CONSTRUCTION
+-- (C2/C9) -- so an unconserved move is unrepresentable, not rejected at run time.
+-- applyTx (sec.4) is the single mutation boundary: it requires the unit be
+-- registered, inserts/updates rows and NEVER deletes one (monotone carrier, C1),
+-- and returns the whole new Ledger or a Left, never a partial state (atomicity,
+-- C3). Product guards -- sufficient source balance, stage legality -- live in
+-- handle (sec.8, G1-G5).
+--   applyTx :: Transaction -> Ledger -> Either LedgerError Ledger   -- sec.4
+
+-- Time travel is this same step FOLDED over the event stream (foldM threads the
+-- ledger, stopping at the first error); equivalently, once the proposals are
+-- built, it is foldM applyTx over the transactions (sec.4). Replaying to any t
+-- rebuilds the exact ledger as of t -- this is clone_at t.
+replay :: [Event] -> Ledger -> Either LedgerError Ledger
+replay evs l0 = foldM (flip step) l0 evs
+\end{lstlisting}
+
+\noindent Replay is a \emph{fold homomorphism}---meaning replaying two event batches joined, \texttt{replay (xs <> ys)}, equals replaying each in turn, \texttt{replay xs >=> replay ys}, where \texttt{f >=> g} runs \texttt{f}, feeds its result to \texttt{g}, and stops at the first error. The reconstructed ledger is therefore independent of where a checkpoint is cut: checkpoint-independence (\S\ref{sec:invariants}, P8) is a consequence of the law, not a separate test.
+
+\noindent The event log is therefore canonical. Every state change passes through the single door and is logged, and replay rebuilds any state from those events alone. Any ledger, current or historical, is reproducible by replaying its log; the projections of \S\ref{sec:sec04}, \texttt{UnitStatus} among them, are rebuilt this way.
+
+\begin{remark}[Replay law (optional)]
+\emph{Plain reading.} The ledger state is fixed by the sequence of events alone. Applying events A then B then C gives the same state whether or not you checkpoint after B---order matters, where you cut does not.
+
+\emph{Optional lens.} \texttt{replay = foldM applyTx} is a monoid homomorphism from the free monoid of events (\texttt{[Transaction]}, \texttt{<>}, \texttt{[]}) into the monoid of state-transitions---the endo-Kleisli arrows \texttt{Ledger -> Either LedgerError Ledger} under \texttt{(>=>)} with identity \texttt{Right}---so \texttt{replay (xs <> ys) = replay xs >=> replay ys} holds exactly; checkpoint-independence is a consequence of this law, and functional determinism follows from \texttt{applyTx} being pure and total.
+\end{remark}
+
+\subsection{Purity}
+
+\begin{principle}[Purity]
+\label{prin:purity}
+For fixed inputs---view, parameters, market data---a lifecycle function produces identical outputs, independent of when or where it runs.
+\end{principle}
+
+Purity is a design requirement, not a coding convention. A lifecycle function has no hidden dependency: no runtime database lookup, no configuration read, no ambient state. Every input affecting the output is passed explicitly.
+
+Purity alone does not give reproducibility; reproducibility also requires a deterministic market-data oracle---a fixed specification of price source, snapshot time, and fallback chain. The market data used by each invocation is captured and stored at execution time as a versioned snapshot. Replays read the stored snapshot, not a live feed. Vendor corrections are separate data versions: a replay ``as known at $t$'' uses the snapshot from $t$; a replay ``with corrected data'' uses the restated snapshot. Each is deterministic given its inputs. Market data is governed by the valuation and market-data satellite specifications; this section depends only on the determinism the oracle provides.
+
+Purity reduces testing to three mechanical forms. Unit tests assert ``given view and inputs, expect these moves and state changes.'' Property tests, such as idempotence (Principle~\ref{prin:idempotence}), run the same function repeatedly on cloned views. Regression tests construct the appropriate historical view and feed the stored snapshot.
+
+\subsection{Time Travel}
+
+Time travel reconstructs exact ledger state at any historical timestamp $t$: not merely today's totals replayed, but what each position was, what it referenced, and how its value evolved. Four situations make this non-trivial; any implementation must reconstruct each.
+
+\begin{enumerate}
+\item \textbf{Futures and margin PnL.} The margining story is reconstructed step by step: the sequence of variation-margin calls and the prices at which each was computed, not only the final cash total.
+\item \textbf{Corporate actions and share denominators.} A 2-for-1 split turns 100 pre-split shares at a pre-split price into 200 post-split shares at roughly half the price; economic value is preserved but the unit changes. Replaying trade tickets into a current share definition mis-describes the $t_0$ position. Correct time travel reconstructs both views and explains the jump as a corporate action, not a reference-table edit.
+\item \textbf{Exercise and novation.} On exercise the derivative is replaced by a cash or physical position; on novation the original contract is extinguished and a new one created with a different counterparty. The reconstruction must show why the derivative is present at $t_0$ and absent at $t_1$, not only the cash that moved.
+\item \textbf{Basket composition changes.} A basket of 40\% A, 30\% B, 30\% C is redefined when B is acquired, substituting the acquirer D at a merger-dictated ratio. Time travel before the change shows the original basket; after, the updated basket with the conversion explained. A basket read from today's static file cannot distinguish the two.
+\end{enumerate}
+
+These are routine features of real portfolios. Unit state makes their reconstruction possible: each event---split, exercise, novation, redefinition---is recorded as an explicit state change on the relevant unit, so a view cloned at any historical date carries the correct state, and re-applying $f$ to that state with the stored market data reproduces exactly the moves generated then. Without explicit unit state, time travel is limited to balance replay---enough for cash totals, insufficient to explain what the portfolio meant.
+
+\paragraph{Cloning.} Two operations realise reconstruction.
+
+\begin{itemize}[nosep]
+\item \textbf{clone()} deep-copies the current view---units, states, and moves to the current time---for simulation or testing without affecting the original.
+\item \textbf{clone\_at($t$)} replays the move stream and all state changes up to $t$ and returns the ledger as of $t$; later moves are ignored.
+\end{itemize}
+
+\noindent Any lifecycle function re-run against a clone reproduces the same pending transaction given the same market data. Backtesting and scenario analysis reduce to: take a historical state, apply $f$, inspect the moves and state deltas. Time travel is a design property, not a debugging aid: any state is reachable again by replaying the same transactions, and any lifecycle logic re-applied yields identical outcomes (\S\ref{sec:invariants}, P8).
+
+\subsection{State Storage and Embedded Defence}
+
+Unit state is not stored as a private dictionary on the unit. It lives in the three-home state model of \S\ref{sec:sec04}, where the per-unit lifecycle projection is \texttt{UnitStatus}.
+
+\begin{remark}
+\texttt{UnitStatus} holds one value per unit, shared---read identically by every holder. Its value changes over time, but \texttt{UnitStatus} is not a separate source of truth: the immutable event log is. Every change is caused by a logged event; the stored value is overwritten in place only as a read cache. Replaying the events up to any point rebuilds the exact value that held then, so nothing is lost by overwriting and there is no other way to change the value. A value exists from registration onward.
+\end{remark}
+
+\noindent A lifecycle function never writes \texttt{UnitStatus} off-log; it returns a Transaction, \texttt{applyTx} logs the event, and the projection is rebuilt from the log. This is why time travel is exact: \texttt{clone\_at($t$)} rebuilds the projection from the events up to $t$.
+
+Attaching every lifecycle state change to the unit gives an embedded explanation layer. For any instrument $u$, its current state $\text{state}_t(u)$ and recorded changes reconstruct its lifecycle history---coupons paid, dividends accrued, barriers triggered, margin calls made. Three consequences follow.
+
+\begin{enumerate}[nosep]
+\item \textbf{Valuation justification.} Current valuation is explained directly from the state---remaining cash flows, exercised versus unexercised rights, triggered versus untriggered features---without chasing flags across systems.
+\item \textbf{Client notification.} Coupon advices and margin-call letters are generated mechanically from the state-change stream, since every economically relevant event is an explicit transition.
+\item \textbf{Traceability.} Any amount or flag in the current state traces back to the exact transaction that created it.
+\end{enumerate}
+
+\subsection{Lifecycle Risk Profile}
+\label{sec:risk-profile}
+
+Every lifecycle function category is either a pure function or a deterministic projection; \texttt{applyTx} is the sole mutation point, and no function bypasses it. The table maps each category to its purity guarantee and its property-test coverage (\S\ref{sec:invariants}).
+
+\begin{center}
+\begin{longtable}{p{3.2cm} p{4cm} p{2.8cm} p{3.5cm}}
+\toprule
+\textbf{Function Category} & \textbf{Description} & \textbf{Purity Guarantee} & \textbf{Property Test Coverage} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Function Category} & \textbf{Description} & \textbf{Purity Guarantee} & \textbf{Property Test Coverage} \\
+\midrule
+\endhead
+Contract evaluation & Maps (input, state, conditions) to moves & Pure (\S\ref{sec:contracts}) & P1 (conservation); totality (no unhandled error) \\
+\midrule
+State transition & Maps (unit, state, event) to (moves, new state) & Pure (Principle~\ref{prin:purity}) & P5, P6 (idempotency); valid transitions \\
+\midrule
+Transaction commit (\texttt{applyTx}) & Sole door: registration check, monotone atomic commit & Deterministic; sole mutator & P1 (conservation by construction), P2 (atomic commitment) \\
+\midrule
+View / snapshot & Read-only ledger accessor & Pure (read-only) & P8 (snapshot / time-travel consistency) \\
+\midrule
+PnL projection & $V_t = \sum w_t(u) \cdot P_t(u)$ & Pure (derived from state + prices) & P10 (path-independence) \\
+\midrule
+Balance computation & $w_t(u)$ from move-stream replay & Pure (projection of log) & P1 (conservation), P3 (referential integrity) \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Strategy as Unit: QIS and Leveraged ETFs}
+
+A quantitative investment strategy or leveraged ETF is itself a unit. Its state carries the last rebalance timestamp, the current weights or holdings, configuration (target leverage, rebalancing frequency, reset rules), and path-dependent flags (triggered barriers, suspension status). This is strategy-as-unit; the collapse of its holdings sector is governed by condition C12 (\S\ref{sec:sec04}).
+
+The lifecycle function computes, at each rebalance or leverage reset, the trades required to hold the target allocation---moves between the strategy wallet and market wallets---and an updated state recording new weights, reference level, and performance lock-in. Subscriptions and redemptions are lifecycle events: a subscription creates units, triggers the underlying rebalance, and updates composition and leverage; a redemption destroys units and unwinds correspondingly.
+
+Time travel follows the general rule. A view cloned at $t$ reconstructs the strategy unit's state and all past rebalances; re-applying the rebalance logic with the stored market data reproduces the same transactions. Client-level exposure, leverage, and performance at $t$ are explained directly from the reconstructed state and its moves.

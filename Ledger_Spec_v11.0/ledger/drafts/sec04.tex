@@ -1,0 +1,802 @@
+\section{Where Unit State Lives: The Three-Home State Model}
+\label{sec:sec04}
+\label{sec:states}
+
+Unit state lives in three homes, one map each: immutable \emph{ProductTerms}$[u]$
+keyed by unit; shared \emph{UnitStatus}$[u]$ keyed by unit; and per-position
+\emph{PositionState}$[w,u]$ keyed by (wallet, unit). There is no wallet-keyed state
+sector: every per-wallet economic fact is keyed by a mandate or strategy unit and so
+lives in \emph{PositionState}$[w,u_{\mathrm{MA}}]$. Each economic fact has exactly one
+home and one writer, so internal reconciliation failure cannot arise; conservation and
+deterministic replay then hold by construction, through the sealed single-writer
+discipline and the purity and totality of replay. This placement is the minimum basis of
+the problem (\S\ref{sec:sec04-three}) and unique under any correctness gate
+(\S\ref{sec:sec04-pareto}).
+
+A \emph{unit} is anything held and conserved (\S\ref{sec:ledger}): an instrument, and
+also a mandate or a strategy contract (\S\ref{sec:sec04-three}). The framework
+primitives --- wallet, unit, holding $h(w,u)$, move, transaction, conservation
+$\sum_{w}h(w,u)=0$ --- are those of \S\ref{sec:ledger}.
+
+\subsection{The placement rule and the 2\texorpdfstring{$\times$}{x}2}
+\label{sec:sec04-rule}
+
+One rule governs every placement: each economic fact has exactly one home and one
+writer. A fact violates it in exactly two ways. \emph{Keyed wrong}: one home collapses
+two facts, or one fact duplicates across homes that drift. \emph{Authored wrong}: two
+authorities keep one fact and their records drift apart. Two questions forestall the two
+failures, and because there are only two failures there is no third question.
+
+\emph{Does the fact depend on the holder, or only on the unit?} The scope is one unit's
+state, so a unit and a holder of it are the only terms in view. Every economic fact ---
+one entering conservation, valuation, or profit and loss --- is then a (holder, unit)
+fact or a unit fact. What stays keyed by the wallet alone --- KYC, permissions, an audit
+cursor --- enters none of these three reckonings; it is identity, not economic state, and
+lives in a \emph{WalletRegistry} that carries no quantity and joins no conservation law.
+
+\emph{Is the fact's record owned by an outside authority or by the ledger?} The criterion
+is who owns the record's history, not who sources the number. An externally authored fact
+is one an outside authority --- the exchange, the contract, the reference-data provider
+--- owns and restates, and the ledger preserves version by version. A ledger-authored
+fact is one the ledger's own events produce and overwrite. A benchmark level the ledger
+records and overwrites is ledger-authored; the benchmark identity the provider restates is
+the authority's versioned record --- the two sort apart though both come from that
+provider.
+
+The two questions give a $2\times2$; three of its four cells are occupied, and each
+occupied cell is one home.
+
+\begin{center}
+\begin{tabular}{@{}r p{0.36\textwidth} p{0.36\textwidth}@{}}
+\toprule
+ & \textbf{ledger-authored} & \textbf{externally authored} \\
+\midrule
+\textbf{per unit} & \textbf{Status}: lifecycle stage, last settlement price, current
+weights, benchmark level & \textbf{Terms}: multiplier, currency, expiry, strike, ISIN,
+fee schedule, mandate text, benchmark identity \\
+\addlinespace
+\textbf{per (holder, unit)} & \textbf{Position}: held quantity, accumulated cost,
+high-water mark, entry NAV & \textit{--- empty ---} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Terms and status share the unit key but cannot be one value, since their authorities of
+record differ (\S\ref{sec:sec04-three}); they ride together on the unit key as a
+co-present pair --- two homes whose mutation disciplines differ, each kept in its own map
+(\S\ref{sec:sec04-construction}).
+
+\subsection{Why three homes, and why the fourth cell is empty}
+\label{sec:sec04-three}
+
+Each occupied cell exists for one reason; the empty cell is empty for one; and exactly
+three maps are forced, no fewer and no more.
+
+\emph{Position is keyed by (holder, unit), because two holders of one contract hold
+different state.} A buyer and a seller hold the same future; the buyer's quantity is
+$+1000$, the seller's $-1000$, and their accumulated costs differ. Substituting one
+holder's position for the other's changes the value, so any unit-only keying identifies the
+two and loses the difference. The holder is in the key.
+
+\emph{Status is keyed by the unit alone, because one value is read identically by every
+holder.} A future settles at one price on the day; an index stands at one level. Stored
+per holder, the number is copied across thousands of rows free to drift --- a
+reconciliation break by construction. Keyed by the unit, it is one value with one writer.
+
+\emph{Terms are a home distinct from status, because the two have different authorities of
+record.} Terms are externally authored, status ledger-authored. Co-mingling the
+authority's record with the ledger's own is the single-source-of-truth violation the
+system exists to prevent. Terms are append-only and versioned for reconstruction; the
+status cache is overwritten on every settlement while the settling event is appended
+immutably to the log (\S\ref{sec:sec04-unitstatus}). Merging the two would put two
+mutation disciplines under one name.
+
+\emph{The fourth cell is empty, because no authority issues a fact about one holder's
+position.} A position is the ledger's own from origin: held quantity folded from the move
+stream, high-water mark and entry NAV written by ledger events. A custodian statement or
+prime-broker position report is a reconciliation input the ledger checks against, not a
+record it adopts as an authority's own. So the (holder, unit) key carries only
+ledger-authored facts, and the externally authored cell is empty by construction.
+
+\paragraph{The $W$-sector collapses (C12).}
+A wallet-keyed economic-state map --- call it the \emph{$W$-sector},
+$\mathrm{Map}[\mathrm{WalletId},\mathrm{WalletState}]$ --- is the apparent demand of the
+managed account, whose state is the client's, not the instrument's. It does not exist,
+because the mandate is a unit. The manager issues a mandate unit $u_{\mathrm{MA}}$ to the
+client (\S\ref{sec:managed}), conserving like any issued unit:
+\[
+h(w_{\mathrm{manager}},u_{\mathrm{MA}})=-1,\qquad
+h(w_{\mathrm{client}},u_{\mathrm{MA}})=+1,\qquad
+\sum_{w}h(w,u_{\mathrm{MA}})=0 .
+\]
+Every field that looked per-wallet --- high-water-mark value, accrued management and
+performance fee, mandate breach flags, benchmark NAV at this wallet's inception --- is then
+a fact about the position $(w_{\mathrm{client}},u_{\mathrm{MA}})$ and lives in
+\emph{PositionState}. Two mandates on one wallet are two rows, each with its own
+high-water mark and fees; a wallet-keyed scalar would have merged them. This is why
+\hyperref[cond:C12]{C12} keys on the mandate unit, not the wallet. A relationship spanning
+several instruments that does \emph{not} reduce to a single (holder, unit) row would be a
+(holder, several-units) fact occupying a fourth home and a third map; the count excludes
+it, and it lies outside this scope.
+
+\subsection{The UnitStatus discipline, stated once}
+\label{sec:sec04-unitstatus}
+
+UnitStatus holds one value per unit, shared---read identically by every holder. Its
+value changes over time, but UnitStatus is not a separate source of truth: the immutable
+event log is. Every change is caused by a logged event; the stored value is overwritten in
+place only as a read cache. Replaying the events up to any point rebuilds the exact value
+that held then, so nothing is lost by overwriting and there is no other way to change the
+value. A value exists from registration onward.
+
+Equivalently, the stored value always equals what replaying the unit's events produces ---
+the catamorphism property, meaning the fold of the event stream always rebuilds the exact
+cached value --- and no part of the system writes it except through a logged event. In the
+reference (\S\ref{sec:sec04-reference}) this holds by construction: every
+\emph{UnitStatus} field is written only by \texttt{applyStatus}, folded over the unit's
+status writes inside the sole transition \texttt{applyTx} (and \texttt{register}, which is
+\texttt{applyTx} of a move-less introduction); the
+\texttt{Ledger} constructor is unexported, so no out-of-band \texttt{setStatus} exists.
+Externally sourced inputs --- a settlement price, the current benchmark level --- enter
+only as a logged observation event, so the fold stays pure at the boundary. Every later
+reference to cached unit state in this specification is read in this sense.
+
+\subsection{The construction}
+\label{sec:sec04-construction}
+
+The homes are built from the smallest pieces, each forced by the one before, and the
+disciplines C1--C12 (\S\ref{sec:sec04-conditions}) are introduced where the construction
+forces them. Quantities are exact integer minor units, never floating point, so
+determinism and conservation are arithmetic facts.
+
+\paragraph{Scalars and keys.}
+A balance is a quantity with a zero, associative addition, and a negation --- an abelian
+group. The negation forces the two legs of a transfer to cancel; the zero makes the
+sum over no wallets conserved with no special case, which discharges the vacuous base of
+conservation (\hyperref[cond:C9]{C9}). A price is a number but not a quantity --- prices
+are never summed --- so it is a separate type with neither identity nor inverse. A balance
+is named by two keys, wallet and unit, the holder in the key.
+
+\begin{lstlisting}[language=Haskell]
+{-# LANGUAGE GADTs, DataKinds, KindSignatures, StandaloneDeriving #-}
+import           Control.Monad      (foldM)
+import           Data.List          (foldl')
+import           Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
+import           Data.Map.Strict    (Map)
+import qualified Data.Map.Strict    as Map
+
+newtype Qty = Qty Integer deriving (Eq, Ord)        -- exact minor units, never Float
+instance Show Qty      where show (Qty n) = show n
+instance Semigroup Qty where Qty a <> Qty b = Qty (a + b)
+instance Monoid    Qty where mempty = Qty 0          -- the zero discharges the vacuous base (C9)
+
+qneg :: Qty -> Qty                                   -- group inverse: a transfer's legs cancel
+qneg (Qty n) = Qty (negate n)
+qmax :: Qty -> Qty -> Qty
+qmax (Qty a) (Qty b) = Qty (max a b)
+
+newtype WalletId = WalletId String deriving (Eq, Ord, Show)
+newtype UnitId   = UnitId   String deriving (Eq, Ord, Show)
+\end{lstlisting}
+
+\paragraph{ProductTerms --- the authority's record, grown only by appending (C6, C7).}
+``One or more versions, append-only'' is a non-empty list, so a registered unit always has
+a current version and ``registered but versionless'' is not representable. The type is
+abstract: its constructor is unexported, so no importer can lay down a fresh one-version
+value and discard history. The only growth operations are \texttt{register}, which writes
+version one, and \texttt{appendVersion}, which appends; no setter exists, so the
+append-only discipline holds by absence, not by convention (\hyperref[cond:C6]{C6}). The
+first version is written at registration, so terms are total on the registered units
+(\hyperref[cond:C7]{C7}).
+
+\begin{lstlisting}[language=Haskell]
+data TermsVersion = TermsVersion
+  { tvLabel :: String, tvFields :: Map String String }  -- opaque payload: multiplier, ISIN, ...
+  deriving (Eq, Show)
+
+newtype ProductTerms = ProductTerms (NonEmpty TermsVersion) deriving (Show)
+  -- exported ABSTRACT: no data constructor, no setter -> append-only holds by absence (C6)
+
+currentTerms :: ProductTerms -> TermsVersion           -- total: NonEmpty always has a last
+currentTerms (ProductTerms vs) = NE.last vs
+allVersions  :: ProductTerms -> NonEmpty TermsVersion
+allVersions  (ProductTerms vs) = vs
+appendVersion :: TermsVersion -> ProductTerms -> ProductTerms   -- C6: append, never rewrite
+appendVersion tv (ProductTerms vs) = ProductTerms (vs <> (tv :| []))
+
+productTerms :: Ledger -> UnitId -> Maybe ProductTerms  -- Nothing = unregistered
+productTerms l u = Map.lookup u (ledgerPT l)
+\end{lstlisting}
+
+\paragraph{UnitStatus --- the shared read cache (C5).}
+Status records the unit's lifecycle stage together with its last settlement price and any
+successor, under the discipline of \S\ref{sec:sec04-unitstatus}. The lifecycle is a closed
+sum, \texttt{Registered}$\to$\texttt{Active}$\to$\texttt{Expired}$\to$\texttt{Closed};
+\texttt{Registered} is the at-registration stage --- a unit recorded in and known to the
+ledger before any settlement, which an OTC option, a bespoke mandate, or an internal
+strategy reaches exactly as an exchange instrument does.
+Every \emph{UnitStatus} field changes only through a \texttt{StatusWrite} --- the closed
+writer set whose three constructors each name one field --- applied by the single total
+writer \texttt{applyStatus}, the projection step of \S\ref{sec:sec04-unitstatus}; no other
+code overwrites a status field, so each write is last-write-wins and idempotent (P6).
+Product-declared defaults are written at Unit Store registration (\S\ref{sec:unit-store}),
+so status is total on the registered units (\hyperref[cond:C5]{C5}).
+
+\begin{lstlisting}[language=Haskell]
+data Lifecycle = Registered | Active | Expired | Closed deriving (Eq, Show)
+
+data UnitStatus = UnitStatus
+  { usLifecycle    :: Lifecycle
+  , usLastSettle   :: Maybe Qty       -- None at the registration default (C5)
+  , usSupersededBy :: Maybe UnitId    -- set only by a Breaking amendment (C8)
+  } deriving (Eq, Show)
+
+defaultStatus :: UnitStatus           -- C5: product-declared default, written at registration
+defaultStatus = UnitStatus Registered Nothing Nothing
+
+data StatusWrite                      -- the closed status-writer set; each names ONE field
+  = SetLifecycle    Lifecycle         -- a lifecycle event
+  | SetLastSettle   Qty               -- a settle event (a logged observation)
+  | SetSupersededBy UnitId            -- a Breaking amendment (C8)
+  deriving (Eq, Show)
+
+applyStatus :: StatusWrite -> UnitStatus -> UnitStatus   -- the ONLY writer of a status field;
+applyStatus (SetLifecycle l)    s = s { usLifecycle    = l }      -- total, last-write-wins,
+applyStatus (SetLastSettle q)   s = s { usLastSettle   = Just q } -- idempotent (P6)
+applyStatus (SetSupersededBy u) s = s { usSupersededBy = Just u }
+
+unitStatus :: Ledger -> UnitId -> Maybe UnitStatus       -- Nothing = unregistered
+unitStatus l u = Map.lookup u (ledgerUS l)
+\end{lstlisting}
+
+\paragraph{PositionState --- the per-position home (C1).}
+A position carries more than a balance: its primary field is the held quantity, which
+conserves; beside it ride non-conserved per-(holder, unit) facts --- a high-water mark, an
+entry NAV --- witnessing that the Position home carries facts no zero-sum law binds. A
+first touch starts a position at $0_P$, the all-zero state. Two orthogonal disciplines
+govern the home (\hyperref[cond:C1]{C1}): \emph{(a)} the accessor returns
+$\mathrm{Option}$, so $\mathrm{None}$ (never held) and $\mathrm{Some}(0_P)$ (held, now
+flat) stay distinct --- variation-margin settlement, wash-sale lookback, and record-date
+entitlement each act on the difference; \emph{(b)} the carrier is monotone --- a row, once
+created, is never removed, and close-out leaves it flat. The two are independent: (a)
+constrains the return type, (b) the domain. The monotone carrier keeps the key set stable
+across any checkpoint cut, which is what makes replay a literal fold (P8). The
+high-water-mark and entry-NAV writers are valuation events specified in the valuation
+satellite (\S\ref{sec:valuation}); they are out of scope here and leave those fields at
+their defaults throughout.
+
+\begin{lstlisting}[language=Haskell]
+data PositionState = PositionState
+  { psAc       :: !Qty           -- conserved, additive        <- Settle / Trade
+  , psBalance  :: !Qty           -- conserved, additive        <- Transfer
+  , psHwm      :: !Qty           -- NOT conserved, monotone    <- FeeCrystallise (qmax)
+  , psEntryNav :: !(Maybe Qty)   -- NOT conserved, write-once  <- Subscribe
+  } deriving (Eq, Show)
+
+zeroP :: PositionState           -- flat row on first touch; also the held-and-flat baseline
+zeroP = PositionState mempty mempty mempty Nothing
+
+position :: Ledger -> WalletId -> UnitId -> Maybe PositionState   -- C1 Option accessor:
+position l w u = Map.lookup (w, u) (ledgerPS l)
+  -- Nothing = never held;  Just zeroP = held once, now flat.  The two stay distinct.
+  -- Monotone carrier (C1, storage half): applyTx only inserts/updates a row, and no
+  -- row deleter is exported anywhere -- close-out leaves a flat row, never removes it.
+\end{lstlisting}
+
+\paragraph{The three homes, three maps --- the sealed Ledger.}
+Terms and status share the unit key but keep separate maps --- \texttt{ledgerPT}
+append-only, \texttt{ledgerUS} overwrite-in-place --- because their mutation disciplines
+differ. Their co-presence, ``$u$ registered in terms $\iff$ $u$ registered in status,'' is
+preserved by construction, not policed: \texttt{register} is the sole introducer and writes
+both, and every later writer touches them only for an already-registered unit. The position
+map is the balance map enriched. The \texttt{Ledger} constructor and its field selectors are
+unexported: a \texttt{Ledger} is built only by the writers below and read only through the
+accessors. Were a selector exported, record update through it would install a
+non-conserving map without naming the constructor, bypassing the single-writer discipline.
+Coherence is carried by the single introducer; the seal keeps conservation true by
+construction.
+
+\begin{lstlisting}[language=Haskell]
+data Ledger = Ledger
+  { ledgerPT :: Map UnitId             ProductTerms   -- append-only terms, by unit
+  , ledgerUS :: Map UnitId             UnitStatus     -- overwrite status,  by unit
+  , ledgerPS :: Map (WalletId, UnitId) PositionState  -- positions,   by (holder, unit)
+  }
+  -- exported ABSTRACT: constructor and selectors unexported. A Ledger is built only by the
+  -- writers below and read only through the accessors -> single-writer discipline; with no
+  -- row deleter, the carrier is monotone (C1).
+
+emptyLedger :: Ledger
+emptyLedger = Ledger Map.empty Map.empty Map.empty
+
+data LedgerError = ReRegistration UnitId | UnitAlreadyExists UnitId | UnknownUnit UnitId
+                 | DanglingSupersede UnitId  -- SetSupersededBy target is not a registered unit
+  deriving (Eq, Show)
+\end{lstlisting}
+
+\paragraph{The Transaction --- the one atomic event (C2, C3).}
+One event records, for a single unit, the whole change across the three maps, in two
+complementary parts. First, the conserved economic flow in \emph{edge} form: a list of
+moves, each debiting one wallet and crediting another by the same magnitude, so the signed
+per-unit sum of any move list is the group identity \emph{by construction} ---
+$\mathrm{qneg}\,q \mathrel{\diamond} q = \mathit{mempty}$ for each leg, summed by the monoid
+laws, the empty list (a move-less registration or amendment) included, which is the vacuous
+base (\hyperref[cond:C9]{C9}). Second, the non-balance state delta that rides alongside the
+moves: per-wallet bookkeeping (accumulated cost, high-water mark, entry NAV, via the C11
+\texttt{FieldWrite} table), the shared \emph{UnitStatus} writes, and a \emph{ProductTerms}
+introduction or append. Conservation is then a property of the type, not a checked
+side-condition: there is no unconserved \texttt{Transaction} to reject, hence no
+\texttt{validate} gate (\hyperref[cond:C2]{C2}). It applies in full or not at all; a
+partially applied transaction is not a representable state (\hyperref[cond:C3]{C3}). One
+structural field, \texttt{txIntroduce}, is the sole asymmetry between registration and every
+other event: \texttt{Just} introduces the unit (writing terms and status together),
+\texttt{Nothing} operates on an existing one --- so registration is the move-less instance of
+this one type, not a separate operation. An event touching several units --- a rebalance
+trading three futures, or a future bought against cash --- is a transaction per unit applied
+as a single fold; per-unit conservation composes to event-level conservation. Induction over
+the stream lifts the per-event identity to the global invariant P1.
+
+\begin{lstlisting}[language=Haskell]
+-- One value, two notations: txMoves is the per-edge view of the conserved flow; the
+-- remaining fields are the non-balance bookkeeping that rides with it.
+-- (Move, moveDelta, mUnit, mQty are the framework primitives of sec:ledger.)
+data Transaction = Transaction
+  { txUnit      :: UnitId                           -- the unit this event concerns
+  , txMoves     :: [Move]                           -- conserved flow as edges (by construction)
+  , txRows      :: Map WalletId [SomeWrite]         -- non-balance per-wallet bookkeeping
+  , txStatus    :: [StatusWrite]                    -- shared UnitStatus writes
+  , txIntroduce :: Maybe (TermsVersion, UnitStatus) -- Just => introduce txUnit (registration)
+  , txAppend    :: Maybe TermsVersion               -- Just => append a version (C6, Preserving)
+  } deriving (Show)
+
+-- Conservation witnesses. Each move contributes qneg q <> q = mempty, so the foldMap lands
+-- at mempty BY THE MONOID LAWS -- not by a sum computed and compared at run time (C2, C9).
+unitDelta :: UnitId -> Transaction -> Qty
+unitDelta u tx =
+  foldMap (\m -> if mUnit m == u then qneg (mQty m) <> mQty m else mempty) (txMoves tx)
+-- law:  unitDelta u tau == mempty   for every unit u and transaction tau
+
+netDelta :: Transaction -> Qty                       -- the empty/registration case too
+netDelta tx = foldMap (\m -> qneg (mQty m) <> mQty m) (txMoves tx)
+
+-- The canonical move-less instances. Trade/settlement/transfer use the record constructor
+-- directly (txIntroduce = Nothing, moves + rows present).
+registerTx :: UnitId -> TermsVersion -> UnitStatus -> Transaction   -- C5+C7+C10: introduction
+registerTx u tv us = Transaction
+  { txUnit = u, txMoves = [], txRows = Map.empty
+  , txStatus = [], txIntroduce = Just (tv, us), txAppend = Nothing }
+
+appendTx :: UnitId -> TermsVersion -> Transaction                   -- C6 Preserving amendment
+appendTx u tv = Transaction
+  { txUnit = u, txMoves = [], txRows = Map.empty
+  , txStatus = [], txIntroduce = Nothing, txAppend = Just tv }
+
+supersedeTx :: UnitId -> UnitId -> Transaction                      -- C8 Breaking: stamp old unit
+supersedeTx u uFresh = Transaction
+  { txUnit = u, txMoves = [], txRows = Map.empty
+  , txStatus = [SetSupersededBy uFresh], txIntroduce = Nothing, txAppend = Nothing }
+\end{lstlisting}
+
+\paragraph{Per-field canonical writer (C11).}
+Each \emph{PositionState} field is tagged with the closed set of field-writers permitted to
+mutate it: accumulated cost by settle and trade; high-water mark by fee-crystallisation;
+entry NAV by subscription. The balance field is not in this table: its sole canonical writer
+is the \texttt{Move} edge (handler \texttt{Transfer}), applied in \texttt{applyTx}, so a
+balance change without a conserving move is unrepresentable. A write by a field-writer
+outside the permitted set
+is a type error at the writer's authorship site; the tag is erased once writes share one
+delta row, so the guarantee binds at authorship, not at the stored row
+(\hyperref[cond:C11]{C11}). These field-writers are a different axis from the event classes
+of \hyperref[cond:C2]{C2}: one event class drives one or more field-writers, and the two
+name-sets are not meant to coincide. The discipline is carried by a GADT (a generalised
+algebraic data type, in which each constructor fixes its own type index) whose
+constructors \emph{are} the field-to-writer table.
+
+\begin{lstlisting}[language=Haskell]
+data Handler = Settle | Trade | Transfer | FeeCrystallise | Subscribe deriving (Eq, Show)
+
+-- The GADT constructors ARE the C11 field->writer table; no other pairing is representable.
+-- The balance field is absent: its sole writer is the Move edge (handler 'Transfer), applied
+-- in applyTx -- so "balance written off-ledger" is unrepresentable.
+data FieldWrite (h :: Handler) where
+  WAc       :: Qty -> FieldWrite 'Settle           -- ac, by settle
+  WAcTrade  :: Qty -> FieldWrite 'Trade            -- ac, by trade
+  WHwm      :: Qty -> FieldWrite 'FeeCrystallise   -- hwm, by fee crystallisation
+  WEntryNav :: Qty -> FieldWrite 'Subscribe        -- entry_nav, by subscribe
+deriving instance Show (FieldWrite h)
+
+data SomeWrite where SomeWrite :: FieldWrite h -> SomeWrite  -- index erased once writes share a row
+instance Show SomeWrite where show (SomeWrite w) = show w
+
+applyWrite :: FieldWrite h -> PositionState -> PositionState  -- total over all constructors
+applyWrite (WAc q)       p = p { psAc      = psAc p <> q }
+applyWrite (WAcTrade q)  p = p { psAc      = psAc p <> q }
+applyWrite (WHwm q)      p = p { psHwm      = qmax (psHwm p) q }                    -- monotone
+applyWrite (WEntryNav q) p = p { psEntryNav = maybe (Just q) Just (psEntryNav p) } -- write-once
+
+-- A settle handler authors ONLY 'Settle writes -- the result type IS the C11 checkpoint.
+settleHandler :: [(WalletId, Qty)] -> Map WalletId [FieldWrite 'Settle]
+settleHandler legs = Map.fromList [ (w, [WAc q]) | (w, q) <- legs ]
+
+erase :: Map WalletId [FieldWrite h] -> Map WalletId [SomeWrite]  -- authorship -> erasure (S3)
+erase = fmap (map SomeWrite)
+
+_c11_ok_settle :: Qty -> FieldWrite 'Settle
+_c11_ok_settle = WAc
+_c11_ok_fee    :: Qty -> FieldWrite 'FeeCrystallise
+_c11_ok_fee    = WHwm
+-- _c11_bad :: Qty -> FieldWrite 'Settle
+-- _c11_bad = WHwm    -- TYPE ERROR: WHwm :: FieldWrite 'FeeCrystallise, not 'Settle
+\end{lstlisting}
+
+\paragraph{Registration, settlement, moves, and amendment --- one door, \texttt{applyTx}.}
+Every change to the three maps flows through one transition, \texttt{applyTx}; the ledger is
+sealed and there is no second write path. Registration is the move-less transaction whose
+\texttt{txIntroduce} is \texttt{Just}: it writes its first terms version and default status
+as one entry, and refuses a unit already present --- re-registration is a hard error, never a
+silent reset (\hyperref[cond:C10]{C10}). Because terms and status are written together,
+``registered in terms $\iff$ registered in status'' holds by construction. \texttt{register}
+is therefore \texttt{applyTx} of \texttt{registerTx}, not a separate operation. A move's
+effect is its per-wallet net delta, written into the balance field and gated on registration;
+its two legs are exact inverses, so it sums to zero over wallets, and a zero-quantity or
+self-move nets to zero on every wallet and writes no net change --- \emph{held} means named in
+a move that nets nonzero. Amendment has two tracks, chosen by a product-declared total
+predicate (\hyperref[cond:C8]{C8}): a fungibility-preserving amendment is one move-less
+transaction appending a terms version, leaving positions untouched; a fungibility-breaking
+amendment spans two units, so it is the composition of two transactions --- introduce the
+successor $u_{\mathrm{new}}$, then stamp
+\texttt{superseded\_by}$(u_{\mathrm{old}}\!\to u_{\mathrm{new}})$ on the predecessor's status
+--- run atomically through \texttt{applyTx} by \texttt{amend}, the move of holders being a
+separate paired-issuance event, never part of the amendment. Ordering the two transactions so
+the successor is introduced before the predecessor is stamped means the supersede pointer
+always names a registered unit; a \texttt{SetSupersededBy} whose target is absent is rejected
+as a \texttt{DanglingSupersede}, so the pointer can never dangle. Reads are capability-scoped: a
+cross-overlay read of another holder's position is forbidden, and strategy exports flow only
+through \emph{UnitStatus} (\hyperref[cond:C4]{C4}).
+
+A move carries its conserved flow as edges in \texttt{txMoves}; its two legs are exact
+inverses (\texttt{qneg}), so the signed per-unit sum is \texttt{mempty} by construction, and
+a zero-quantity or self-move contributes no net write.
+
+\begin{lstlisting}[language=Haskell]
+-- C5+C7+C10: register is applyTx of the move-less introduction. It is not a primitive
+-- standing outside the fold; registration, trade, settlement and amendment all flow through
+-- the ONE apply.
+register :: UnitId -> TermsVersion -> UnitStatus -> Ledger -> Either LedgerError Ledger
+register u tv us = applyTx (registerTx u tv us)
+
+-- The single door. C3 (all-or-nothing) is structural: the WHOLE new Ledger or a Left, never
+-- a partial state. txIntroduce=Just must introduce an ABSENT unit (else ReRegistration, C10),
+-- writing PT and US together (C5/C7); txUnit and every unit a move names must be registered
+-- (else UnknownUnit), so PT<->US co-presence is preserved; rows insert/update, never delete
+-- (C1 monotone). Conservation is already a property of txMoves (edges) -- nothing to validate.
+applyTx :: Transaction -> Ledger -> Either LedgerError Ledger
+applyTx tx l0 = do
+    l1 <- introduce l0
+    ()  <- requireKnown l1
+    ()  <- requireSupersedeTargets l1
+    Right (commit l1)
+  where
+    u = txUnit tx
+
+    introduce l = case txIntroduce tx of
+      Nothing -> Right l
+      Just (tv, us)
+        | u `Map.member` ledgerPT l -> Left (ReRegistration u)              -- C10
+        | otherwise -> Right l
+            { ledgerPT = Map.insert u (ProductTerms (tv :| [])) (ledgerPT l) -- C7
+            , ledgerUS = Map.insert u us                        (ledgerUS l) -- C5
+            }
+
+    requireKnown l =
+      case filter (\x -> not (x `Map.member` ledgerPT l)) (u : map mUnit (txMoves tx)) of
+        (bad : _) -> Left (UnknownUnit bad)
+        []        -> Right ()
+
+    -- Referential integrity for the supersede pointer: a SetSupersededBy target must name a
+    -- registered unit, else the stamp would dangle. A Breaking amendment introduces the
+    -- successor first, so its id is registered by the time supersedeTx is applied (C8).
+    requireSupersedeTargets l =
+      case filter (\x -> not (x `Map.member` ledgerPT l))
+                  [ t | SetSupersededBy t <- txStatus tx ] of
+        (bad : _) -> Left (DanglingSupersede bad)
+        []        -> Right ()
+
+    commit l = l
+      { ledgerPT = maybe (ledgerPT l)
+                         (\tv -> Map.adjust (appendVersion tv) u (ledgerPT l))   -- C6 append
+                         (txAppend tx)
+      , ledgerUS = if null (txStatus tx)
+                     then ledgerUS l
+                     else Map.adjust (\s -> foldl' (flip applyStatus) s (txStatus tx)) u (ledgerUS l)
+      , ledgerPS = foldl' (flip applyMoveRow)
+                          (Map.foldrWithKey applyRow (ledgerPS l) (txRows tx))
+                          (txMoves tx)
+      }
+
+    applyRow w writes ps =                                      -- non-balance bookkeeping
+      let key = (w, u)
+          cur = Map.findWithDefault zeroP key ps               -- first touch -> flat row
+          new = foldl' (\acc (SomeWrite fw) -> applyWrite fw acc) cur writes
+      in  Map.insert key new ps                                 -- insert/update only
+
+-- A Move writes ONLY psBalance, via the conserving pair from moveDelta (from -= q, to += q),
+-- keyed by the move's own unit -- the sole writer of the balance field.
+applyMoveRow :: Move -> Map (WalletId, UnitId) PositionState
+             -> Map (WalletId, UnitId) PositionState
+applyMoveRow m ps0 = foldl' step ps0 (moveDelta m)
+  where
+    step ps (w, dq) =
+      let key = (w, mUnit m)
+          cur = Map.findWithDefault zeroP key ps
+      in  Map.insert key cur { psBalance = psBalance cur <> dq } ps
+
+-- C8: a product-declared total predicate chooses the track. Either track reaches the maps
+-- ONLY through applyTx -- there is no second write path.
+data Fungibility = Preserving | Breaking deriving (Eq, Show)
+type FungibilityPredicate = ProductTerms -> TermsVersion -> Fungibility
+data AmendResult = Appended UnitId | Superseded UnitId UnitId deriving (Eq, Show)
+
+amend :: FungibilityPredicate -> UnitId -> TermsVersion -> UnitId -> Ledger
+      -> Either LedgerError (AmendResult, Ledger)
+amend isFungible u tvNew uFresh l =
+  case Map.lookup u (ledgerPT l) of
+    Nothing -> Left (UnknownUnit u)
+    Just pt -> case isFungible pt tvNew of
+      Preserving ->                                 -- ONE move-less Transaction; positions untouched
+        (\l' -> (Appended u, l')) <$> applyTx (appendTx u tvNew) l
+      Breaking                                      -- spans two units: a composite of TWO Transactions
+        | uFresh `Map.member` ledgerPT l -> Left (UnitAlreadyExists uFresh)
+        | otherwise -> do
+            l1 <- applyTx (registerTx uFresh tvNew defaultStatus) l   -- introduce the successor
+            l2 <- applyTx (supersedeTx u uFresh)                 l1   -- stamp the predecessor
+            Right (Superseded u uFresh, l2)         -- old terms never rewritten (C7/P7)
+\end{lstlisting}
+
+\paragraph{Deterministic replay.}
+Replay is the monadic left-fold of the event stream over the empty ledger. It is
+deterministic because application is a pure, total function of the event and the prior
+ledger: the same events give the same ledger. It returns the rebuilt ledger on a
+well-formed stream and an error on an ill-formed one --- a repeated registration, or a move
+or settlement on an unregistered unit --- the fold halting at the first refusal.
+Checkpointing is sound by the monadic left-fold law: the fold over a concatenation splits
+at any cut. Since registration, settlement, and moves are all events, replay from the empty
+ledger rebuilds every unit's terms, status, and positions, so every view --- balances,
+profit and loss, the cached \emph{UnitStatus} of \S\ref{sec:sec04-unitstatus} --- is a
+projection of the stream. Row retention serves audit, not determinism (P8).
+
+\begin{lstlisting}[language=Haskell]
+-- A Transaction IS the event; applyTx is the pure, total transition. Replay is the
+-- error-stopping left fold of the stream. Determinism (P8) is the fold-homomorphism law,
+--     replay (xs <> ys)  =  replay xs >=> replay ys,
+-- so the result is independent of where a checkpoint is cut. On a well-formed stream (every
+-- event on a registered unit) no Left arises, so replay is total there. (Balances and PnL are
+-- further projections of the same stream -- netBal, in the balance-sheet section.)
+replay :: [Transaction] -> Ledger -> Either LedgerError Ledger
+replay ds l0 = foldM (\l d -> applyTx d l) l0 ds
+\end{lstlisting}
+
+\subsection{The twelve conditions}
+\label{sec:sec04-conditions}
+
+Each condition renders one illegal state unrepresentable. The labels are stable tags, not
+a sequence. Each is stated once below and forced at the construction step or instrument
+named; the four instruments that force them --- a future whose state depends on past
+trades, a managed account, a strategy that trades futures, and an instrument registered but
+never traded --- are worked in \S\ref{sec:sec04-construction} and \S\ref{sec:sec04-three}.
+
+\begin{longtable}{@{}p{0.8cm} p{11.0cm} p{2.5cm}@{}}
+\toprule
+ & \textbf{Condition} & \textbf{Forced at} \\
+\midrule
+\endhead
+\hypertarget{cond:C1}{C1}\label{cond:C1} & Position accessor returns $\mathrm{Option}$
+(never-held vs.\ held-and-flat distinct) \emph{and} the carrier is monotone (no row
+deleted); both. & PositionState \\
+\addlinespace
+\hypertarget{cond:C2}{C2}\label{cond:C2} & Every \texttt{Transaction} carries its conserved
+flow as edge moves, whose signed per-unit sum is \texttt{mempty} by construction; vacuous
+base case (empty move list) included. & Transaction \\
+\addlinespace
+\hypertarget{cond:C3}{C3}\label{cond:C3} & A \texttt{Transaction} spans all three maps for
+one unit and applies in full or not at all; partial application unrepresentable. &
+Transaction \\
+\addlinespace
+\hypertarget{cond:C4}{C4}\label{cond:C4} & Reads are capability-scoped; cross-overlay reads
+forbidden; strategy exports flow only through \emph{UnitStatus}. & strategy \\
+\addlinespace
+\hypertarget{cond:C5}{C5}\label{cond:C5} & \emph{UnitStatus} is registration-total:
+product-declared defaults written at registration. & untraded unit \\
+\addlinespace
+\hypertarget{cond:C6}{C6}\label{cond:C6} & \emph{ProductTerms} is a non-empty version list,
+append-only; no version mutated in place. & ProductTerms \\
+\addlinespace
+\hyperref[cond:C7]{C7} & \emph{ProductTerms} is registration-total: first
+version written at registration. & ProductTerms \\
+\addlinespace
+\hypertarget{cond:C8}{C8}\label{cond:C8} & Two-track amendment by a total fungibility
+predicate: \texttt{Preserving} appends a version; \texttt{Breaking} allocates a fresh $u$
+and records \texttt{superseded\_by}. & amendment \\
+\addlinespace
+\hypertarget{cond:C9}{C9}\label{cond:C9} & A move-less event has an empty move list, which
+folds to \texttt{mempty}, so it is conserved vacuously; conservation sums edge legs and never
+divides by a holder count. & untraded unit \\
+\addlinespace
+\hyperref[cond:C10]{C10} & Re-registering an existing unit is a hard
+error, never a silent reset. & registration \\
+\addlinespace
+\hypertarget{cond:C11}{C11}\label{cond:C11} & Each \emph{PositionState} field has a
+canonical writer set; a writer outside it is a type error at authorship, erased at the
+delta row. & PositionState \\
+\addlinespace
+\hypertarget{cond:C12}{C12}\label{cond:C12} & All per-(wallet, mandate/strategy) economic
+state lives at \emph{PositionState}$[w,u_{\mathrm{MA}}]$; the $W$-sector is empty by
+schema. & managed account \\
+\bottomrule
+\end{longtable}
+
+\subsection{Why exactly three maps}
+\label{sec:sec04-pareto-three}
+
+Three independent constraints each force one map, and removing any one breaks its
+constraint. \emph{(i)} Distinct per-holder state under the same contract forces a
+$(w,u)$-keyed map --- \emph{PositionState}. \emph{(ii)} Shared observables read identically
+by every holder force a $u$-keyed map distinct from per-holder state --- \emph{UnitStatus}.
+\emph{(iii)} The two mutation disciplines --- append-only versioned terms versus an
+overwrite-in-place status cache --- force a third, append-only map distinct from status ---
+\emph{ProductTerms}. A fourth map, the $W$-sector, adds a sector whose economic content is
+empty (\hyperref[cond:C12]{C12}). Three maps are the minimum basis of the problem, not a
+compromise.
+
+\subsection{The unique design}
+\label{sec:sec04-pareto}
+
+The adopted design --- three maps under C1--C12, design~B --- is the unique Pareto-optimum
+on testability, correctness, and simplicity under any correctness gate. Each rejected
+alternative fails on one forcing point.
+
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{A} (per-unit state, plus per-$(w,u)$ for futures only) has no sector for
+shared observables distinct from immutable terms, so settlement prices and terms share one
+overwrite cell --- the two mutation disciplines of \S\ref{sec:sec04-pareto-three}(iii)
+collapse.
+\item \textbf{C} (a sentinel unit carrying wallet state) has a sentinel with no issuer and
+no conservation partner, so $\sum_{w}h(\cdot)=0$ fails by fiat.
+\item \textbf{D} (an explicit $W$-sector) adds a sector whose economic content is empty:
+every candidate datum is $(w,u_{\mathrm{MA}})$-keyed (\hyperref[cond:C12]{C12}).
+\item \textbf{E} (state indexed only over the held set) equals B on correctness but has no
+implementation in available tooling and is far less simple; shippability decides, not
+elegance.
+\item \textbf{F} (a universe wallet $w_\star$ folding \emph{UnitStatus} into
+\emph{PositionState}$[w_\star,u]$) re-introduces the per-unit/per-$(w,u)$ split as a runtime
+predicate on the wallet axis, and conservation must then carve out $w_\star$ by hand ---
+\emph{UnitStatus} is the type-level expression of what F hides as a wallet-id convention.
+\end{itemize}
+
+\subsection{Invariants made unrepresentable}
+\label{sec:sec04-unrep}
+
+Under design~B with C1--C12, seven illegal states are placed beyond reach rather than
+merely tested; each line names the invariant of the hub (\S\ref{sec:invariants}) it
+discharges, or, where the guarantee is a contributing mechanism rather than the invariant
+itself, the hub invariant it underpins. The P-numbers are the canonical hub numbering of
+\S\ref{sec:invariants}. The mechanism differs by invariant and is named in each line. ``Unrepresentable'' is precise: an abstract
+type whose only constructor is a checked smart constructor keeps the illegal value from
+reaching the operation that would act on it; a non-empty list makes the versionless state
+untypable; a per-field tag is a type error at authorship; conservation is carried by the edge
+form of a move, whose two legs cancel by construction. It is not a claim that every guarantee
+is a type-level fact --- read-scoping, in particular, is enforced at the capability layer
+wrapping the accessors, not in the data reference.
+
+\begin{longtable}{@{}p{2.0cm} p{6.7cm} p{5.8cm}@{}}
+\toprule
+\textbf{Invariant} & \textbf{Mechanism} & \textbf{Discharged by} \\
+\midrule
+\endhead
+P1 (conservation of quantity) & Conserved flow is carried as \texttt{Move} edges, each
+naming both legs (\texttt{qneg}\,$q \mathrel{\diamond} q = \mathit{mempty}$), so the signed
+per-unit sum of any transaction is \texttt{mempty} by construction; there is no unconserved
+\texttt{Transaction} to reject, hence no \texttt{validate} gate. & C2 (edge-conserved flow),
+C3 (atomic transaction) \\
+\addlinespace
+P8 (snapshot/replay determinism) & Replay is the \texttt{foldM} of the stream, a fold
+homomorphism: replaying a concatenated log equals replaying each part and composing; the
+monotone carrier keeps the key set stable across any cut. & C1(b) (monotone carrier) \\
+\addlinespace
+P6 (lifecycle idempotency) & Lifecycle stage is $u$-keyed in \emph{UnitStatus},
+written by replacement, so re-applying a stage write is the identity; non-conserved fields
+carry the same algebra (high-water mark by $\max$, entry NAV write-once). & C5
+(registration-total status) \\
+\addlinespace
+Terms immutability (underpins P4) & Append-only non-empty version list; no in-place
+mutation, no exported setter. & C6 (append-only), C7 (registration-total) \\
+\addlinespace
+Identity immutability (underpins P4) & Re-registration rejected; a breaking amendment
+allocates $u_{\mathrm{new}}$ and never rewrites $u_{\mathrm{old}}$. & C8 (two-track),
+C10 (no re-registration) \\
+\addlinespace
+P7 (virtual/real isolation; read-scoping) & Cross-overlay reads forbidden at the capability
+layer wrapping the accessors, not in the data reference. & C4 (capability-scoped reads) \\
+\addlinespace
+Handler-field canon (underpins P9) & Canonical writer set per field; a writer outside it is
+a type error at authorship, erased once writes share a delta row. & C11 (per-field writer) \\
+\bottomrule
+\end{longtable}
+
+No other candidate design places more than three of the core invariants beyond reach.
+
+\subsection{Reference implementation}
+\label{sec:sec04-reference}
+
+The reference is \texttt{reference/Ledger.hs}, woven through \S\ref{sec:sec04-construction} and
+collected here. It is total and deterministic, and makes the illegal states unrepresentable
+rather than merely checked: \texttt{Ledger} is sealed with no row deleter (C1 monotone
+half) and an \texttt{Option} accessor (C1 Option half); a \texttt{Transaction} carries its
+conserved flow as \texttt{Move} edges, so the signed per-unit sum is \texttt{mempty} by
+construction and no \texttt{validate} gate is needed (C2, the empty move list giving C9);
+\texttt{ProductTerms} is abstract over a non-empty list grown only by registration and
+\texttt{appendVersion} (C6, C7); the \texttt{FieldWrite} GADT is the C11 field-to-writer
+table; \texttt{applyTx} is the single door, returning the whole ledger or an error with no
+partial state (C3); registration is the move-less \texttt{txIntroduce}=\texttt{Just}
+instance, rejecting re-registration (C10) and writing terms and status together; and
+\texttt{amend} is the two-track C8. Every \emph{UnitStatus} field is written only by
+\texttt{applyStatus}, folded inside \texttt{applyTx}, which is the projection-of-log
+discipline of \S\ref{sec:sec04-unitstatus} held by construction.
+
+The pieces woven through \S\ref{sec:sec04-construction} constitute \texttt{reference/Ledger.hs} in
+full, building on the \texttt{Move} algebra of \S\ref{sec:ledger}
+(\texttt{move}, \texttt{moveDelta}, \texttt{Timestamp}, \texttt{SourceId}); the consolidated,
+compile-ordered source is collected as the section's reference. Run on that source, the
+following evaluation makes the behaviour concrete --- the comments are the printed results.
+
+\begin{lstlisting}[language=Haskell]
+expect :: Show e => Either e a -> IO a
+expect = either (error . show) pure
+
+main :: IO ()
+main = do
+  let uES = UnitId "CME-ES"; wB = WalletId "BUYER"; wS = WalletId "SELLER"
+  l0 <- expect $ register uES (TermsVersion "ES-v1" (Map.fromList [("mult","50")]))
+                              defaultStatus emptyLedger
+  print (position   l0 wB uES)        -- Nothing : never held (C1 Option half)
+  print (unitStatus l0    uES)        -- Just (UnitStatus Registered Nothing Nothing) (C5)
+  -- a conserving trade: +1000 to BUYER as a Move EDGE (balance), with accumulated-cost rows
+  -- authored at 'Settle then erased (C11). (move/Timestamp/SourceId are the sec:ledger types.)
+  Just mv <- pure (move wS wB uES (Qty 1000) (Timestamp 0) (SourceId "demo"))
+  let tradeTx = Transaction uES [mv]
+                  (erase (settleHandler [(wB, Qty 1000), (wS, Qty (-1000))]))
+                  [] Nothing Nothing
+  print (netDelta tradeTx)            -- 0 : the move legs cancel BY CONSTRUCTION (C2)
+  l1 <- expect $ applyTx tradeTx l0
+  print (psBalance <$> position l1 wB uES) -- Just 1000 : balance, written by the Move edge
+  print (psAc      <$> position l1 wB uES) -- Just 1000 : accumulated cost, via the row
+  -- There is no unconserved Transaction to reject: a one-legged flow is not a Move, so it is
+  -- not representable in txMoves -- conservation is a property of the type, not a validate gate.
+  -- close-out: a Move back keeps a flat row (monotone carrier): held-and-flat /= never-held
+  Just mvC <- pure (move wB wS uES (Qty 1000) (Timestamp 1) (SourceId "demo"))
+  l2 <- expect $ applyTx (Transaction uES [mvC] Map.empty [] Nothing Nothing) l1
+  print (psBalance <$> position l2 wB uES) -- Just 0 : retained, not Nothing
+  print (register uES (TermsVersion "dup" Map.empty) defaultStatus l2)
+                                      -- Left (ReRegistration (UnitId "CME-ES")) (C10)
+\end{lstlisting}
+
+\begin{remark}[FORMALIS clearance]
+The listings above are excerpted verbatim from \texttt{reference/\allowbreak Ledger.hs}, the
+FORMALIS-cleared reference core; they carry that clearance and introduce no new code.
+Quantities are exact \texttt{Integer} minor units, a correctness choice that makes
+determinism and conservation arithmetic facts. Three structural points match the cleared
+code: the per-unit homes are \emph{three coupled maps} (\texttt{ledgerPT}, \texttt{ledgerUS},
+\texttt{ledgerPS}) with co-presence preserved by construction --- matching both the code and
+\S\ref{sec:sec04-pareto-three}; the lifecycle is the closed sum
+\texttt{Registered}/\texttt{Active}/\texttt{Expired}/\texttt{Closed} with the last settlement
+price a separate \texttt{Maybe} field written only through a logged \texttt{StatusWrite},
+rather than carried on an \texttt{Active} constructor; and one atomic \texttt{Transaction}
+carries both the conserved move edges and the non-balance state delta, so conservation holds
+by construction and there is no separate validate step.
+\end{remark}
+
+The testing commitments for this construction --- handler mutation score 85--90\%,
+lifecycle-guard 70--80\%, core overall $\geq80\%$, and a state-machine model bounded by a
+finite generator universe --- are carried by the testing agenda
+(\S\ref{sec:conclusion}, Appendix~B), not restated here.

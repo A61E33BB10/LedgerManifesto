@@ -1,0 +1,129 @@
+\section{Balance Sheet Substantiation and Dual Valuation}
+\label{sec:sec10}\label{sec:substantiation}
+
+The balance sheet is a projection of the move stream, not a separate record. Each move carries CDM-native metadata linking its balance to the originating product, business event, and counterparty, so every line item traces to its business event along a standardised evidence chain. Substantiation---the demonstration to an external auditor that a balance is complete, accurate, and properly valued---therefore reduces to replaying the log.
+
+\subsection{Balance Reconstruction}
+
+The move stream is an immutable, chronological log. The balance of wallet $w$ in unit $u$ at time $t$ is its opening balance plus the signed sum of every move on $u$ up to $t$:
+\[
+w_t(u) = w_0(u) + \sum_{\substack{\text{moves } m:\; m.\text{unit}=u,\; m.\text{time}\leq t}}
+\begin{cases}
++m.\text{quantity} & m.\text{destination}=w \\
+-m.\text{quantity} & m.\text{source}=w.
+\end{cases}
+\]
+The result is deterministic and reproducible from the raw stream alone. An auditor verifies any balance at any date $t$ by replaying the stream to $t$ and applying this formula; no independent balance record exists to reconcile against.
+
+The reconstruction is a projection of the move stream: map each move to the signed balance it contributes, then combine all contributions. The combining operation and its unit (the all-zero balance) make the per-$(\text{wallet},\text{unit})$ balance map a \emph{monoid}, and the projection \lstinline!balances! is \lstinline!foldMap! over that monoid.
+
+\begin{lstlisting}[language=Haskell]
+-- Scalars and keys are those of Section 2: Qty is the additive abelian
+-- group of exact minor units; a Move carries a positive quantity of one
+-- unit from a source wallet to a destination wallet.
+newtype Qty      = Qty Integer     deriving (Eq, Show)
+newtype WalletId = WalletId String deriving (Eq, Ord, Show)
+newtype UnitId   = UnitId   String deriving (Eq, Ord, Show)
+
+instance Semigroup Qty where Qty a <> Qty b = Qty (a + b)
+instance Monoid    Qty where mempty         = Qty 0
+qneg :: Qty -> Qty
+qneg (Qty n) = Qty (negate n)
+
+data Move = Move { from, to :: WalletId, unit :: UnitId, qty :: Qty }
+
+-- The projection target: one signed total per (wallet, unit). The monoid
+-- is POINTWISE addition -- combine cell by cell, all-zero map as unit. This
+-- is NOT the library default for Map, which is left-biased union and would
+-- silently drop the second contribution to a cell. Choosing the right
+-- monoid is the whole correctness content of this type.
+newtype Balances = Balances (Map (WalletId, UnitId) Qty)
+
+instance Semigroup Balances where
+  Balances a <> Balances b = Balances (Map.unionWith (<>) a b)
+instance Monoid Balances where
+  mempty = Balances Map.empty
+
+-- One move debits its source and credits its destination: the two-cell
+-- signed contribution the displayed formula writes with + / -.
+contribution :: Move -> Balances
+contribution m = Balances (Map.fromListWith (<>)
+  [ ((to   m, unit m),      qty m)
+  , ((from m, unit m), qneg (qty m)) ])
+
+-- foldMap: map every move to its contribution, then combine them all with
+-- one associative operation; the empty stream maps to the all-zero balance.
+-- Folding the chronological prefix up to t gives w_t; the opening balance
+-- is just the moves before the window, so there is no separate opening term
+-- and no separate balance record to reconcile against.
+balances :: [Move] -> Balances
+balances = foldMap contribution
+
+netBal :: WalletId -> UnitId -> [Move] -> Qty
+netBal w u ms = let Balances b = balances ms
+                in Map.findWithDefault mempty (w, u) b
+\end{lstlisting}
+
+\begin{remark}
+\lstinline!balances! is a \emph{monoid homomorphism} from the free monoid of move lists (lists under concatenation, empty list as unit) into the monoid of balance maps---meaning it carries concatenation to combination,
+\[
+\texttt{balances (xs ++ ys) = balances xs <> balances ys}.
+\]
+This one law is the substantiation guarantee read three ways. With \texttt{ys} empty and the operands reassociated, the grouping of independent batches cannot change the result, so replay is order-stable and deterministic. With \texttt{xs} the moves up to a snapshot and \texttt{ys} the moves since, the snapshot balance combined with later moves equals the balance of the whole stream---the $O(k)$ snapshot query of Section~\ref{subsec:snapshots} is correct \emph{by this law}, not by separate argument. And summing any unit's column over all wallets cancels each $+q$ against its $-q$ to \texttt{mempty}: that is the conservation law P1 (Section~\ref{sec:ledger}), here a consequence of \lstinline!contribution! emitting equal and opposite legs, not an assertion to enforce.
+\end{remark}
+
+\subsection{Substantiation Scope}
+
+Position quantities and transaction provenance are substantiated by construction: the position set, the flows between wallets, and unit state at any historical date all derive from the move stream by the reconstruction above. This eliminates the manual comparison of independent records that substantiation otherwise requires.
+
+Valuation and disclosure are not so substantiated. Fair value hierarchy classification under IFRS~13 (Level~1/2/3, with sensitivity analysis for Level~3 inputs) and the disclosures of IAS~1 paragraphs 117--124 (accounting policies, significant estimates and judgments) depend on inputs outside the move stream: external price feeds, valuation-model documentation, management judgment, and audit assessment. Legal enforceability depends on external documentation. The design claim is therefore exact: the ledger substantiates quantities and transaction provenance by construction; valuations, disclosures, and legal status require supplementary evidence.
+
+Unit state read during substantiation comes from UnitStatus, a materialised projection of the same log. UnitStatus holds one value per unit, shared---read identically by every holder. Its value changes over time, but UnitStatus is not a separate source of truth: the immutable event log is. Every change is caused by a logged event; the stored value is overwritten in place only as a read cache. Replaying the events up to any point rebuilds the exact value that held then, so nothing is lost by overwriting and there is no other way to change the value. A value exists from registration onward.
+
+The internal reconciliation failure modes the construction renders structurally unreachable, the boundary modes that remain detectable, and securities lending's by-design treatment are enumerated once in Appendix~\ref{app:reconciliation}.
+
+\subsection{Dual Valuation}
+
+No single price serves settlement and risk management at once: settlement requires the price at which an external party will transact, risk management a single coherent price across related positions. Both views read the same position set; only the price vector differs.
+
+\begin{definition}[Dual Valuation]
+Each unit $u\in\mathcal{U}$ carries two price functions:
+\begin{itemize}[nosep]
+\item $P_t^{\text{MtMk}}(u)$, mark-to-market, from observable market data---used for settlement, margin, external reporting, and custodian reconciliation;
+\item $P_t^{\text{MtMd}}(u)$, mark-to-model, from internal valuation models---used for risk management, portfolio optimisation, and performance attribution.
+\end{itemize}
+Their differential is $\Delta_t(u)=P_t^{\text{MtMd}}(u)-P_t^{\text{MtMk}}(u)$.
+\end{definition}
+
+\paragraph{Multi-exchange futures.} Nikkei~225 futures settle on three exchanges at different cut-off times:
+\begin{align*}
+P_t^{\text{MtMd}}(\text{NKY}) &= 35{,}500 && \text{(theoretical fair value)}\\
+P_t^{\text{MtMk}}(\text{NKY-SIMEX}) &= 35{,}480 && \text{(Singapore settlement)}\\
+P_t^{\text{MtMk}}(\text{NKY-CME}) &= 35{,}490 && \text{(Chicago settlement)}\\
+P_t^{\text{MtMk}}(\text{NKY-OSE}) &= 35{,}495 && \text{(Osaka settlement)}.
+\end{align*}
+The three cannot share a mark-to-market price: Singapore closes hours before Chicago, Osaka between them, and each settlement price fixes the market at a different moment, so margin must use the exchange-specific price. They share one mark-to-model price because all converge to the same final settlement value, the Nikkei~225 index. A desk holding offsetting positions across the three reads net exposure from the single MtMd price while each leg settles at its own MtMk price.
+
+\paragraph{Fair value adjustment.} The model price admits an adjustment for the gap between theoretical and executable prices---liquidity cost, bid-ask spread, model uncertainty:
+\[
+P_t^{\text{MtMd, adj}}(u) = P_t^{\text{MtMd}}(u) + \text{FVA}_t(u).
+\]
+Prudent valuation under CRR Article~105 requires the adjusted price for regulatory capital; risk management uses the unadjusted price. Dual valuation carries both.
+
+\paragraph{Single position set.} Desk-level consistency and firm-level reconciliation coexist because both valuations read the same wallet balances. Each desk prices related positions coherently through $P^{\text{MtMd}}$; the firm reads valuation discrepancy directly from $\Delta_t(u)$; internal transfers may book on either basis by policy. Position divergence between the two views is impossible---there is one position set, two price vectors.
+
+\subsection{Snapshots and Audit Trail}
+\label{subsec:snapshots}
+
+A snapshot is a substantiated checkpoint: a consistent cut of the move stream, carrying both pricing bases and the provenance metadata of each move. A balance query starting from the most recent snapshot replays only the moves since it, making the query $O(k)$ in the moves since the snapshot rather than $O(n)$ in the total. A snapshot is consistent only when taken at a quiescence point---no in-flight transactions---or under multi-version concurrency control.
+
+Conservation enforces double-entry accounting on quantities, independent of price:
+\[
+\sum_{w\in\mathcal{W}} w_t(u) = 0 \qquad \forall u,\,\forall t,
+\]
+the closed-system law of Section~\ref{sec:ledger} (P1). Valuation applies the price vector to the conserved quantities:
+\[
+V_t^{\text{MtMk}} = \sum_{w} w_t(u)\cdot P_t^{\text{MtMk}}(u), \qquad
+V_t^{\text{MtMd}} = \sum_{w} w_t(u)\cdot P_t^{\text{MtMd}}(u).
+\]
+Quantities are conserved and shared; only the two valuations differ.

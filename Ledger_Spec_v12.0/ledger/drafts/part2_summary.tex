@@ -1,0 +1,32 @@
+\subsection*{Key Invariants and Consequences}
+
+Unit state lives in three homes under one placement rule, and the conditions C1--C12 each
+render an illegal state unrepresentable rather than merely tested. Each guarantee carries
+its canonical number in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{One home, one writer.} Each economic fact has exactly one home and one
+writer, so internal reconciliation failure cannot arise. The homes are immutable
+\emph{ProductTerms}$[u]$, shared \emph{UnitStatus}$[u]$, and per-position
+\emph{PositionState}$[w,u]$; the externally-authored per-(holder, unit) cell is empty by
+construction (C12). (\S\ref{sec:states}.)
+\item \textbf{UnitStatus is a projection, not a source of truth.} It holds one value per
+unit, overwritten in place only as a read cache; the immutable event log is authoritative,
+and replaying the events to any point rebuilds the exact value that held then. This
+discipline discharges lifecycle idempotency P6---write-by-replacement at one key---via C5.
+(\S\ref{sec:sec04-unitstatus}.)
+\item \textbf{Conservation by construction (P1).} A \texttt{Transaction} carries its flow
+as \texttt{Move} edges whose signed per-unit sum is the group identity; C2 (edge-conserved
+flow) and C3 (atomic transaction across all three maps) leave no unconserved transaction
+to reject. (\S\ref{sec:states}.)
+\item \textbf{Snapshot/replay determinism (P8).} Replay is the fold of the stream; the
+monotone carrier C1 keeps the key set stable across any checkpoint cut, so the result is
+independent of where the cut falls. (\S\ref{sec:states}.)
+\item \textbf{Terms and identity immutability (underpin P4).} \emph{ProductTerms} is an
+append-only non-empty version list (C6, C7); re-registration is a hard error and a breaking
+amendment allocates a fresh unit, never rewriting the old one (C8, C10).
+(\S\ref{sec:states}.)
+\item \textbf{Read scoping (P7).} Cross-overlay reads are forbidden at the capability layer
+wrapping the accessors; strategy exports flow only through \emph{UnitStatus} (C4).
+(\S\ref{sec:states}.)
+\end{itemize}

@@ -1,0 +1,732 @@
+\section{The State-Basis Discipline}
+\label{sec:basis}
+\label{sec:state-basis}
+
+A corporate action rewrites the frame in which a unit's numbers mean anything. A 2-for-1
+split turns 1{,}000 shares marked at 100 into 2{,}000 shares marked at 50: value is
+unchanged, but every quantity and every price-like datum now speaks a different per-share
+language. The ledger already records the entitlement moves --- ``a 2-for-1 split doubles
+each entitled holding while the price reference halves'' (\S\ref{sec:contracts}) --- but
+the second clause has no carrier: no stored fact says \emph{which frame} a consumed quote
+inhabits, so a post-split balance can meet a pre-split quote and commit
+$2{,}000\times100=\EUR{200{,}000}$, a phantom doubling both of whose factors are
+individually correct. The defect is a missing referential-integrity edge between consumed
+data and the state that gives them meaning; no internal reconciliation can catch it,
+because nothing internal disagrees.
+
+The repair is one coordinate and one seam. \emph{The coordinate is state; the datum
+carries a reference; the seam is typed.} For each unit, the corporate-action basis is a
+fold over logged events, materialised in \texttt{UnitStatus} behind the existing single
+writer (\S\ref{sec:sec04-unitstatus}). Every consumed datum carries, in its attested
+envelope, a stable reference into that fold. Quantity-like and price-like values meet
+only inside a coherent snapshot whose basis assignment is fixed by the ledger and sealed
+by a type variable; mixed-basis pairing is a type error at authorship and a typed refusal
+at the erased store boundary. Informally: a datum is not a scalar but a pair (value,
+state-version); pricing requires all inputs in the same state basis as the positions;
+adjustment operators map data between state bases.
+
+Observation time cannot serve as the coordinate. An external quote may lag the ledger's
+own ex transition (\S\ref{sec:appD}); ex dates differ per venue; and a retro-effective
+corporate action changes the basis of a past timestamp after the fact. A timestamp
+therefore does not determine the frame, and a runtime join of two timelines would
+re-derive at every consumption site what one state coordinate states once. Nor is a
+fourth state home needed: observations already enter only as logged events
+(\S\ref{sec:states}), and their store is a materialised projection of those events under
+the existing cache discipline --- derivable, discardable, never authoritative. The
+three-home model of \S\ref{sec:states} is retained; one field is added to the second
+home.
+
+\subsection{The basis coordinate}
+\label{sec:basis-coordinate}
+
+A unit's basis changes only at declared events. Two sources declare them, both
+log-shaped.
+
+\begin{definition}[Boundary event]
+\label{def:boundary-event}
+A \emph{boundary event} on unit $u$ is a logged event carrying the unit, an effective
+time $t_{\mathrm{eff}}$, a \emph{declaration} --- a finite partial map from datum kinds
+to operator specifications (\S\ref{sec:basis-operators}) --- and provenance. Boundary
+events are content-addressed; \emph{bid} denotes the address. The two sources are
+corporate-action lifecycle transactions on held units (\S\ref{sec:contracts}) and
+external basis notices with no lifecycle leg --- index divisor maintenance, composition
+true-ups --- entering as logged observation events with a canonical handler.
+\end{definition}
+
+\begin{definition}[Basis point, chain, effective order, epoch]
+\label{def:basis-point}
+A \emph{basis point} of $u$ is either the registration point $\bot_u$ or a boundary id
+of $u$. The \emph{basis chain} of $u$, relative to a replay view, is the sequence of
+$u$'s boundary events known to that view in \emph{effective order}: the lexicographic
+total order on
+\[
+(t_{\mathrm{eff}},\ \mathit{prec},\ \mathit{bid}),
+\]
+where $\mathit{prec}$ is the intra-day precedence declared in the attested notice
+(\S\ref{sec:basis-failure}, W4) and $\mathit{bid}$ is a deterministic final tie-break.
+The \emph{epoch ordinal} of a basis point is its position in the chain --- a derived,
+per-view quantity, never stored.
+\end{definition}
+
+Stamps and state store basis-point ids, never ordinals: a retro-effective boundary
+inserts mid-chain and renumbers every later ordinal, while content addresses are stable.
+The order is total on every representable log because the one case where the tie-break
+is load-bearing --- two non-commuting boundaries on one unit with equal
+$t_{\mathrm{eff}}$ --- is forced to carry declared precedence by the same-$t_{\mathrm{eff}}$
+weld (W4): absent a declared mutual precedence, the colliding notice refuses into
+pending-transition, fail-closed. Booking order never enters the composite; the tie-break
+is data in the notice, and $\mathit{bid}$ is reached only where declared precedences tie.
+
+\begin{definition}[The basis field]
+\label{def:usbasis}
+\texttt{UnitStatus} gains one field, \texttt{usBasis :: BasisPoint}, defined from
+registration onward --- \texttt{defaultStatus} carries $\bot_u$ (\hyperref[cond:C5]{C5})
+--- and written only through the closed \texttt{StatusWrite} set by one new constructor.
+\end{definition}
+
+\begin{lstlisting}[language=Haskell]
+data BasisPoint = Origin UnitId | Boundary BoundaryId   -- content address, never an ordinal
+  deriving (Eq, Ord, Show)
+
+data StatusWrite                      -- the closed status-writer set, extended by ONE case
+  = SetLifecycle    Lifecycle
+  | SetLastSettle   (Price, BasisPoint)  -- was Maybe Qty: dimensionally wrong, basis-free
+  | SetSupersededBy UnitId
+  | SetBasis        BasisPoint        -- ABSOLUTE, not an increment: last-write-wins,
+  deriving (Eq, Show)                 -- idempotent (P6), exactly as its siblings
+\end{lstlisting}
+
+\noindent
+Re-applying \texttt{SetBasis b} to a status already at \texttt{b} is the identity, so P6
+is untouched: the write is absolute, and the chain is a projection of the log --- no
+counter is stored. The stated invariant is that \texttt{usBasis} equals the
+effective-order tip of the chain as known to the view. This invariant is not
+self-maintaining: replay folds the log in booking order (\S\ref{sec:lifecycle}), the
+chain is projected in effective order, and the two folds do not commute on
+retro-effective insertions --- under naked last-write-wins, a retro-effective boundary
+booked late would regress the coordinate to a mid-chain point. The invariant is
+therefore welded at the door, not assumed.
+
+\begin{principle}[Tip weld]
+\label{prin:tip-weld}
+\texttt{applyTx} admits a transaction carrying \texttt{SetBasis}\,$b$ on unit $u$ only if
+$b$ is the last element, in the effective order of
+Definition~\ref{def:basis-point}, of $u$'s chain after insertion of the boundary the
+transaction itself carries. The condition is checkable at admission from the committed
+log and the transaction alone.
+\end{principle}
+
+For a chain-tip boundary --- the common case --- the mandated write is the boundary's own
+id: behaviour unchanged. For a retro-effective boundary, the post-insertion tip is the
+already-committed tip, so the mandated write re-asserts the standing tip --- idempotent
+under P6 --- and the coordinate never moves backward: \emph{basis regressed by a late
+notice} is an unrepresentable ledger state. The inserted boundary changes mid-chain
+arrows, but arrows are per-view projections of the log, never stored
+(Definition~\ref{def:basis-category}), so every subsequent snapshot recomputes them;
+observations stamped in the window repair through re-stamp events
+(\S\ref{sec:basis-time-travel}), moves through the existing compensating path. The
+booking-order status fold and the effective-order chain projection consequently agree on
+\texttt{usBasis} at every log prefix --- an equality witnessed by the retro-insertion
+permutation oracle (Appendix~\ref{app:properties}), not merely asserted.
+
+\begin{principle}[Invariance weld]
+\label{prin:invariance-weld}
+A basis-changing corporate action is one atomic transaction
+(\hyperref[cond:C3]{C3}) carrying its entitlement moves, its \texttt{SetBasis}, and its
+declaration; \texttt{applyTx} admits it only if the moves and the declaration jointly
+satisfy the invariance identity of Theorem~\ref{thm:basis-value-invariance}: quantity
+legs equal to $q\mapsto q\cdot f$ up to explicit cash-in-lieu legs, and booked cash legs
+equal to $q\cdot c$.
+\end{principle}
+
+The check needs no market data and is the same admission idiom as \texttt{move}'s
+positivity gate. Consequence: ``positions doubled but basis not advanced,'' ``basis
+advanced but declaration missing,'' ``declaration inconsistent with moves,'' and --- by
+the tip weld --- ``basis regressed by a late notice'' are all unrepresentable ledger
+states.
+
+\subsection{The adjustment operators and their composition law}
+\label{sec:basis-operators}
+
+An operator is declared data applied by one generic evaluator; no operator is inferred
+from an event's name or from any model.
+
+\begin{definition}[Operator specification]
+\label{def:opspec}
+A declaration maps each affected datum kind to one of the following. Parameters come
+from the declared terms of the notice, never from the event taxonomy: a 5\% stock
+dividend declaring $f=21/20$ is a scale regardless of its name.
+\end{definition}
+
+\begin{lstlisting}[language=Haskell]
+data OpSpec
+  = Scale Rational       -- q /= 0;  invertible
+  | Shift Rational       -- invertible
+  | Subst UnitId Rational -- r /= 0; cross-unit succession, invertible
+  | Recompose Sigma      -- invertible iff sigma is declared bijective
+  | AId                  -- identity: DECLARED, never assumed
+  | Pending BoundaryRef  -- boundary known, parameter unpublished: no arrow yet
+  | Terminal             -- series ends: no arrow in either direction
+  deriving (Eq, Show)
+-- Side conditions (non-zero, bijectivity) are enforced by unexported smart
+-- constructors at the single admission door (applyTx), the `move` idiom: the
+-- invalid spec is never stored, so the evaluator is total over stored values.
+\end{lstlisting}
+
+\noindent
+The map is partial, and absence is load-bearing: a kind outside the declaration's domain
+has no arrow and cannot cross that boundary --- fail-closed. \texttt{AId} must be
+declared; it is never a default. All data-plane arithmetic is exact rational; the single
+crossing to integer minor units is \texttt{toPrice}, whose rounding rule is fixed once in
+\emph{ProductTerms} (round-half-even, one site), so composition of exact maps is
+path-independent and intermediate caching is sound.
+
+\begin{definition}[The basis category]
+\label{def:basis-category}
+Objects: the basis points of all units. Generating arrows, per datum kind $k$: for each
+boundary event $g$ with $k$ in the domain of its declaration, one arrow from the point
+before $g$ to $\mathit{bid}(g)$, with action the interpretation of the declared
+operator; and for each declared succession (\texttt{Subst}, welded to
+\texttt{usSupersededBy}, \hyperref[cond:C8]{C8}), one arrow from the predecessor's final
+point to $\bot_{u'}$. Inverse arrows exist exactly where the generator is invertible;
+\texttt{Pending} and \texttt{Terminal} generate no action. Within one unit the chain is
+totally ordered and succession edges are unique, so between any two basis points there
+is at most one arrow per kind.
+\end{definition}
+
+\begin{proposition}[Composition law]
+\label{prop:composition-law}
+For basis points $b\le b'$ on the (possibly succession-extended) chain, with intervening
+boundaries $g_1,\dots,g_n$ in the effective order of Definition~\ref{def:basis-point},
+\[
+A_k(b\to b') \;=\; \mathrm{interp}(g_n)\circ\cdots\circ\mathrm{interp}(g_1),
+\qquad\text{defined iff $k$ is in every $g_i$'s declaration;}
+\]
+\[
+A_k(b'\to b) \;=\; A_k(b\to b')^{-1}
+\quad\text{defined iff every generator is invertible;}
+\]
+\[
+A_k(b\to b)=\mathrm{id},
+\qquad
+A_k(b\to b'') \;=\; A_k(b'\to b'')\circ A_k(b\to b').
+\]
+\end{proposition}
+
+Operators do not commute; order-sensitivity is dissolved, not configured. Effective
+order is data in the log --- $t_{\mathrm{eff}}$ and $\mathit{prec}$ from the attested
+notice, $\mathit{bid}$ from content --- and no other composite is expressible, because
+arrow values are authored solely by the ledger's fold: their constructors are unexported
+(\S\ref{sec:basis-types}). Knowledge order lives on the bitemporal axis
+(\S\ref{sec:basis-time-travel}), never in the composite.
+
+The one illustration: spot 102 stamped at $b$; effective order dividend
+\texttt{Shift 2} ($b\to b_1$), then split \texttt{Scale} $\tfrac12$ ($b_1\to b_2$).
+Then $A(b\to b_2)(102)=(102-2)/2=50$. The reversed composite, $102/2-2=49$, is not an
+arrow of the category: no pair of basis points has it as its unique arrow, and no
+exported constructor can forge it. Had the dividend and split shared one
+$t_{\mathrm{eff}}$, the composite would be fixed by their declared mutual precedence ---
+and the pair would be inadmissible without it: the 49-versus-50 ambiguity is refused at
+the door, never resolved by arrival order.
+
+\begin{theorem}[Lifecycle value invariance across boundaries]
+\label{thm:basis-value-invariance}
+Let a boundary declare price action $p\mapsto(p-c)/f$ with quantity legs
+$q\mapsto q\cdot f$ (up to explicit cash-in-lieu legs) and cash legs $q\cdot c$, as
+Principle~\ref{prin:invariance-weld} requires. Then
+\[
+(q\cdot f)\cdot\frac{p-c}{f} \;=\; q\cdot p \;-\; q\cdot c :
+\]
+marked value is continuous through every boundary up to exactly the cash the same atomic
+transaction books.
+\end{theorem}
+
+\begin{proof}
+The identity is algebraic; the weld makes its hypotheses admission conditions, so every
+committed boundary satisfies them. Fractional entitlements land as explicit cash-in-lieu
+moves in the same transaction, so the identity holds to the minor unit; residues are
+conserved flows, never rounding dust.
+\end{proof}
+
+\noindent
+This proves, for basis boundaries, the lifecycle value-invariance property stated in
+restricted form in \S\ref{sec:intro}: the price jump at the boundary exactly offsets the
+booked cash.
+
+\paragraph{Pending crystallisation.} A \texttt{Pending} boundary advances the basis
+point at effectiveness --- the moves and \texttt{SetBasis} commit atomically
+(\hyperref[cond:C3]{C3}) --- and its parameter arrives later as a
+parameter-publication event referencing the boundary id, a versioned resolution under
+the \emph{ProductTerms} append discipline (\hyperref[cond:C6]{C6}). The chain projection
+resolves each boundary to its latest parameter version; no list element mutates, and the
+epoch is unaffected because publication is not a boundary. Until publication, no arrow
+crosses that boundary for the affected kinds: quarantine is forced
+(\S\ref{sec:basis-failure}), which is correct, because any interim mark is a guess.
+
+\begin{principle}[Re-derivation canon]
+\label{prin:rederivation}
+Primitive data are transported by declared arrows; derived data are re-derived from
+transported inputs.
+\end{principle}
+
+The framework never assumes that a derivation commutes with adjustment: equivariance is
+a property of the black box's interior, and the model-free directive forbids depending
+on it. A stored derived datum --- a vendor divisor, an index level --- carries as its
+stamp the joint basis of its inputs, a finite map $\mathrm{UnitId}\to\mathrm{BasisPoint}$
+(a plain observation is the singleton case). It is admissible at a target assignment
+$\beta$ iff its stamp equals $\beta$ pointwise on its whole domain
+(Invariant~\ref{inv:basis}(ii)); the framework refuses to transport it, fail-closed. A
+derivation performed inside a snapshot scope consumes transported primitive inputs and
+is automatically at $\beta$ --- the phantom index propagating through ordinary
+application.
+
+\subsection{The stamp and the ingest door}
+\label{sec:basis-ingest}
+
+A raw vendor number becomes a ledger observation only through one total ingest function
+--- the parse-boundary idiom of \texttt{move}.
+
+\begin{lstlisting}[language=Haskell]
+ingest :: Ledger -> SourceId -> Timestamp -> RawDatum
+       -> Either IngestError StampedObs
+data StampedObs   -- ABSTRACT: constructor unexported; ingest is the only door.
+  -- Carries: value (exact), t_obs, source, and stamp :: Map UnitId BasisPoint,
+  -- inside the attestation envelope (provider key, signature, content address).
+\end{lstlisting}
+
+\noindent
+The stamp is assigned per (unit, source): a source lagging the ex transition
+(\S\ref{sec:appD}) is a source still publishing at the old basis point while the unit
+has advanced, recorded as a per-source basis offset --- either transcribed from the
+source's declared convention under signature, or asserted by the gateway against the
+committed corporate-action log. It is never defaulted from the ledger's prevailing
+state. \texttt{ingest} additionally refuses a stamp naming an unregistered unit, so the
+scope-closure condition of Invariant~\ref{inv:basis} is discharged at the door, never at
+consumption. This subsumes the caller-asserted quote-ex flag and the hard-coded
+one-step price adjustment of \S\ref{sec:appD}, generalising both to arbitrary boundary
+chains; sourcing remains the market-data satellite's concern, while the stamp and the
+coherence check are ledger-owned.
+
+The assignment is a named trust assumption:
+
+\begin{description}[style=nextline]
+\item[TA-BASIS.] \emph{Owner:} market-data operations. \emph{Content:} the per-(unit,
+source) basis stamp assigned at ingest is true of the source's dissemination.
+\emph{Violation consequence:} mis-based valuation. \emph{Detection:} W3 partition
+quarantine (\S\ref{sec:basis-failure}) --- a large innovation coinciding with no
+committed boundary quarantines the series --- and daily reconciliation of
+vendor-published adjustment factors against applied declarations.
+\end{description}
+
+\subsection{The invariant}
+\label{sec:basis-invariant}
+
+\begin{invariant}[Single-basis consumption]
+\label{inv:basis}
+Let $V$ be a valuation invocation over position scope $S$ at time $t$, and let
+$\beta_t:\mathrm{UnitId}\to\mathrm{BasisPoint}$ be the total basis assignment given by
+replayed \texttt{usBasis} over all registered units (total by
+Definition~\ref{def:usbasis}: \texttt{defaultStatus} carries $\bot_u$). Then:
+(i)~every balance consumed by $V$ is read from $S$ at $\beta_t|_S$;
+(ii)~every datum $d$ consumed by $V$ satisfies
+$\mathrm{stamp}(d)(u)=\beta_t(u)$ for every $u\in\mathrm{dom}(\mathrm{stamp}(d))$ ---
+the check ranges over the stamp's whole domain, whether or not $u\in S$;
+(iii)~every value formed from several data is formed from data satisfying (ii) under one
+and the same $\beta_t$.
+\end{invariant}
+
+\noindent
+\emph{Well-definedness.} \texttt{withSnapshot} (\S\ref{sec:basis-types}) fixes $\beta$
+as $\beta_t$ restricted to the \emph{stamp-closure} of $S$ ---
+$S\cup\bigcup\{\mathrm{dom}(\mathrm{stamp}(d)) : d \text{ consumed}\}$ --- which is
+defined because $\beta_t$ is total over registered units and \texttt{ingest} admits no
+stamp naming an unregistered unit. $S$ restricts which balances are read; it never
+restricts the domain on which admissibility is checked.
+
+Clause (iii) is what makes the invariant meaningful for a black box: the framework
+legislates which data it is legal to feed a pricing function, never what the function
+does. State-sufficiency (\S\ref{sec:valuation}) survives with its third, previously
+silent dependency --- basis agreement --- now carried by the snapshot's type variable;
+the three illegal states of \S\ref{sec:valuation} gain a fourth: a held unit priced in
+the wrong basis is representable as an error and unrepresentable as a \texttt{Cash}.
+
+The condition form, alongside C1--C12 (\S\ref{sec:sec04-conditions}):
+
+\begin{description}[style=nextline]
+\item[C13 (basis edge).]\hypertarget{cond:C13}{}\label{cond:C13} Every consumed datum
+names its joint basis; consumption requires pointwise agreement, over the stamp's whole
+domain, with the prevailing total assignment $\beta_t$, or a ledger-authored arrow. C13
+is the data-plane sibling of P3: referential integrity for meaning, as P3 is for
+existence.
+\end{description}
+
+\subsection{Type-level enforcement}
+\label{sec:basis-types}
+
+The guarantee is stated honestly, in the two-tier discipline of
+\hyperref[cond:C11]{C11}: typed at authorship, erased at rest, re-established at
+consumption. Epochs are runtime replay outputs, so the honest static guarantee is
+\emph{sameness}, not value --- a type-level ordinal in the normative layer would claim
+static knowledge the system cannot have.
+
+\paragraph{Tier 1 --- the didactic law.} One page of exposition of the invariant, not
+the system mechanism. All constructors are unexported; the sole author is the ledger's
+fold, so an \texttt{Adj} value \emph{is} a proof that the log carries exactly these
+boundaries, in effective order.
+
+\begin{lstlisting}[language=Haskell]
+{-# LANGUAGE DataKinds, GADTs, KindSignatures, RoleAnnotations #-}
+data N = Z | S N
+
+newtype PriceAt (e :: N) = PriceAt Rational   -- constructor NOT exported
+newtype BalAt   (e :: N) = BalAt   Integer    -- constructor NOT exported
+type role PriceAt nominal   -- GHC would infer PHANTOM, and Data.Coerce.coerce
+type role BalAt   nominal   -- (Safe Haskell, no unsafe feature) would then forge
+                            -- the crossing at ANY pair of indices. Nominal makes
+                            -- the coercion derivable only at equal index.
+
+data Adj (m :: N) (n :: N) where              -- constructors NOT exported:
+  AIdA  :: Adj n n                            -- the ledger fold is the only author
+  AStep :: Adj m n -> OpSpec -> Adj m ('S n)  -- one boundary, in effective order
+
+adjust :: Adj m n -> PriceAt m -> PriceAt n   -- the ONLY epoch-crossing function
+
+markValue :: BalAt e -> PriceAt e -> Cash     -- Qty and Price meet ONLY at equal index
+markValue (BalAt q) (PriceAt p) = ...
+
+-- _bad :: BalAt ('S e) -> PriceAt e -> Cash
+-- _bad = markValue
+--   TYPE ERROR. The epoch-(n+1) position priced with the epoch-n quote is not a
+--   wrong number; it is not a program. And AStep extends only to 'S n, so the
+--   mis-ordered composite of the 49-vs-50 illustration has no inhabitant.
+\end{lstlisting}
+
+\paragraph{Tier 2 --- the normative seam.} \texttt{withSnapshot} is the one constructor
+of coherent read scopes, mirroring \texttt{applyTx} as the one write door. The ledger is
+sealed inside the scope --- no \texttt{Ledger} parameter escapes downstream; the skolem
+\texttt{b} denotes a whole basis assignment, not one unit's epoch, and every accessor is
+unit-keyed; the per-unit price accessor is fallible, so quarantine is representable.
+
+\begin{lstlisting}[language=Haskell]
+data Snapshot b   -- ABSTRACT. Constructed only by withSnapshot, which fixes the
+                  -- target assignment beta = beta_t on the STAMP-CLOSURE of the
+                  -- scope (Invariant B: beta_t is total over registered units;
+                  -- Scope restricts which balances are read, never beta's domain),
+                  -- reads balances from the SAME sealed ledger, and transports
+                  -- every admissible stamped observation to beta along declared
+                  -- arrows -- refusing, per unit and kind, where none exists.
+type role Snapshot nominal
+
+newtype BalAt'   b = ...        -- constructors NOT exported
+newtype PriceAt' b = ...
+newtype At b a     = ...
+type role BalAt'   nominal
+type role PriceAt' nominal
+type role At       nominal nominal
+
+withSnapshot :: Ledger -> Timestamp -> Scope
+             -> (forall b. Snapshot b -> r) -> r     -- quantifier where the proof lives
+
+snapBal   :: Snapshot b -> WalletId -> UnitId -> BalAt' b
+snapPrice :: Snapshot b -> UnitId -> Either BasisError (PriceAt' b)  -- per-unit refusal
+
+markV :: BalAt' b -> PriceAt' b -> Cash                  -- the seam; Cash is basis-free
+zipAt :: (x -> y -> z) -> At b x -> At b y -> At b z     -- in-scope derivation
+
+data Valuation = Priced Cash
+               | Unpriced UnitId BasisError              -- quarantined, enumerated
+               | PricedStale UnitId BasisPoint BasisPoint Cash  -- logged election
+
+value :: Snapshot b -> [WalletId] -> (Cash, [Valuation]) -- book total + exclusions
+
+-- The single cross-scope door, ledger-authored, factoring ONLY through declared
+-- arrows:
+carry :: Snapshot b0 -> Snapshot b1 -> Kind a -> At b0 a
+      -> Either BasisError (At b1 a)
+\end{lstlisting}
+
+\paragraph{Unreachability, for an arbitrary black-box pricing function.} Let
+$F::\forall b.\ \texttt{Snapshot } b\to r$ be any pricing function. By parametricity in
+\texttt{b} --- within the fragment stated below --- every \texttt{b}-indexed value $F$
+manipulates derives from its one \texttt{Snapshot} argument: the carriers' constructors
+are unexported, their only introduction forms are \texttt{snapBal}, \texttt{snapPrice},
+\texttt{carry}, and index-preserving combinators, and each yields values at $\beta$ by
+construction of the door. Two snapshots' skolems never unify, and \texttt{carry} --- the
+only cross-skolem function --- factors through the unique declared arrow or refuses.
+Hence every (quantity, price-like) pair any well-typed $F$ can form lies in a single
+basis assignment. The runtime complement, at the erased store boundary, is the
+witness-equality check inside \texttt{withSnapshot}, which returns a typed
+\texttt{BasisError}, never a silent pick. This is the C11 guarantee restated at the read
+seam: compile-time at authorship, typed refusal at the boundary --- claimed as exactly
+that and no more.
+
+\paragraph{Language-fragment proviso.} GHC infers role \emph{phantom} for a type
+parameter occurring in no constructor field; \texttt{Coercible} then holds at all index
+pairs, and \texttt{Data.Coerce.coerce} --- Safe Haskell, no unsafe feature --- would
+forge the epoch and skolem crossings past every unexported constructor. Every
+basis-indexed carrier therefore declares \texttt{type role \dots\ nominal} on its basis
+index; the annotations are normative, not stylistic. The enumeration above is claimed
+for exactly this fragment: Safe Haskell; nominal roles on every basis-indexed parameter;
+constructors, field selectors, and eliminators unexported; no \texttt{Generic},
+\texttt{Data}, or \texttt{Typeable}-derived path exposing representation; no
+\texttt{GeneralizedNewtypeDeriving} on the carriers; no Template Haskell in consuming
+modules. Within the fragment the free-theorem reading of $\forall b$ is sound and
+\texttt{coerce} contributes no introduction form.
+
+\subsection{Time travel and late corporate actions}
+\label{sec:basis-time-travel}
+
+\texttt{clone\_at($t$)} already rebuilds every \texttt{UnitStatus} field by the
+catamorphism (\S\ref{sec:lifecycle}); \texttt{usBasis} is such a field, so the basis
+prevailing at $t$ is reconstructed with zero new machinery (P8, extended). Historical
+valuation is \texttt{withSnapshot} over the clone: the target assignment is $\beta_t$;
+raw observations are immutable and stamped, so they never migrate; a datum stamped after
+$\beta_t$ is transported backward iff every intervening generator is invertible
+(Definition~\ref{def:opspec}), else refused into the \S\ref{sec:basis-failure} workflow.
+
+Two version axes are orthogonal, and both compose. The \emph{basis axis} is
+ledger-authored: effective order, per Proposition~\ref{prop:composition-law}. The
+\emph{knowledge axis} is bitemporal: ``as known at $t$'' replays with the chain as known
+at $t$; ``restated'' replays with corrections. A late or retro-effective boundary
+(booking time $t_{\mathrm{notify}}$, economic time $t_{\mathrm{eff}}$) changes no stored
+stamp silently: stamps are stable ids, and the ledger appends \emph{re-stamp derivation
+events} for observations captured in $[t_{\mathrm{eff}},t_{\mathrm{notify}})$ --- value
+unchanged, coordinate corrected, lineage to the late transaction. Its \texttt{SetBasis}
+is tip-welded (Principle~\ref{prin:tip-weld}): it re-asserts the standing effective tip,
+so the live coordinate never regresses; the corrected replay's chain projection places
+the boundary mid-chain and recomputes the spanning arrows. The as-known replay
+reproduces the honest mistake; the corrected replay applies the re-stamps; moves
+committed in the window repair through the existing compensating-transaction path
+(\S\ref{sec:sec11-corrections}), now with a citable coordinate lineage. A pinned
+snapshot plus a pinned chain version is reproducible \emph{and} right; pinning alone was
+reproducibly wrong.
+
+\subsection{Failure semantics as workflow}
+\label{sec:basis-failure}
+
+Every refusal is typed (\texttt{BasisError}); consequence class decides the regime;
+nothing is silent anywhere.
+
+\renewcommand{\arraystretch}{1.25}
+\begin{center}
+\begin{longtable}{@{}p{2.2cm} p{3.6cm} p{4.7cm} p{2.9cm}@{}}
+\toprule
+\textbf{Regime} & \textbf{Trigger} & \textbf{Consequence} & \textbf{Mandatory for} \\
+\midrule
+\endhead
+W1 Block & Move-emitting consumption (settlement projection, NAV strike, fee
+crystallisation) meets any \texttt{BasisError}. & The lifecycle event defers as a
+recorded workflow event with a named unblock condition --- a fresh observation at
+$\beta$, or the crystallising publication event --- queued under obligation liveness
+(P21, \S\ref{sec:obligation-liveness}). Real money never moves on an unwitnessed basis.
+& The stale-data gate (\S\ref{sec:sec11-faults}) and the pre-invocation check
+(\S\ref{sec:temporal}): basis equality first, timestamp threshold second. \\
+\addlinespace
+W2 Per-unit quarantine & \texttt{snapPrice} returns \texttt{Left} for a unit: no
+admissible datum, a \texttt{Pending} gap, an undeclared kind. & The book values on time
+as $(\texttt{Cash},[\texttt{Unpriced}\ \dots])$ --- a total minus a named, enumerated
+exclusion list. Blocking the whole book is rejected: one late notice must not halt
+thousands of units; shippability decides. & Daily marks, risk, management PnL. \\
+\addlinespace
+W2$'$ Flagged-stale carry & An explicit, logged election event with its canonical
+writer row in the C11 table. & The unit is valued \emph{coherent-at-}$\beta^-$ --- the
+latest assignment $\beta^-\le\beta_t$ at which its data are pointwise complete --- never
+a mixed vector. The result is \texttt{PricedStale}, a distinct constructor carrying its
+gap; downstream must pattern-match. \emph{Coherent-at-}$\beta$ means all inputs share
+assignment $\beta$; \emph{current} means $\beta=\beta_t$; W2$'$ is coherent, not
+current, and says so. & Management PnL where quarantining a large unit is worse than a
+flagged carry. \\
+\addlinespace
+W3 Partition quarantine & Aggregation partitions sources by asserted basis point;
+quorum and divergence are computed within a partition only. & $\{100\ @\ b_3\}$ and
+$\{50\ @\ b_4\}$ are two singleton partitions --- no false divergence, no median 75 that
+exists in no basis. A large innovation with no committed boundary is the signature of an
+undeclared corporate action or a bad feed: the series quarantines. This is TA-BASIS's
+detection signal; the window in which the world has split but the log has not is
+detected, not prevented. & All ingestion around corporate-action windows. \\
+\addlinespace
+W4 Notice attestation & A boundary declaration rewrites both sides of the seam and,
+once its moves are emitted, cannot be repaired by the price-correction path. & Admission
+requires issuer or exchange signature, or content-hash agreement across
+$N_{\mathrm{CA}}\ge2$ independent sources (owner: data governance). Same-$t_{\mathrm{eff}}$
+weld: a boundary whose $t_{\mathrm{eff}}$ equals that of another boundary on the same
+unit --- committed or co-presented --- is admitted only if the attested notices declare
+mutual precedence ($\mathit{prec}$, Definition~\ref{def:basis-point}); absent
+declaration, the colliding notice refuses into pending-transition, fail-closed. Between
+first notice and confirmation the unit is \emph{pending-transition}: W1 blocks, W2
+quarantines, W3 partitions. & Every boundary event. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The pending spin-off is the normal case, not the edge: \texttt{Pending} advances the
+basis point at effectiveness, so no number prices the unit at the new basis until the
+parameter publishes --- quarantine is forced, and a flagged carry at the old basis is
+the only honest alternative.
+
+\subsection{The 2-for-1 split, end to end}
+\label{sec:basis-worked}
+
+A wallet holds 1{,}000 shares of $u$; $\texttt{usBasis}=b_3$.
+
+\begin{enumerate}[nosep]
+\item \emph{Snap.} Vendor EX1 publishes 100.00; \texttt{ingest} stamps
+$\{u\mapsto b_3\}$ per the $(u,\mathrm{EX1})$ convention. Immutable, logged.
+\item \emph{The corporate action.} One atomic transaction $\tau$: moves $+1{,}000$ from
+the corporate-action virtual wallet ($1{,}000\to2{,}000$); \texttt{SetBasis}\,$b_4$;
+declaration $\{\mathrm{KSpot}\mapsto\texttt{Scale}\ \tfrac12,\dots\}$. Admission welds:
+quantity legs $2{,}000=1{,}000\times2$; cash legs $0=1{,}000\times0$
+(Theorem~\ref{thm:basis-value-invariance}); $b_4$ is the post-insertion effective tip
+(Principle~\ref{prin:tip-weld}). No reachable state has the doubling without the
+boundary.
+\item \emph{Snapshot at $t_{\mathrm{price}}$.} $\beta(u)=b_4$; balance 2{,}000 at $b_4$
+by the fold; the stored spot is stamped $b_3$; the door transports along the unique
+arrow: $A(b_3\to b_4)(100)=50$.
+\item \emph{Mark.} $\texttt{markV}\ 2{,}000\ 50=\EUR{100{,}000}$. Phantom: none.
+\item \emph{The bug, attempted.} Feeding the raw 100 requires a
+$\texttt{PriceAt'}\ b$ value, whose only doors are \texttt{snapPrice} and \texttt{carry}
+--- both refuse or transport --- and whose nominal role bars the \texttt{coerce} back
+door. In Tier 1, pairing the epoch-$(n{+}1)$ balance with the epoch-$n$ quote is a type
+error. The \EUR{200{,}000} is a program that does not exist on the compile side and a
+\texttt{Left BasisMismatch} on the runtime side; it never reaches a committed
+\texttt{Cash}.
+\item \emph{Attribution.} True post-split spot 55 (up 10\% like-for-like). Open
+$\texttt{Snapshot}\ b_0$ (pre) and $\texttt{Snapshot}\ b_1$ (post); \texttt{carry}
+transports the opening pair along the declared arrow, $(1{,}000,100)\mapsto(2{,}000,50)$,
+value-preserving by Theorem~\ref{thm:basis-value-invariance} with $c=0$. Then
+$\mathrm{PnL}_{\text{price}}=2{,}000\times(55-50)=+10{,}000$ and
+$\mathrm{PnL}_{\text{flow}}=(2{,}000-2{,}000)\times55=0$. The $-45{,}000/+45{,}000$
+phantom pair of the naive decomposition is gone: the decomposition, not just the sum, is
+basis-invariant, and it is writable through the one declared door.
+\item \emph{Late notice.} If $\tau$ is unlogged at $t_{\mathrm{price}}$,
+\hyperref[cond:C3]{C3} keeps moves and boundary together, so the snapshot is coherent at
+$b_3$: $1{,}000\times100=\EUR{100{,}000}$ --- right under the information held.
+Meanwhile the exchange disseminates $\approx50$: W3 fires and quarantines the series; W1
+blocks settlement-grade use. At $t_{\mathrm{notify}}$, $\tau$ commits with economic time
+$t_{\mathrm{eff}}$; if later-effective boundaries committed in the interim, the tip weld
+makes $\tau$'s \texttt{SetBasis} re-assert the standing tip while its boundary inserts
+mid-chain in the projection. Re-stamp events move the window's observations to their
+corrected points; the corrected replay is coherent end to end. At no point does
+$2{,}000\times100$ or $1{,}000\times50$ reach a committed \texttt{Cash}.
+\end{enumerate}
+
+\paragraph{The dividend.} The same walk with \texttt{Shift 2} and $f=1$: transport gives
+$102-2=100$; the 2-per-share cash leg books once, in the same transaction, with
+$\text{booked cash}=q\cdot c$ by the weld; total \EUR{102{,}000}. The
+\texttt{Cum}/\texttt{Ex} pricing of \S\ref{sec:appD} is recovered exactly as the
+one-step, $f=1$ fibre: \texttt{Cum} is the old basis point, \texttt{Ex}~$d$ the new one
+with generator \texttt{Shift}~$d$, and the quote-ex flag is the per-(unit, source)
+stamp. The lagging source --- quote still cum after the ledger's ex transition --- is
+stamped at the old point and transported: the case \S\ref{sec:appD} hard-codes,
+generalised.
+
+\paragraph{The index divisor.} Index $I$ over A (60) and B (84); level $(60+84)/D=100$
+fixes $D=1.44$, snapped as a derived observation with joint stamp
+$\{I\mapsto b_I,\ A\mapsto b_A,\ B\mapsto b_B\}$. B splits 2-for-1 ($b_B\to b_B'$);
+fresh prices A 60, B 42. The corrupt number --- $(60+42)/1.44=70.8$, a phantom
+$-29.2\%$ index move --- requires consuming the snapped $D$ at an assignment where
+$\beta_t(B)=b_B'\ne b_B$: pointwise inadmissible, refused fail-closed --- and the check
+is well-defined although the scope holds only $I$, because $\beta_t$ is total over
+registered units and admissibility ranges over the stamp's full domain $\{I,A,B\}$
+(Invariant~\ref{inv:basis}(ii)). The framework will not transport a derived datum
+(Principle~\ref{prin:rederivation}). Legal paths: the index authority's maintenance
+boundary on $I$ declares \texttt{Recompose} with $D'=1.02$, so $(60+42)/1.02=100$,
+entering under W4 like any corporate action; a fresh divisor observation arrives stamped
+at the new assignment; or the level is re-derived in-scope from transported
+constituents. Until one of these, $\texttt{snapPrice}\ I$ is a \texttt{Left}:
+\texttt{Unpriced}~$I$, enumerated, never a silent 70.8.
+
+\subsection{CDM corporate-action mapping}
+\label{sec:basis-cdm}
+
+CDM \texttt{BusinessEvent}s already map to transactions through the forgetful map $F$
+(\S\ref{sec:cdm}); ``CDM'' denotes Common Domain Model v6.0.0 throughout, as pinned in
+Appendix~\ref{sec:appF}. The extension is one rule: a corporate-action event's
+instructions supply both halves of $\tau$ --- the moves and the declaration --- keyed on
+declared terms, never taxonomy. $F$ lands in (moves, \texttt{SetBasis} + declaration)
+instead of moves alone; it remains total and deterministic, and the one economic fact it
+now keeps is precisely the fact it was discarding.
+
+\renewcommand{\arraystretch}{1.25}
+\begin{center}
+\begin{longtable}{@{}p{4.4cm} p{4.2cm} p{4.8cm}@{}}
+\toprule
+\textbf{CDM representation} & \textbf{Moves (existing)} & \textbf{Declaration (new)} \\
+\midrule
+\endhead
+StockSplit / ReverseSplit / StockDividend (QuantityChange, ratio $r$) & entitlement
+$\times r$ via the corporate-action virtual wallet (\S\ref{sec:contracts}) &
+$\mathrm{KSpot}\mapsto\texttt{Scale}\,(1/r)$, per-share reference kinds likewise; weld
+checks $q'=q\cdot r$ \\
+\addlinespace
+CashDividend / coupon detachment (Transfer) & cash issuer $\to$ holders &
+$\mathrm{KSpot}\mapsto\texttt{Shift}\,d$ on cum-quoted kinds; weld checks cash
+$=q\cdot d$; subsumes \S\ref{sec:appD} \\
+\addlinespace
+SpinOff & issuance moves of the child; child registered at $\bot$ & parent kinds
+\texttt{Pending}\,\textit{ref} until allocation publishes; the publication event
+crystallises the parameter \\
+\addlinespace
+Merger, stock-for-stock (TermsChange + succession) & C8 Breaking amendment + paired
+issuance; \texttt{usSupersededBy} & \texttt{Subst}\,$u'\,r$ --- the cross-unit arrow;
+predecessor data reach the successor's basis through it \\
+\addlinespace
+Merger for cash & terminal moves & \texttt{Terminal} --- no arrow in either direction;
+fail-closed forbids any further crossing \\
+\addlinespace
+Index rebalance / divisor change & rebalance moves on the strategy unit & boundary on
+the index unit via the basis-notice handler;
+$\mathrm{KComposition}\mapsto\texttt{Recompose}\,\sigma$, under W4 \\
+\addlinespace
+Election / proration windows & per-holder entitlement differences are moves & boundary
+\texttt{Pending} during the window; the unit-level operator crystallises at proration
+--- Status stays read identically by every holder \\
+\addlinespace
+TermsChange (non-corporate-action amendment) & C6/C8 as today & no declaration; the
+basis advances only on declared basis change \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection*{Key Invariants and Consequences}
+
+\begin{itemize}[nosep]
+\item \textbf{One coordinate, one seam (C13).} The corporate-action basis is a
+\texttt{UnitStatus} field folded from logged boundary events; every consumed datum
+carries a joint basis stamp; consumption requires pointwise agreement with the total
+assignment $\beta_t$ or a ledger-authored arrow. C13 is the data-plane sibling of P3.
+(\S\ref{sec:basis-coordinate}, \S\ref{sec:basis-invariant}.)
+\item \textbf{Value invariance is a theorem, not a property claim.} The invariance weld
+makes the identity $(qf)\cdot\frac{p-c}{f}=qp-qc$ an admission condition, so marked
+value is continuous through every boundary up to exactly the booked cash
+(Theorem~\ref{thm:basis-value-invariance}); the lifecycle value-invariance property of
+\S\ref{sec:intro} is proved on both factors for basis boundaries.
+\item \textbf{No regression, no reordering.} \texttt{SetBasis} is absolute and
+idempotent, so P6 is unchanged; the tip weld makes ``basis regressed by a late notice''
+unrepresentable, and booking-order replay agrees with the effective-order chain
+projection on \texttt{usBasis} at every log prefix --- witnessed by the retro-insertion
+permutation oracle (P24 family, Appendix~\ref{app:properties}), not asserted.
+\item \textbf{Fail-closed by expressibility.} Declarations are partial maps: an
+undeclared kind has no arrow and cannot cross a boundary; \texttt{Pending} and
+\texttt{Terminal} generate no action; identity is declared, never assumed.
+(\S\ref{sec:basis-operators}.)
+\item \textbf{The phantom is not a number but a non-program.} Within the stated language
+fragment, every (quantity, price-like) pair a well-typed pricing function can form lies
+in one basis assignment; at the erased boundary the same discipline is a typed refusal,
+never a silent pick. Mixed-basis value is unrepresentable as a \texttt{Cash} and
+representable only as an enumerated \texttt{Valuation} exclusion.
+(\S\ref{sec:basis-types}, \S\ref{sec:basis-failure}.)
+\item \textbf{Time travel extends for free.} \texttt{clone\_at($t$)} rebuilds
+\texttt{usBasis} by the existing catamorphism (P8); the basis axis is effective order,
+the knowledge axis is bitemporal, and late notices repair through re-stamp events with
+citable lineage while the live coordinate never moves backward.
+(\S\ref{sec:basis-time-travel}.)
+\item \textbf{Protected elements untouched.} The atomic move, conservation, and log
+immutability (P1, P2, P4) are unchanged in obligation; every addition is an appended
+event class, a new \texttt{StatusWrite} constructor, a new admission condition at the
+existing single door, a named projection, or a type refinement at the seam.
+\end{itemize}
+
+\noindent
+The pairing is the invariant: type both of its factors in the same frame, and the
+phantom PnL has nowhere to live.

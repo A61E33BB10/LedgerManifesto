@@ -1,0 +1,382 @@
+\section{European SBL Worked Example: GMSLA~2010 Title Transfer with Rehypothecation}
+\label{app:eu-sbl-example}
+
+This appendix works a complete European securities loan under GMSLA~2010 title transfer. The lifecycle covers non-cash collateral, rehypothecation, daily mark-to-market, a manufactured dividend, a partial recall, and full return. Every move is a single-coordinate write of the six-coordinate position vector (Section~\ref{sec:gpm}, Principle~\ref{princ:single-coord}). Conservation is verified at each step. The example is the title-transfer correctness witness; the pledge counterpart is Appendix~\ref{app:us-sbl-example}.
+
+\subsection{Participants and Setup}
+
+Five entities take part: a beneficial owner lending through an agent, a prime broker borrowing, the broker's short-selling client, the open market, and a third party that receives re-used collateral.
+
+\begin{center}\small
+\begin{tabular}{l l p{7.2cm}}
+\toprule
+\textbf{Entity} & \textbf{Role} & \textbf{Description} \\
+\midrule
+CALPERS\_EU & Lender (beneficial owner) & Holds 500{,}000 TotalEnergies (ISIN FR0000120271). Agent lender BNY~Mellon. \\
+GOLDMAN & Borrower & Prime broker; borrows TTE to cover a client short. \\
+HEDGE\_FUND & Goldman's client & Short seller; sells the borrowed TTE to market. \\
+MARKET & Market buyer & Virtual wallet for the open market. \\
+COUNTERPARTY\_C & Third party & Receives rehypothecated Bund collateral in a separate repo. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Loan terms.} 500{,}000 TotalEnergies (TTE), open loan, fee 25~bps p.a.\ (ACT/360), non-cash collateral (German Bund, ISIN DE0001102580), margin 102\%, GMSLA~2010 title transfer. Under title transfer Goldman takes ownership of the Bund collateral and may rehypothecate it. SFTR Article~15 documentation is required.
+
+\noindent\textbf{Units.} TTE (equity), BUND (German Bund), EUR (cash). Position vector $(\mathrm{own},\,\allowbreak\mathrm{onloan},\,\allowbreak\mathrm{borr},\,\allowbreak\mathrm{coll\_post},\,\allowbreak\mathrm{coll\_recv},\,\allowbreak\mathrm{coll\_rehyp})$, abbreviated own, onl, borr, c\_p, c\_r, c\_rh.
+
+\begin{remark}
+Loan, collateral, and exposure values follow the valuation rules of the valuation satellite specification (IBP-163, IBP-129, IBP-191); the figures are stated here as inputs, not re-derived. Intermediate quantities are computed in exact integer minor units; round-half-to-even (IEEE~754) applies only at the settlement-instruction projection boundary.
+\end{remark}
+
+%----------------------------------------------------------------------
+\subsection{Step 1: Loan Initiation (Day 0)}
+\label{sec:eu-step1}
+%----------------------------------------------------------------------
+
+TTE \EUR{58.50}; Bund \EUR{98.50} per \EUR{100} nominal. The collateral requirement is the loan value grossed up by the 102\% margin, converted into Bund units and rounded up.
+\[
+\mathrm{LV} = 500{,}000 \times 58.50 = \text{\EUR{29,250,000}}, \qquad
+\mathrm{RCV} = \mathrm{LV} \times 102\% = \text{\EUR{29,835,000}}.
+\]
+\[
+Q_{\mathrm{Bund}} = \left\lceil \tfrac{29{,}835{,}000}{98.50} \right\rceil = 302{,}894 \;\text{(units of \EUR{100} nominal)},
+\]
+market value $302{,}894 \times 98.50 = \text{\EUR{29,835,059}}$. Rounding up leaves slight over-collateralisation.
+
+The initiation transaction has two legs. The securities leg records the loan; the collateral leg transfers Bund ownership from Goldman to CalPERS.
+
+\begin{lstlisting}
+tau_1 = Transaction(type = SETTLEMENT, day = 0):
+  -- Securities leg (TTE)
+  Move 1: CALPERS_EU  onloan    += 500,000   [onloan]
+  Move 2: GOLDMAN     borr      += 500,000   [borr]
+  -- Collateral leg (BUND) -- title transfer
+  Move 3: GOLDMAN     own       -= 302,894   [own]
+  Move 4: CALPERS_EU  coll_recv += 302,894   [coll_recv]
+\end{lstlisting}
+
+\noindent Move~3 writes $\mathrm{own}$, not $\mathrm{coll\_post}$. Under title transfer the poster transfers \emph{ownership}: Goldman's Bund ownership decreases, and CalPERS holds the Bunds as received collateral. This is the defining distinction from the pledge regime (Appendix~\ref{app:us-sbl-example}). Virtual wallets absorb the contra-entries for both legs.
+
+Positions after $\tau_1$:
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+CALPERS\_EU & TTE & 500{,}000 & 500{,}000 & 0 & 0 & 0 & 0 & 0 \\
+CALPERS\_EU & BUND & 0 & 0 & 0 & 0 & 302{,}894 & 0 & 0 \\
+GOLDMAN & TTE & 0 & 0 & 500{,}000 & 0 & 0 & 0 & 500{,}000 \\
+GOLDMAN & BUND & $-302{,}894$ & 0 & 0 & 0 & 0 & 0 & $-302{,}894$ \\
+Virtual$_{C{\leftrightarrow}G}$ & TTE & \multicolumn{7}{l}{$-500{,}000$ (securities delivery contra)} \\
+Virtual$_{\mathrm{mkt}}$ & BUND & \multicolumn{7}{l}{$+302{,}894$ (Bund delivery contra)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Conservation (TTE).} $500{,}000_C + 500{,}000_{G,\mathrm{borr}} - 500{,}000_{\mathrm{Virt}} - 500{,}000_{\mathrm{Cust}} = 0$. \checkmark\quad
+\textbf{P18.} CalPERS $\mathrm{own}(\text{TTE}) = 500{,}000$, unchanged. \checkmark\quad
+\textbf{SFTR.} NEWT.
+
+%----------------------------------------------------------------------
+\subsection{Step 2: Delivery to Hedge Fund and Short Sale (Day 0)}
+\label{sec:eu-step2}
+%----------------------------------------------------------------------
+
+\textbf{Locate (EU SSR Article 12(1)).} Before the short sale HEDGE\_FUND satisfies the locate obligation. The borrow from CalPERS meets Article~12(1)(a) (the person ``has borrowed the share''). Locate is a pre-trade validation the executor checks before $\tau_3$. It generates no moves and changes no coordinate.
+
+Goldman delivers the borrowed shares to the hedge fund, which sells them to the market for cash. Every move in both transactions writes $\mathrm{own}$.
+
+\begin{lstlisting}
+tau_2 = Transaction(type = SETTLEMENT, day = 0):  -- Goldman -> Hedge Fund
+  Move 1: GOLDMAN    own -= 500,000    [own]
+  Move 2: HEDGE_FUND own += 500,000    [own]
+
+tau_3 = Transaction(type = SETTLEMENT, day = 0):  -- Hedge Fund short sale to market
+  Move 1: HEDGE_FUND own -= 500,000        [own]
+  Move 2: MARKET     own += 500,000        [own]
+  Move 3: MARKET     own -= 29,250,000     [own, EUR]
+  Move 4: HEDGE_FUND own += 29,250,000     [own, EUR]
+\end{lstlisting}
+
+\noindent Goldman's $\mathrm{borr}$ is untouched: it tracks the return obligation, not possession.
+
+Positions after $\tau_3$:
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+CALPERS\_EU & TTE & 500{,}000 & 500{,}000 & 0 & 0 & 0 & 0 & 0 \\
+GOLDMAN & TTE & $-500{,}000$ & 0 & 500{,}000 & 0 & 0 & 0 & 0 \\
+HEDGE\_FUND & TTE & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+MARKET & TTE & 500{,}000 & 0 & 0 & 0 & 0 & 0 & 500{,}000 \\
+HEDGE\_FUND & EUR & 29{,}250{,}000 & 0 & 0 & 0 & 0 & 0 & 29{,}250{,}000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Goldman is flat in available shares ($-500{,}000 + 500{,}000_{\mathrm{borr}} = 0$) but short in ownership. The economic short passed through from the hedge fund.
+
+\noindent\textbf{Conservation (TTE).} $500{,}000_C - 500{,}000_G + 500{,}000_M - 500{,}000_{\mathrm{Virt}} = 0$. \checkmark
+
+%----------------------------------------------------------------------
+\subsection{Step 3: Rehypothecation of Bund Collateral (Day 1)}
+\label{sec:eu-step3}
+%----------------------------------------------------------------------
+
+Goldman owns the Bunds under title transfer and re-uses 302{,}894 of them as collateral in a separate repo with COUNTERPARTY\_C. P19 (rehypothecation regime compliance) requires SFTR Article~15 re-use documentation. The documentation is an operational compliance flag, not a move.
+
+The re-use is recorded in two transactions: a reclassification inside CalPERS's vector, and the onward delivery of the Bunds against cash.
+
+\begin{lstlisting}
+tau_4a = Transaction(type = RECLASSIFICATION, day = 1):  -- within CalPERS vector
+  Move 1: CALPERS_EU  coll_recv  -= 302,894   [coll_recv, BUND]
+  Move 2: CALPERS_EU  coll_rehyp += 302,894   [coll_rehyp, BUND]
+
+tau_4b = Transaction(type = SETTLEMENT, day = 1):  -- onward delivery to COUNTERPARTY_C
+  Move 1: GOLDMAN        own -= 302,894        [own, BUND]
+  Move 2: COUNTERPARTY_C own += 302,894        [own, BUND]
+  Move 3: COUNTERPARTY_C own -= 29,835,059     [own, EUR]
+  Move 4: GOLDMAN        own += 29,835,059     [own, EUR]
+\end{lstlisting}
+
+\noindent Goldman's Bund $\mathrm{own}$ moves $-302{,}894 \to -605{,}788$. Goldman is doubly short: it has delivered Bunds to CalPERS and to COUNTERPARTY\_C and owes both. The reclassification records the re-use inside CalPERS's vector without changing CalPERS's total Bund holding.
+
+Positions after $\tau_{4a}$ and $\tau_{4b}$:
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+CALPERS\_EU & BUND & 0 & 0 & 0 & 0 & 0 & 302{,}894 & 0 \\
+GOLDMAN & BUND & $-605{,}788$ & 0 & 0 & 0 & 0 & 0 & $-605{,}788$ \\
+COUNTERPARTY\_C & BUND & 302{,}894 & 0 & 0 & 0 & 0 & 0 & 302{,}894 \\
+GOLDMAN & EUR & 29{,}835{,}059 & 0 & 0 & 0 & 0 & 0 & 29{,}835{,}059 \\
+COUNTERPARTY\_C & EUR & $-29{,}835{,}059$ & 0 & 0 & 0 & 0 & 0 & $-29{,}835{,}059$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Conservation (BUND).} $302{,}894_C - 605{,}788_G + 302{,}894_{CC} + 302{,}894_{\mathrm{Virt}} - 302{,}894_{\mathrm{Cust}} = 0$. \checkmark\quad
+\textbf{P19.} Regime \texttt{TITLE\_TRANSFER} permits rehypothecation; Art.~15 flag set. \checkmark
+
+%----------------------------------------------------------------------
+\subsection{Step 4: Mark-to-Market (Day 3)}
+\label{sec:eu-step4}
+%----------------------------------------------------------------------
+
+TTE \EUR{60.25}; Bund \EUR{98.20}.
+\[
+\mathrm{LV}_3 = 500{,}000 \times 60.25 \times 102\% = \text{\EUR{30,727,500}}, \qquad
+\text{collateral} = 302{,}894 \times 98.20 = \text{\EUR{29,744,189}}.
+\]
+\[
+\text{Exposure} = 30{,}727{,}500 - 29{,}744{,}189 = \text{\EUR{983,311}}, \qquad
+Q_{\mathrm{add}} = \left\lceil \tfrac{983{,}311}{98.20} \right\rceil = 10{,}014 \;\text{units}.
+\]
+The lender is under-collateralised. A margin call delivers additional Bunds.
+
+\begin{lstlisting}
+tau_5 = Transaction(type = MARGIN_CALL, day = 3):
+  Move 1: GOLDMAN     own       -= 10,014   [own, BUND]
+  Move 2: CALPERS_EU  coll_recv += 10,014   [coll_recv, BUND]
+\end{lstlisting}
+
+\noindent The addition enters $\mathrm{coll\_recv}$ (not $\mathrm{coll\_rehyp}$): it is not yet re-used.
+
+Positions after $\tau_5$:
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh \\
+\midrule
+CALPERS\_EU & BUND & 0 & 0 & 0 & 0 & 10{,}014 & 302{,}894 \\
+GOLDMAN & BUND & $-615{,}802$ & 0 & 0 & 0 & 0 & 0 \\
+COUNTERPARTY\_C & BUND & 302{,}894 & 0 & 0 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{P13.} CalPERS holds $312{,}908$ Bunds $\times\,98.20 = \text{\EUR{30,727,566}} \geq \text{\EUR{30,727,500}}$ required. \checkmark\quad
+\textbf{Fee accrual (Days 0--3).} Day~0 base $29{,}250{,}000 \times 0.0025/360 = \text{\EUR{203.13}}$/day; from Day~3, $30{,}125{,}000 \times 0.0025/360 = \text{\EUR{209.20}}$/day. Running total \EUR{818.58}.\quad
+\textbf{SFTR.} VALU.
+
+%----------------------------------------------------------------------
+\subsection{Step 5: Manufactured Dividend (Day 7)}
+\label{sec:eu-step5}
+%----------------------------------------------------------------------
+
+TotalEnergies pays \EUR{1.25} per share. CalPERS retains economic ownership, so Goldman pays a manufactured dividend of $500{,}000 \times 1.25 = \text{\EUR{625,000}}$. The manufactured payment is a contractual GMSLA payment, not a distribution. Its net amount may differ from the gross dividend under the applicable withholding-tax treaty.
+
+\begin{lstlisting}
+tau_6 = Transaction(type = CORP_ACTION, day = 7):
+  Move 1: GOLDMAN     own -= 625,000    [own, EUR]
+  Move 2: CALPERS_EU  own += 625,000    [own, EUR]
+\end{lstlisting}
+
+EUR positions after $\tau_6$:
+
+\begin{center}\small
+\begin{tabular}{l r r r r r r}
+\toprule
+\textbf{Entity (EUR)} & own & onl & borr & c\_p & c\_r & c\_rh \\
+\midrule
+CALPERS\_EU & 625{,}000 & 0 & 0 & 0 & 0 & 0 \\
+GOLDMAN & 29{,}210{,}059 & 0 & 0 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Conservation (EUR).} $625{,}000_C + 29{,}210{,}059_G + 29{,}250{,}000_{HF} - 29{,}835{,}059_{CC} + \text{virtual offsets} = 0$. \checkmark
+
+%----------------------------------------------------------------------
+\subsection{Step 6: Partial Recall and Return (Days 10--12)}
+\label{sec:eu-step6}
+%----------------------------------------------------------------------
+
+CalPERS sells 200{,}000 TTE, so BNY~Mellon recalls 200{,}000 shares. The recall notice (IBP-328) reaches Goldman on Day~10. Settlement follows at $T+2$ (Euronext Paris) on Day~12.
+
+The recall itself moves nothing; it changes only the loan state.
+
+\begin{lstlisting}
+tau_7 = Transaction(type = RECALL, day = 10):
+  -- Move-less: empty move list (vacuously conserved); carries only a state delta.
+  -- SBL state ACTIVE -> RECALLED; recall_qty = 200,000; recall_date = Day 10
+\end{lstlisting}
+
+\noindent\textbf{Day 12.} TTE \EUR{59.80}; Bund \EUR{98.30}. Remaining loan $300{,}000$:
+\[
+\mathrm{LV}_{12} = 300{,}000 \times 59.80 \times 102\% = \text{\EUR{18,298,800}}.
+\]
+Collateral held $312{,}908 \times 98.30 = \text{\EUR{30,758,856}}$; excess \EUR{12,460,056}:
+\[
+Q_{\mathrm{release}} = \left\lfloor \tfrac{12{,}460{,}056}{98.30} \right\rfloor = 126{,}755 \;\text{Bund units}.
+\]
+Remaining $312{,}908 - 126{,}755 = 186{,}153$ Bunds, value $186{,}153 \times 98.30 = \text{\EUR{18,298,835}} \geq \mathrm{LV}_{12}$ (P13 \checkmark). Release draws from $\mathrm{coll\_recv}$ first (10{,}014), then $\mathrm{coll\_rehyp}$ (116{,}741).
+
+The partial return reverses 200{,}000 of the loan and releases the excess collateral.
+
+\begin{lstlisting}
+tau_8 = Transaction(type = PARTIAL_RETURN, day = 12):
+  -- Securities return (TTE)
+  Move 1: GOLDMAN     borr       -= 200,000   [borr]
+  Move 2: CALPERS_EU  onloan     -= 200,000   [onloan]
+  -- Collateral release (BUND): coll_recv then coll_rehyp
+  Move 3: CALPERS_EU  coll_recv  -= 10,014    [coll_recv]
+  Move 4: GOLDMAN     own        += 10,014    [own]
+  Move 5: CALPERS_EU  coll_rehyp -= 116,741   [coll_rehyp]
+  Move 6: GOLDMAN     own        += 116,741   [own]
+
+tau_8b = Transaction(type = SETTLEMENT, day = 12):  -- Goldman unwinds repo leg
+  Move 1: COUNTERPARTY_C own -= 116,741        [own, BUND]
+  Move 2: GOLDMAN        own += 116,741        [own, BUND]
+  Move 3: GOLDMAN        own -= 11,473,439     [own, EUR]
+  Move 4: COUNTERPARTY_C own += 11,473,439     [own, EUR]
+\end{lstlisting}
+
+\noindent Releasing 116{,}741 from $\mathrm{coll\_rehyp}$ forces Goldman to recall those Bunds from COUNTERPARTY\_C first ($\tau_{8b}$).
+
+Positions after $\tau_8$ and $\tau_{8b}$:
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+CALPERS\_EU & TTE & 500{,}000 & 300{,}000 & 0 & 0 & 0 & 0 & 200{,}000 \\
+GOLDMAN & TTE & $-500{,}000$ & 0 & 300{,}000 & 0 & 0 & 0 & $-200{,}000$ \\
+CALPERS\_EU & BUND & 0 & 0 & 0 & 0 & 0 & 186{,}153 & 0 \\
+GOLDMAN & BUND & $-372{,}306$ & 0 & 0 & 0 & 0 & 0 & $-372{,}306$ \\
+COUNTERPARTY\_C & BUND & 186{,}153 & 0 & 0 & 0 & 0 & 0 & 186{,}153 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{P18.} CalPERS $\mathrm{own}(\text{TTE}) = 500{,}000$, unchanged. \checkmark\quad
+\textbf{P15.} Loan quantity $500{,}000 \to 300{,}000$, monotonically non-increasing. \checkmark\quad
+\textbf{SFTR.} MODI (not ETRM: partial, not full return).
+
+%----------------------------------------------------------------------
+\subsection{Step 7: Full Return and Settlement (Day 20)}
+\label{sec:eu-step7}
+%----------------------------------------------------------------------
+
+Remaining 300{,}000 TTE returned. TTE \EUR{61.00}; Bund \EUR{98.40}.
+
+The full return clears the remaining loan and collateral coordinates and unwinds the rest of the repo.
+
+\begin{lstlisting}
+tau_9 = Transaction(type = FULL_RETURN, day = 20):
+  Move 1: GOLDMAN     borr       -= 300,000   [borr]
+  Move 2: CALPERS_EU  onloan     -= 300,000   [onloan]
+  Move 3: CALPERS_EU  coll_rehyp -= 186,153   [coll_rehyp]
+  Move 4: GOLDMAN     own        += 186,153   [own]
+
+tau_9b = Transaction(type = SETTLEMENT, day = 20):  -- unwind remaining repo
+  Move 1: COUNTERPARTY_C own -= 186,153        [own, BUND]
+  Move 2: GOLDMAN        own += 186,153        [own, BUND]
+  Move 3: GOLDMAN        own -= 18,308,845     [own, EUR]
+  Move 4: COUNTERPARTY_C own += 18,308,845     [own, EUR]
+\end{lstlisting}
+
+\noindent\textbf{Fee.} Accrued daily on the mark-to-market loan value over 20 days:
+
+\begin{center}\small
+\begin{tabular}{l l r r}
+\toprule
+\textbf{Period} & \textbf{Qty} & \textbf{Loan value (no margin)} & \textbf{Daily fee} \\
+\midrule
+Days 0--2 & 500{,}000 & \EUR{29,250,000} & \EUR{203.13} \\
+Days 3--6 & 500{,}000 & \EUR{30,125,000} & \EUR{209.20} \\
+Days 7--11 & 500{,}000 & various & $\approx$\EUR{207.64} avg \\
+Days 12--19 & 300{,}000 & $\approx$\EUR{18,000,000} & $\approx$\EUR{125.00} avg \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Total accrued fee \EUR{3,548.40} (exact amount depends on daily closing prices). The fee settles as a single cash payment.
+
+\begin{lstlisting}
+tau_10 = Transaction(type = FEE_SETTLEMENT, day = 20):
+  Move 1: GOLDMAN     own -= 3,548.40   [own, EUR]
+  Move 2: CALPERS_EU  own += 3,548.40   [own, EUR]
+\end{lstlisting}
+
+\noindent\textbf{Loan disposal.} $\vec{w}_{\text{CALPERS}}(u_{\mathrm{loan}})[\mathrm{own}]\!: +1 \to 0$; $\vec{w}_{\text{GOLDMAN}}(u_{\mathrm{loan}})[\mathrm{own}]\!: -1 \to 0$. SBL state RETURNED (terminal); SFTR ETRM.
+
+Final positions:
+
+\begin{center}\small
+\begin{tabular}{l l r r r r r r l}
+\toprule
+\textbf{Entity} & \textbf{Unit} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+CALPERS\_EU & TTE & 500{,}000 & 0 & 0 & 0 & 0 & 0 & 500{,}000 \\
+CALPERS\_EU & BUND & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+CALPERS\_EU & EUR & 628{,}548 & 0 & 0 & 0 & 0 & 0 & 628{,}548 \\
+GOLDMAN & TTE & $-500{,}000$ & 0 & 0 & 0 & 0 & 0 & $-500{,}000$ \\
+GOLDMAN & BUND & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+GOLDMAN & EUR & $-575{,}773$ & 0 & 0 & 0 & 0 & 0 & $-575{,}773$ \\
+COUNTERPARTY\_C & EUR & $-52{,}775$ & 0 & 0 & 0 & 0 & 0 & $-52{,}775$ \\
+HEDGE\_FUND & EUR & 29{,}250{,}000 & 0 & 0 & 0 & 0 & 0 & 29{,}250{,}000 \\
+MARKET & TTE & 500{,}000 & 0 & 0 & 0 & 0 & 0 & 500{,}000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Goldman retains $\mathrm{own}(\text{TTE}) = -500{,}000$ from the delivery to the hedge fund, a relationship separate from the loan. The CalPERS loan is fully closed: all 500{,}000 TTE returned, 0 on loan.
+
+\noindent\textbf{Final conservation.} TTE: $500{,}000_C - 500{,}000_G + 500{,}000_M - 500{,}000_{\mathrm{Virt}} = 0$ \checkmark. BUND: all zero \checkmark. EUR: sums to zero across all entities including virtual wallets \checkmark.
+
+\noindent\textbf{PnL.}
+\begin{itemize}[nosep]
+\item \textbf{CalPERS}: \EUR{3,548.40} fee $+$ \EUR{625,000} manufactured dividend; TTE position unchanged, unrealised $500{,}000 \times (61.00 - 58.50) = \text{\EUR{1,250,000}}$.
+\item \textbf{Goldman}: \EUR{3,548.40} fee $+$ \EUR{625,000} manufactured dividend paid; earned the repo spread on rehypothecated Bunds.
+\item \textbf{Hedge Fund}: short PnL $(58.50 - 61.00) \times 500{,}000 = -\text{\EUR{1,250,000}}$; must buy back at \EUR{61.00} to close.
+\end{itemize}
+

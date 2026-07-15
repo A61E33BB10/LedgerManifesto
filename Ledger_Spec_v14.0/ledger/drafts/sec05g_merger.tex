@@ -1,0 +1,80 @@
+\section{An Elective Merger}\label{sec:tour-merger}
+
+The hardest corporate action for a deterministic system is one where the holders
+choose. Different holders of the same security take different consideration, so the
+same event produces different moves for different wallets --- and yet the security has
+one price series that every holder must read the same way. This stop, the last on the
+ACME line, shows both halves handled by holder choice entering as ordinary data. The
+following March, an acquirer $Q$ takes over ACME; write the target line as $T$, held
+1{,}000 shares, marked \EUR{100}, split 500 to holder $A$ and 500 to holder $B$.
+
+\subsection{Nothing moves until confirmation}
+
+The announcement opens a messy window: terms proposed, elections open, proration
+unknown. The design's answer to the window is to declare no operator for it. With no
+operator, nothing adjusts --- no quote is transported, no strike moves, no number
+changes --- and any attempt to consume a datum across the still-unresolved boundary
+fails closed. The fail-closed reaches only consumption that would \emph{cross} the
+announced boundary; it does not freeze the $T$ line. A fresh $T$ print taken in the
+standing pre-merger basis and read in that same basis is no boundary crossing, so $T$
+marks normally all through the arbitrage window --- only a datum trying to convert across
+the unresolved terms is stopped. The world has said a merger is coming; the log records
+that it is pending and computes nothing across it. This is the opposite of guessing, and
+it is what lets the window be messy without corrupting anything.
+
+Confirmation resolves it. The final terms are \EUR{102} cash or 2.04 $Q$ shares per
+$T$ share, under a 60\% aggregate cash cap that here does not bind. $A$ elects cash,
+$B$ elects stock, so half the book elects cash --- comfortably under the cap, which is
+why nothing is prorated. The elections are not inferred; each holder's choice is a logged
+instruction, read by the contract as declared data.
+
+\subsection{Different moves, one fate, and a weld in aggregate}
+
+On the entitlement plane the two holders get different moves, because they chose
+differently: $A$'s 500 shares become $500 \times 102 = \EUR{51{,}000}$ cash, and $B$'s
+500 shares become $500 \times 2.04 = 1{,}020$ $Q$ shares. On the quotation plane the
+$T$ series has one fate, read identically by every holder: the confirmed blend of
+\EUR{51} cash and 1.02 $Q$ per $T$ share, declared as the composite
+$\texttt{Subst}(Q, 1.02) \circ \texttt{Shift}(-51)$ --- no new case: the composite is
+one declared conversion, the pair $(f, c) = (1.02, 51)$. A stale \EUR{100} $T$ mark transports across it to
+$(100 - 51)/1.02 = 2450/51$ per $Q$ share, an exact rational.
+
+No single holder's moves match the blend --- that is what an election means --- so the
+door cannot check the merger holder by holder against a uniform rule. It checks the
+legs in aggregate at the confirmed $(f, c) = (1.02, 51)$: the quantity legs must sum
+to $f$ times the total, $1{,}020 = 1{,}000 \times 1.02$, and the cash legs to $c$ times
+the total, $\EUR{51{,}000} = 1{,}000 \times 51$. Both hold. This aggregate weld is a
+distinct check reserved for a confirmed elective structure; it does not replace the
+strict per-holder weld that governs a uniform action, which stands at full strength for
+every non-elective boundary. Each holder's own allocation is then economic detail,
+checked by recomputation against that holder's logged election and the confirmed
+proration.
+
+The value is continuous in aggregate to the minor unit. Before: $1{,}000 \times 100 =
+\EUR{100{,}000}$. After: $1{,}020 \times 2450/51 + 51{,}000 = 49{,}000 + 51{,}000 =
+\EUR{100{,}000}$, with no rounding residue, since $1{,}020/51 = 20$ exactly. The
+per-holder differences are each measured against the one transported mark of $2450/51$
+per $Q$ share, and each is exactly that holder's own elected consideration seen against
+that mark: $A$'s \EUR{51{,}000} of cash stands \EUR{1{,}000} above the \EUR{50{,}000}
+its 500 shares carried before, and $B$'s $1{,}020$ $Q$ shares, valued at the mark, come
+to \EUR{49{,}000}, \EUR{1{,}000} below. The two differences sum to zero, but this is a
+frame identity, not a transfer between the holders: no value passes from $B$ to $A$.
+Each holder's consideration settles against the acquirer $Q$ --- $Q$ pays $A$'s cash and
+issues $B$'s shares --- and because the cash cap does not bind, both elections are
+satisfied in full, nothing prorated and nothing exchanged between the two. The
+$\pm\,\EUR{1{,}000}$ is simply what each election is worth when both are marked at the
+single blended price the $T$ line resolves to.
+
+And because the boundary transported only what it observed, a fresh $Q$ price is
+ordinary marking profit and loss, not a phantom. If $Q$'s next print is \EUR{50}, the
+transported mark $2450/51$ per share leaves a gap of $50 - 2450/51 = 100/51$ per
+share, and over 1{,}020 shares that is $1{,}020 \times 100/51 = \EUR{2{,}000}$ exactly
+--- old information meeting a fresh mark, shown as market movement, never absorbed into
+the merger operator. \emph{Because holders elect differently, no single holder's moves
+match the confirmed blend, so the per-holder weld that governs a uniform action cannot
+apply; what the door checks instead is the aggregate weld --- the quantity legs summing
+to $f$ times the total, $1{,}020 = 1{,}000 \times 1.02$, and the cash legs to $c$ times
+the total, $\EUR{51{,}000} = 1{,}000 \times 51$ --- the distinct check an elective
+structure forces. That the contract stays deterministic and replays to the same
+per-holder transactions holds here too, but it is the aggregate weld this stop turns
+on.}

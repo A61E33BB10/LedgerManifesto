@@ -1,0 +1,216 @@
+\begin{abstract}
+Every firm that trades keeps score more than once. One set of systems books the
+trades; another values them; a third reports them; a fourth settles them. These
+systems hold overlapping copies of the same facts, and the copies drift apart.
+When they disagree --- and they disagree every day --- people reconcile: they
+find the breaks, decide which copy is right, and correct the others by hand. This
+document describes a system of record for post-trade activity built so that a
+large class of those disagreements cannot occur, because the numbers they would
+disagree about are never stored twice. Positions, profit and loss, balance
+sheets, and reports are computed from one immutable record rather than maintained
+alongside it.
+
+The design rests on a single claim. \emph{The ledger is the orchestrator of the
+output of many smart contracts.} The smart contracts run outside the ledger's
+trust boundary, each triggered by an event --- an incoming trade, a lifecycle
+event (an expiry, a coupon, a barrier fixing), or a corporate action (a dividend,
+a split, a spin-off). When its trigger fires, a contract reads the declared data
+in the ledger and the stamped observations it is allowed to see, works out what
+must change, and produces transactions --- moves, terms versions, status writes.
+The ledger runs none of the contracts' product-specific logic. Transactions
+arrive at its single door; the door admits each one, records it in the immutable
+log, and every view --- positions, profit and loss, reports --- is computed from
+the log.
+
+The chapters that follow substantiate this claim: first the door and the log,
+then the declared data a contract may read, then the contracts and their
+triggers, and finally a sequence of real products --- cash equity, a dividend
+forecast, listed futures, a structured note, a special dividend, a spin-off, an
+elective merger, and a securities loan --- each processed by the same machine.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\section{The Orchestrator Thesis}\label{sec:thesis}
+
+\subsection{The problem is reconciliation}
+
+Consider what has to be true for two internal reports to agree. A trading desk's
+risk system says the book holds 2{,}000 shares of a company; the firm's general
+ledger says the same position is worth \EUR{100{,}000}; the regulatory report
+says a dividend was received on it last week. These three statements are about one
+underlying fact --- a holding and its history --- but each system stores its own
+copy of that fact and updates it on its own schedule. If the risk system applied
+a stock split and the general ledger did not, the share count and the valuation
+now describe different states of the world. Nothing inside either system is wrong;
+they are simply out of step. Finding that break, and fixing it, is reconciliation,
+and it is where much of the cost and most of the operational risk of a
+post-trade system lives.
+
+The design in this document removes the source of the break rather than
+detecting it faster. There is one record: an ordered, append-only stream of
+events. A position is not a stored number that systems update; it is the sum of
+the moves that touched it, computed on demand from the stream. Profit and loss is
+not a second stored number; it is the difference of two valuations, each computed
+from the same positions. A balance sheet is a projection; a report is a
+projection. Because balances, profit and loss, and reports are all computed from
+the one stream, two of them cannot disagree about a fact the stream records only
+once. Within the system's scope, three reconciliation failures that dominate
+real operations --- trading system against general ledger, profit and loss
+against balance sheet, and one entity's books against another's --- are not
+merely made rare. Each of them is a disagreement between two projections of one
+record, and a disagreement between two projections of one record is not a state
+the system can be in.
+
+\subsection{The division of labour}
+
+The stream is not enough on its own, because someone has to decide what events to
+put in it. A trade must become a change in holdings and cash; a coupon date must
+become a payment; a two-for-one split must double a share count and halve a price
+reference. Each of these decisions is specific to a product and, often, to a
+single contract's terms. There is no general rule that turns ``a barrier was
+observed at 78.40'' into the right set of moves for every structured note ever
+written; the note's own terms say what happens.
+
+The design draws a sharp line here. The logic that works out what a particular
+event means for a particular product lives in a \emph{smart contract}: a
+deterministic function that reads the relevant facts and produces the resulting
+transactions. A financial instrument, on this view, is a contract that emits
+moves, and adding a new product is writing a new contract, not changing the
+ledger. The ledger itself performs none of this product-specific work. It admits
+transactions; it does not manufacture them. Its job is to take each proposed
+transaction at its single door, decide whether the transaction is well-formed,
+record it if so, and refuse it otherwise --- and then to answer every question
+about the resulting state by reading the log.
+
+This division is what the word \emph{orchestrator} in the thesis names. The
+contracts compute; the ledger admits and records; the views are read back. The
+ledger orchestrates the output of the contracts without running the contracts'
+internals, in the same sense that a database commits the rows an application hands
+it without containing the application's business rules.
+
+\subsection{Three words that need pinning down}
+
+The thesis uses three phrases loosely enough to mislead a careful reader, so we
+fix their exact content before building on them.
+
+\paragraph{``Outside the ledger'' means outside its trust boundary.} A contract
+is external to the ledger, untrusted by it, and verifiable against it. None of
+this requires the contract to run in a separate process or on a separate machine.
+The reference implementation of a processor is an ordinary function called in the
+same process as the door. ``Outside'' is a statement about authority, not
+location: the ledger never treats a contract's output as authoritative merely
+because the contract produced it. Whatever a contract submits is a proposal until
+the door admits it, and it is admitted under exactly the same checks as every
+other transaction.
+
+\paragraph{``Runs none of the logic'' is scoped to product-specific logic.} The
+ledger interprets nothing and prices nothing. It runs no pricing model, no
+product-specific settlement rule, no event-specific special case. It does,
+however, run one generic thing, and honesty requires naming it. When a datum
+recorded before a corporate action is read after it, the ledger converts that
+datum by an operator the corporate action \emph{declared} --- halving a price
+across a two-for-one split, for instance. This conversion is not product logic
+and not a pricing decision; it is the mechanical application of a declared
+operator drawn from a small fixed menu, and the ledger applies it uniformly to
+everything that crosses the boundary. The pricing function that decided a note was
+worth what it was worth stays a black box the ledger never opens. Section~\ref{sec:data}
+makes this precise; here it is enough to say that ``the ledger runs none of the
+logic'' means none of the \emph{contracts'} logic. The one computation the ledger
+does perform is this read-seam application, and it is not an interpreter of anything
+a contract wrote.
+
+\paragraph{Conservation is not something the door checks.} It would be natural to
+say the door admits a transaction only after checking that it does not create or
+destroy value. That is not what happens, and the difference matters. The unit of
+change is a \emph{move}: a positive quantity of one unit leaves one wallet and the
+same quantity enters another. A move is a transfer and nothing else; it has no way
+to express a quantity appearing from nowhere. Because a transaction is built from
+moves, an unconserved transaction cannot be constructed --- there is no value for
+the door to reject. The door checks the things that \emph{can} fail. Conservation
+is not among them, because it cannot fail. Section~\ref{sec:door} develops this;
+it is the first and strongest instance of a principle the whole design leans on:
+where an illegal state can be made unrepresentable, that is preferred to checking
+for it, because a check can be forgotten and a type cannot.
+
+\subsection{Trusted for nothing, verifiable in everything}
+
+If the contracts are untrusted, why is it safe to record what they produce?
+Because everything a contract reads is in the log. A contract reads declared
+terms, the adjustment schedule, dimensions, the datum-kind registry, and stamped
+observations --- all of them log-resident. Given the log up to the point where a
+contract ran, anyone can run the same computation again and check that the
+contract's output is what the declared inputs imply. The ledger therefore trusts
+a contract to \emph{produce} a transaction, never to be \emph{right} about it;
+being right is not trusted, it is checked. This is what ``trusted for nothing,
+verifiable in everything'' asserts, and for everything a contract produces the
+assertion is unconditional.
+
+For what the system takes in from the outside world, the assertion is not
+unconditional, and it would be dishonest to claim otherwise. Two inputs rest on
+named, bounded trust assumptions. First, when a market observation is stamped on
+the way in, the stamp is trusted to describe the source's dissemination
+truthfully. Second, before a kind of observation may be consumed at all, it is
+registered, and the registration declares how that kind transforms across a
+boundary. That declaration is trusted --- but only within a bound. A mandatory
+per-entry witness checks the declaration against the value-invariance identity and
+refuses any kind whose declared dimension would not survive a scale; the trust
+reaches exactly as far as that check and no further. These two assumptions are
+stated once, carried explicitly, and made to fail closed. They are not eliminated. A further mechanism illustrates the limit, and it is a
+rule of the ledger, not a judgement about the market. Every stamped datum declares
+the basis it was observed in. If a datum asserts a basis for which no boundary has
+been recorded --- it claims to live one frame forward of anything the log knows ---
+the ingest door refuses it and quarantines the series by policy. The rule fires on
+a structural mismatch between the datum's declared basis and the log, never on an
+economic guess that some price move ``must'' have been a corporate action. What
+lies outside the system is only the human follow-up: obtaining the missing attested
+notice, so the boundary can be recorded and the series released. That is detection
+and repair after the fact, not prevention, and the system is honest about the
+difference.
+
+\subsection{Two layers of correctness}
+
+The distinction between what is guaranteed and what is checked runs through the
+whole design, and it is worth stating once, plainly, as two layers.
+
+\begin{principle}[Admission and recomputation]\label{prin:two-layer}
+Admission guarantees that no transaction can break the ledger; recomputability
+from declared data guarantees that a wrong transaction can always be detected.
+Structural correctness is enforced at the door. Economic correctness is not
+enforced at the door: it is made checkable by recomputing the transaction from the
+log, and a failed check marks a producer defect, repaired downstream.
+\end{principle}
+
+The first layer is unconditional and owes nothing to the contract. A transaction
+that reaches the log conserves every unit, applies in full or not at all, writes
+each fact through its one legal writer, and leaves no dangling reference --- and
+it has these properties whether the contract that produced it was careful,
+careless, or hostile, because the properties never depended on the contract. The
+second layer is where a contract can still be wrong: it can propose a transaction
+that is perfectly well-formed and yet books the wrong economics --- pays
+\EUR{98} where the declared terms owe \EUR{100}. The door has no basis to refuse
+such a transaction, and it does not try. Instead the discrepancy is caught by
+recomputing the transaction from the log and comparing; the difference is exactly
+the defect, and it is a defect in the producer, never in the ledger, repaired by
+a compensating transaction. The ledger does not manufacture that repair. The
+producer is corrected and resubmits through the same door, and the resubmission
+carries a \texttt{corrects} field naming the transaction it supersedes; the
+original stays in the log, now marked corrected, and both the error and its repair
+survive. Section~\ref{sec:contracts} works this example through in full.
+
+The two layers reduce to one sentence: the ledger \emph{relies on} the first and
+\emph{expects} the second. It relies on
+structural correctness because structural correctness is guaranteed by
+construction and no producer can break it. It expects economic correctness of its
+contracts, and rather than trusting that expectation it makes it checkable,
+turning ``the contract must be right'' from an article of faith into a
+recomputation anyone can run.
+
+The remainder of the document is this claim, developed and then substantiated.
+Section~\ref{sec:door} builds the door and the log and shows why an untrusted
+proposal is safe to record. Section~\ref{sec:data} defines the declared data a
+contract may read. Section~\ref{sec:contracts} specifies the contracts and proves
+out the two layers. The product tour that follows runs eight economically
+distinct events through the one machine, and each stop closes one design question
+by showing the mechanism absorb a real product with real numbers.

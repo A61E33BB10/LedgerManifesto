@@ -1,0 +1,113 @@
+\section{Conclusion and Open Problems}
+\label{sec:conclusion}
+%==============================================================================
+
+\subsection{Summary}
+
+The architecture rests on five concepts: wallet, unit, move, transaction, and contract. It rests on one invariant: every financial event is a set of quantity transfers between wallets, and the total quantity of each unit is conserved. Every instrument is a deterministic contract that emits moves. One immutable event log records them. Pure lifecycle functions extend the log; this gives idempotent processing and replay to any past state. Product complexity is isolated in contracts. The ledger engine is invariant under what is traded. The scalar position suffices while ownership and possession coincide. Where they diverge, the position vector of \S\ref{sec:gpm} extends the balance to six stored coordinates and degenerates back to the scalar when they coincide. Auditability, reproducibility, time travel, and encoded correctness follow; reproducibility holds under version-pinned market data, reference data, and pricing models (\S\ref{sec:scope-limitations}).
+
+The standard is self-consistency: internally inconsistent states are unreachable by construction, not detectable after the fact. Where a failure depends on an external actor and cannot be eliminated, it is made detectable and narrowly scoped. Appendix~\ref{app:reconciliation} records this assessment per failure mode. External reconciliation against custodians, counterparties, and regulatory authorities remains necessary at the ledger boundary.
+
+\subsection{Resolved Design Problems}
+
+Three problems intrinsic to an event-sourced post-trade ledger are resolved; they are stated here only to close them.
+
+\begin{description}[nosep]
+\item[Concurrency.] Resolved by the single-writer workflow model (\S\ref{sec:temporal}). Each lifecycle workflow instance serialises events for its unit. Cross-unit coordination is handled by parent workflows. The executor never receives concurrent mutations for one unit.
+\item[Liveness.] Resolved in two stages (\S\ref{sec:temporal}). Deterministic-date obligations are covered by durable timers. Event-triggered obligations (SBL recalls, collateral substitution, CSA margin, close-out deadlines) are covered by the obligation as a first-class object with invariants P21--P23. The guarantee covers all obligation types. Durable timers (liveness) composed with the idempotency chain (safety) yield exactly-once lifecycle processing.
+\item[State attachment.] The unit-versus-wallet question of where unit state lives is resolved by the three-home state model (\S\ref{sec:states}): unit state is a materialised projection of the immutable event log. It is a read cache the log always rebuilds, not an authoritative mutable store.
+\end{description}
+
+\subsection{Open Problems}
+
+The following are design-level questions, not implementation details. All must be resolved before production, with two exceptions: repos and access control can be addressed incrementally.
+
+\begin{description}[nosep]
+\item[Netting and close-out.] Atomic moves are gross. Netting is a higher-level operation: it inspects pending gross moves, computes net amounts per $(\text{counterparty},\text{unit})$ pair, and emits reduced net moves. Conservation holds by construction: the net moves form a transaction whose signed edge-sum is zero. The algebra of netting (commutativity, associativity, interaction with CCP default management) is unformalised, particularly for multilateral netting through CCPs. Close-out netting under the ISDA Master Agreement is a mass lifecycle event over many contracts. The per-contract model requires a cross-contract close-out mechanism that terminates multiple contracts, computes close-out values, and emits one net settlement move.
+\item[Correction algebra.] Compensating transactions are described informally. A formal algebra of corrections (anti-moves, amendment chains, composition rules) would make corrections first-class objects.
+\item[Multi-entity federation.] The design assumes one shared ledger. Multi-entity deployments require a federation protocol preserving conservation across ledger boundaries. Inter-company eliminations for consolidated reporting are unaddressed.
+\item[XVA.] CVA, DVA, and FVA are non-transfer value changes that do not decompose into wallet-to-wallet moves and may require a dedicated adjustment layer (valuation mechanics: \S\ref{sec:valuation}).
+\item[Bitemporal semantics.] Economic and booking timestamps are distinguished informally. A full bitemporal model would handle market-data restatements without corrupting the historical record (market data: \S\ref{sec:basis}).
+\item[Tax-lot tracking.] Wallets store net quantities. US wash-sale and specific-identification reporting require per-lot tracking (date, quantity, cost basis) as move-stream metadata, with a lot-selection method (FIFO, specific identification). Its interaction with the futures accumulated-cost method (\S\ref{sec:futures}), which deliberately avoids per-trade tracking, is unresolved.
+\item[Impairment and ECL.] IFRS~9 expected credit losses and IAS~36 impairment reduce carrying value without a counterparty transfer. These may require a virtual impairment-reserve wallet or an extension of the move primitive.
+\item[Data privacy and GDPR.] The append-only log conflicts with GDPR Article~17 (erasure) when moves carry personal data. Candidate resolutions: pseudonymous identifiers linked to a separate mutable store; crypto-shredding; or a schema in which personal data never enters the log. Crypto-shredding trades against time travel: once keys are destroyed, \allowbreak\texttt{clone\_at(\allowbreak$t$)} returns anony\-mised counterparty references. That is acceptable for financial replay but incomplete for audit requiring counterparty identification. The choice fixes the move schema and must be made at design time.
+\item[Access control and actor attribution.] The move primitive carries no authenticated actor identity. Production requires per-move attribution to an authorised actor, maker-checker workflows, cryptographic non-repudiation, and wallet-level read/write permissions scoped to role and organisational boundary.
+\item[Repos.] Repurchase agreements (GMRA) share collateral and settlement primitives with SBL (\S\ref{sec:gpm}) but differ in title-transfer semantics. Extension requires the GMRA-specific lifecycle events (open leg, close leg, repricing, substitution, classic repo versus buy-sell back).
+\item[Default management.] Counterparty or clearing-member default requires close-out, portfolio auction, and loss allocation. Conservation must accommodate loss mutualisation (transfer of losses to surviving participants), which needs governance and waterfall rules the framework does not provide.
+\item[Pre-trade validation.] The framework is silent on pre-trade checks (credit limits, position limits, margin sufficiency, regulatory constraints). A pre-condition gate on the move primitive is a natural extension point. Its interaction with the conservation law is unspecified.
+\item[Migration from legacy architectures.] Adoption requires migrating from separate trading systems, risk engines, and general ledgers: parallel running with reconciliation during transition, progressive routing of new trades, and back-loading of historical positions. The political economy of the transition is as consequential as the technical path.
+\item[Tokenised securities.] Appendix~\ref{app:cdm-walkthrough} establishes the tokenised-equity model, the double-counting resolution, and the custodian-is-flat principle. It identifies four CDM v6.0.0 gaps. Open: cross-chain interoperability; partial backing and proof-of-reserves; regulatory classification under MiFID~II and SEC frameworks; tokenised-collateral eligibility; and the interaction of on-chain governance with custodian-mediated shareholder voting.
+\end{description}
+
+\subsection{Flagged Open-Items Register}
+
+The items below are the forward agenda; they are kept distinct from the proven quantity algebra. They are migration, governance, operational, and conformance risks. None invalidates the design on correctness grounds. Each escalation is also cited at its home section: futures in \S\ref{sec:futures}, managed-account in \S\ref{sec:managed}.
+
+\subsubsection{State-Model Adoption Risk Register (F1--F8)}
+
+These accompany the three-home state model (\S\ref{sec:states}). F2, F5, F6 require external stakeholders before any code ships. F1, F3, F4, F7, F8 are internal engineering risks manageable within the delivery programme. Each row pairs a risk with its mitigation.
+
+\begin{longtable}{@{}p{0.5cm}p{6.3cm}p{6.3cm}@{}}
+\toprule
+& \textbf{Risk} & \textbf{Mitigation} \\
+\midrule
+\endhead
+F1 & Migration scope: every downstream consumer that reads unit state as one combined field must be retrofitted. & Ship an accessor that presents the split state as the one combined field, preserving read compatibility; split additively before cutover; parallel-run $\geq$ one quarter with reconciliation. \\
+F2 & Ownership of the C8 fungibility predicate is ungoverned. & Per-product RACI in the Unit Store registry; Legal/Product/Risk sign-off for predicate changes; version the predicate. \\
+F3 & Monotone carrier key-space growth at $10^7\times10^6$ scale is unbenchmarked. & Benchmark Option-accessor cost and cache behaviour before merge; tombstone-compaction policy for rows \texttt{Some(zero)} beyond the retention horizon. \\
+F4 & C1--C14 is a multi-sprint test programme, not a release. & Land the schema with the type-enforced conditions first; stage C2/C3/C8/C11 over later releases; never merge below C1+C2+C3. \\
+F5 & Mandate-as-unit creates an SFTR/EMIR reporting surface for mandate issuance. & Pre-flight with Regulatory; determine whether $u_{\mathrm{MA}}$ issuance needs a UTI/LEI pair; possible \texttt{reportable} opt-out flag. \\
+F6 & CDM alignment (\texttt{TradeState} per \texttt{Trade} vs $\texttt{PositionState}[w,u]$) is asserted, not verified. & Rerun the Rosetta NS1--7 mapping against the three-map schema before any CDM adapter work; publish a delta document. \\
+F7 & Onboarding cost of three maps, Option/Monotone carriers, and thirteen conditions is real. & Ship a decision tree, runbook, and cheat sheet; mandatory training before handler work. \\
+F8 & Forward migration is irreversible once the pre-migration combined wallet-state representation is collapsed into the three maps. & Keep a read-only mirror of that pre-migration representation $\geq$ four quarters post-cutover; document the inverse mapping explicitly. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Testing Commitments (Mutation Score)}
+
+Concrete targets, to be met before production. The generator universe (CDM enum $\times$ product-type cross-product) is finite and enumerable, so coverage is structurally bounded.
+
+\begin{itemize}[nosep]
+\item Event handlers (decimal arithmetic): 85--90\,\%. Conservation kills most sign and coefficient mutants.
+\item Lifecycle guards: 70--80\,\%. Boundary-comparison mutants ($>$ versus $\geq$) require targeted tests.
+\item Overall core: $\geq 80\,\%$ (the Feathers change-safety threshold).
+\item State-machine model at $|W|=3$, $|U|=2$, depth $\leq 6$: $10^5$--$10^6$ reachable states (TLC-tractable); conservation-violating handlers are caught at depth~1.
+\end{itemize}
+
+\subsubsection{Managed-Account Escalations (ME1--ME5)}
+
+Open items from \S\ref{sec:managed}, distinct from the segregation theorem (CONS $\wedge$ LOC $\wedge$ C4) proved there.
+
+\begin{longtable}{@{}p{0.5cm}p{12.6cm}@{}}
+\toprule
+& \textbf{Open item} \\
+\midrule
+\endhead
+ME1 & Store-versus-derive for account-level scalars (NAV, high-water mark): which are stored and which recomputed on read is unsettled. \\
+ME2 & The observation surface is unattested: the external observations driving mandate evaluation carry no cryptographic attestation; an attestation envelope is required. \\
+ME3 & Counterparty legal identity: the mapping from client to a governed LEI is outside the ledger and must be bound. \\
+ME4 & Localisation condition C4 is asserted in the segregation argument, not yet discharged by a type. \\
+ME5 & No in-ledger solvency liveness: continuous solvency monitoring of the managed account is not a framework guarantee. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{Futures Escalations (FE1--FE2)}
+
+Open items from \S\ref{sec:futures}, distinct from the futures lifecycle and its closing identity (cumulative VM $=$ economic PnL) proved there.
+
+\begin{longtable}{@{}p{0.5cm}p{12.6cm}@{}}
+\toprule
+& \textbf{Open item} \\
+\midrule
+\endhead
+FE1 & Variation-margin settlement fan-out cost at scale is unbenchmarked. \\
+FE2 & The derived-consequence alternative to storing accumulated cost per position (C11) was declined; the trade-off is recorded, not closed. \\
+\bottomrule
+\end{longtable}
+
+\noindent Concurrency, liveness, and state attachment are resolved (\S\ref{sec:temporal}, \S\ref{sec:states}). The items in this register and in Open Problems are not. The quantity algebra is sound within the boundary of \S\ref{sec:scope-overview}. The open items bound what the framework does not yet establish.
+
+
+%==============================================================================
+% APPENDICES
+%==============================================================================

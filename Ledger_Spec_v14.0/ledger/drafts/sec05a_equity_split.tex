@@ -1,0 +1,125 @@
+\section{Cash Equity and the Split Phantom}\label{sec:tour-equity}
+
+The plainest product makes the plainest case, so the tour opens on cash equity: a
+purchase, its cash dividend, and then the split that is the first event with a way to
+go quietly wrong.
+
+\subsection{The trade and its dividend}
+
+The trade is where the ACME line begins. The book buys 1{,}000 ACME shares at
+\EUR{100}, and the executed trade is a contract triggered by execution: it produces
+one transaction, and that one transaction, at trade date, books both legs at once. It
+brings 1{,}000 of the ACME share unit from the counterparty's virtual wallet into the
+book's wallet, and it moves \EUR{100{,}000} of cash the other way, into the
+counterparty's virtual wallet --- whose balance is now the unsettled payable the book
+owes. Both legs are booked the instant the trade is struck, because on the trade date
+the position is already owned and the cash is already due; what has not yet happened is
+the external transfer that will hand the counterparty its money. The door checks that
+ACME is a registered unit and that the transaction is well-formed, appends it, and the
+book's share balance is 1{,}000 --- not a stored position some later process must
+maintain, but the sum of the one move the log records --- while the counterparty's
+virtual cash balance is the \EUR{100{,}000} still owed. Settlement, when it comes,
+generates no moves at all: the positions were already correct from trade date, and the
+external transfer of the cash is recorded as state --- the payable's confirmation,
+marked on the transaction the log already holds --- not as a second transaction. The trade-date
+booking and the settlement-date transfer are two dated facts joined by that
+virtual-wallet balance, not a single instant in which shares and cash change hands
+together; conservation holds within the one trade-date transaction, and nothing new is
+needed to express it.
+
+The cash dividend is the simplest lifecycle contract there is, and it is worth seeing
+in full precisely because there is so little to it. ACME declares a \EUR{2} ordinary
+dividend. This is the boundary $(f, c) = (1, 2)$: the quantity factor is 1, so no
+share count changes, and the per-share cash is \EUR{2}. The contract, triggered by
+the confirmed notice, reads the terms and the holding and submits one transaction. It
+pays cash $1{,}000 \times 2 = \EUR{2{,}000}$ into the book's wallet, and it records
+the declared operator \texttt{Shift} $-2$ as the boundary the read seam will
+thereafter apply to prints: a cum-dividend quote of \EUR{102}, read across that
+boundary, transports to $(102 - 2)/1 = \EUR{100}$, exactly the price going
+ex-dividend. The stored price reference on the instrument itself is not moved --- under
+an ordinary dividend a price terms field stands, and it is a market print crossing the
+seam, not a stored field, that the boundary shifts. Value is conserved across the
+boundary up to the cash the boundary paid:
+\EUR{102{,}000} of shares beforehand is \EUR{100{,}000} of shares plus \EUR{2{,}000}
+of cash after. There is no separate dividend engine. There is a contract that reads a
+boundary and emits moves, and it is the same shape of contract that will, in a
+moment, process a split.
+
+A word on the feeds, because this basis convention is the ledger's own. Exchanges and
+vendors rebase a quote series for a split or a large special dividend, but not for an
+ordinary one: a print taken the morning after an ordinary ex-date arrives
+\emph{unadjusted}, in the same basis as the day before. Treating the \EUR{2} ordinary
+dividend as a boundary that carries a pre-ex quote to its ex-frame is therefore a
+convention the ledger declares and applies at the read seam, reconciled there against
+feeds that do not share it --- not a frame the feed already speaks. Nor does the
+convention forecast the market: the realised ex-drop is nearer $c\,(1-\tau)$ than the
+full $c$, because the dividend is taxed in the holder's hands, and that gap between the
+transported quote and the next fresh print is ordinary marking profit and loss, never
+something the boundary absorbs.
+
+\subsection{The split, and the phantom it invites}
+
+On the first of June, ACME splits two-for-one. The corporate-action contract reads
+the confirmed notice, whose declaration is \texttt{Scale 2} --- the boundary
+$(f, c) = (2, 0)$ --- and submits one transaction that does three things at once: it
+moves the holding from 1{,}000 to 2{,}000 shares, it appends a new terms version
+carrying the halved reference price of \EUR{50}, and it writes the new basis. Because
+it is one transaction, no reader can ever see the shares doubled while the basis still
+says pre-split, or the basis advanced while the shares have not moved. The door's
+invariance weld admits it only if the quantity leg realises $q \mapsto q \cdot f$ with
+no cash leg, which \texttt{Scale 2} with $c = 0$ does.
+
+Now the event that breaks careless systems. At 09:59, one minute before the split
+takes effect, a vendor prints an ACME price of \EUR{100}, stamped in the pre-split
+basis. At 10:03 someone values the position. The share count is now 2{,}000. The most
+recent print is \EUR{100}. Multiply them and the book is worth
+$2{,}000 \times 100 = \EUR{200{,}000}$. Every factor here is individually correct:
+2{,}000 is the true share count, and \EUR{100} was a true, recently printed price.
+The product of two correct numbers, \EUR{200{,}000}, contains \EUR{100{,}000} of
+phantom value on top of the true \EUR{100{,}000} --- and no internal reconciliation can
+catch it, because nothing internal disagrees: the position system and the valuation
+system are both reading real data. The error is that the two
+numbers live in different frames: the quantity is post-split, the price is pre-split,
+and they were never entitled to meet.
+
+The right number is \EUR{100{,}000}, and it can be reached from either frame. In the
+pre-split frame, $1{,}000 \times 100 = \EUR{100{,}000}$. In the post-split frame, the
+stale print is first transported across the boundary by the same declared
+\texttt{Scale 2}, now consumed at the read seam: $100 / 2 = \EUR{50}$, and only then
+allowed to meet the 2{,}000-share count, $2{,}000 \times 50 = \EUR{100{,}000}$. Both
+frames agree because there is one declared operator and it is applied wherever a
+pre-split number tries to cross. Single-basis consumption is the rule the door
+enforces here: a quantity and a price may be multiplied only in one frame, and it is
+the ledger that decides the frame, from the declared boundary, not the feed that
+happens to have printed last.
+
+The design forbids the phantom by refusing to build it. The 09:59 print is not
+deleted or corrected --- it is real data and stays in the log --- but the pairing of a
+pre-split price with a post-split quantity is not a wrong number the door computes and
+lets through. It is a transaction that does not typecheck, and a stale datum met at a
+boundary with no declared conversion is a typed refusal, not a silent \EUR{200{,}000}.
+
+One more turn shows why the frame has to be decided by declared order and not by
+arrival order. Suppose the book pulls a history a week later, and reads a May print of
+\EUR{102} across both the May dividend and the June split. The two boundaries compose
+in effective order: dividend first, then split, giving $(102 - 2)/2 = \EUR{50}$. The
+reverse order, $102/2 - 2 = \EUR{49}$, is a different number, and it is not a valid
+conversion of anything: no pair of bases on the chain has it, and no operator the
+menu can build will forge it. The arithmetic does not commute, so if arrival order
+could pick the order of composition, the same datum would convert to \EUR{50} or
+\EUR{49} depending on when it happened to be read. It cannot, because the composition
+is fixed by the declared boundaries, and \EUR{50} is the only number the declared
+data admits.
+
+None of this required restating a single stored share. The 1{,}000 became 2{,}000 by
+one recorded move, and the reference price became \EUR{50} by one appended terms
+version; the old count and the old price both still stand in the log exactly as
+written. \emph{The decision this stop rests on is single-basis consumption composed in
+declared order: a quantity and a price meet only in one frame, the ledger fixes that
+frame from the declared boundary rather than from whichever feed printed last, and when
+boundaries stack it is the declared effective order --- not the order a datum happens to
+arrive --- that fixes the single number it converts to, which is why \EUR{50} is forced
+and \EUR{49} cannot be assembled. That quantities are never restated in place is the
+visible consequence, not the cause: the phantom is unrepresentable because the pairing
+that would build it does not typecheck, not because a restatement was performed
+carefully.}

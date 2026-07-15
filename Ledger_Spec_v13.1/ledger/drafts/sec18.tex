@@ -1,0 +1,298 @@
+\section{Invariants, Conservation Laws, and Property-Based Testing}
+\label{sec:invariants}
+%==============================================================================
+
+This section states the framework's correctness claims once, as precise testable invariants, under the canonical numbering P1--P31, with three further conformance-tier properties P32--P34 stated at their homes (Section~\ref{sec:invariants-producer}). The conditions C1--C14 and the basis-layer invariants of Section~\ref{sec:state-basis} are indexed here against the guarantees they discharge. The invariants serve two roles at once. They are the design specification: the system is correct exactly when all of them hold. They are the test oracle: property-based testing checks every generated input against them. Executable pre/postcondition forms are given in Appendix~\ref{app:properties}; this section fixes the prose statements and the cross-links.
+
+%------------------------------------------------------------------------------
+\subsection{Conservation as Central Invariant and Universal Oracle}
+\label{sec:invariants-conservation}
+
+Conservation states that nothing is created or destroyed inside the ledger: every quantity that leaves one wallet arrives in another, so across all wallets the holdings of each unit always cancel to zero. This is the one property every generated test checks.
+
+The conservation law $Q(u)=\sum_w w_t(u)=0$, for every unit $u$ and time $t$, is the central invariant. It is an algebraic consequence of move semantics ($\mathrm{src}\mathrel{-}=q;\ \mathrm{dst}\mathrel{+}=q$) and holds for every transaction by construction (Section~\ref{sec:ledger}). The conserved-charge analogy is exact: the charge is the total quantity of each unit.
+
+Conservation governs \emph{quantities per unit}, not values (the FX witness is given in Section~\ref{sec:valuation}). Value changes from price movements, including FX, are carried by the valuation projection $V_t=\sum_u w_t(u)\cdot P_t(u)$ (Section~\ref{sec:valuation}). Valuation is a linear functional on the state. Dual valuation applies two price vectors to one state. PnL is the functional's difference at two times. All three derive from conservation and the additive structure of moves.
+
+Conservation is therefore a universal oracle. For any transaction sequence, checking $Q(u)=0$ is constant-time after the sum, and it detects any violation of the system's fundamental guarantee. A conservation failure is an implementation bug, never a financial event.
+
+%------------------------------------------------------------------------------
+\subsection{The Core Invariants P1--P10}
+\label{sec:invariants-core}
+
+The ten core invariants are the acceptance criteria for any implementation. Each is a universally quantified sentence about the ledger---over all transactions, all times, or all inputs of the named kind---so a single counterexample falsifies an implementation regardless of its other outputs. Appendix~\ref{app:properties} gives each as an executable oracle; the prose statement is fixed here.
+
+\begin{enumerate}
+\item[\textbf{P1}] \textbf{Conservation.} $Q(u)=\sum_w w_t(u)=0$ for all units $u$, all times $t$. (Stated as System Closure in Section~\ref{sec:ledger}, Theorem~\ref{inv:P1}.)
+\item[\textbf{P2}] \textbf{Atomic commitment.}\label{inv:P2} A transaction applies completely or not at all; no partial state is observable.
+\item[\textbf{P3}] \textbf{Referential integrity.}\label{inv:P3} Every move references existing wallets and an existing unit.
+\item[\textbf{P4}] \textbf{Log monotonicity.}\label{inv:P4} The event stream is append-only; no entry is retroactively rewritten. Hash chaining---each entry carries the hash of its predecessor---provides tamper-evidence: it detects tampering but does not prevent it. Prevention requires deployment controls (WORM storage, consensus, or hardware security modules). The design requires tamper-evidence as the minimum; stronger immutability depends on the environment.
+\item[\textbf{P5}] \textbf{Transaction idempotency.}\label{inv:P5} Applying the same transaction twice (by \texttt{tx\_id}) has no incremental effect.
+\item[\textbf{P6}] \textbf{Lifecycle idempotency.}\label{inv:P6} Applying the same lifecycle event to the same unit state produces no additional moves. The basis coordinate obeys the same algebra: \texttt{SetBasis} is an absolute replacement write, so re-applying it is the identity (\S\ref{sec:state-basis}).
+\item[\textbf{P7}] \textbf{Virtual/real ledger isolation.}\label{inv:P7} No move has one endpoint in a virtual ledger and the other in the real ledger.
+\item[\textbf{P8}] \textbf{Snapshot consistency.}\label{inv:P8} \texttt{clone\_at($t$)} reconstructs the complete view---balances \emph{and} unit state, the basis coordinate \texttt{usBasis} included---identical to the ledger state at time $t$, under retro-effective boundary insertions as under any other event (\S\ref{sec:basis-time-travel}).
+\item[\textbf{P9}] \textbf{Lifecycle purity.}\label{inv:P9} For fixed inputs, lifecycle functions produce identical outputs and no effect beyond the return.
+\item[\textbf{P10}] \textbf{PnL path-independence.} $\mathrm{PnL}=V_{t_1}-V_{t_0}$, independent of the intermediate transactions (Section~\ref{sec:valuation}, Theorem~\ref{inv:P10}).
+\end{enumerate}
+
+Two further oracles exercised by the same generators are global rather than numbered among the ten. \emph{Totality}: every valid input returns a success or a well-typed error, never an unhandled exception. \emph{Valid transitions only}: every product/state/event triple absent from the product's transition table is rejected. Both are stated in executable form in Appendix~\ref{app:properties}.
+
+%------------------------------------------------------------------------------
+\subsection{SBL Invariants P11--P20}
+\label{sec:invariants-sbl}
+
+Securities borrowing and lending adds ten invariants. They narrow the valid-state set without relaxing any core invariant: every transaction satisfying P11--P20 also satisfies P1--P10. The full statements are in Section~\ref{sec:sbl-invariants}, together with the position vector and Single-Coordinate Move Principle they rest on. The index follows; entries marked \emph{by construction} are not tested but structural---the write discipline makes a violation unbuildable.
+
+\begin{description}[leftmargin=3.2em,style=nextline]
+\item[P11 Paired legs] Every SBL settlement transaction carries both a securities and a collateral leg (exceptions: uncollateralised, cash pool, triparty RQV).
+\item[P12 On-loan consistency]\label{inv:P12} $w^{\mathrm{onloan}}_e(u)$ equals the summed quantity of that entity's live loans of $u$.
+\item[P13 Collateral sufficiency]\label{inv:P13} Posted collateral covers exposure, by one of three formulations: per-loan cash, cash pool, non-cash bilateral.
+\item[P14 Locate drawdown]\label{inv:P14} Every short-sale admission draws down a named, live locate: it references the locate unit and decrements its \texttt{remaining\_quantity} in the same admission; drawdown is monotone and terminal states are absorbing. \emph{By construction:} structural under the locate unit's serialised lifecycle. The capacity bound at confirmation is P26.
+\item[P15 Partial-return monotonicity]\label{inv:P15} Loan quantity is monotonically non-increasing.
+\item[P16 SFTR completeness]\label{inv:P16} Each reportable SBL event produces exactly one SFTR report.
+\item[P17 Settlement-state monotonicity]\label{inv:P17} Settlement states advance monotonically.
+\item[P18 Lender ownership invariance]\label{inv:P18} A pure lender's $\mathrm{own}$ coordinate is constant across lending operations under title transfer (buy-in excluded). \emph{By construction:} under the Single-Coordinate Move Principle, loan initiation and return write $\mathrm{onloan}$, never the lender's $\mathrm{own}$.
+\item[P19 Rehypothecation regime compliance]\label{inv:P19} Rehypothecation is validated against the legal regime.
+\item[P20 Available-inventory identity]\label{inv:P20-hub} $\mathrm{avail}(e,u)=\vec w_e(u)[\mathrm{own}]-\vec w_e(u)[\mathrm{onloan}]+\vec w_e(u)[\mathrm{borr}]$. \emph{By construction:} a definition computed on read from three stored coordinates, never stored, hence not violable (Invariant~\ref{inv:P20}).
+\end{description}
+
+%------------------------------------------------------------------------------
+\subsection{Obligation Liveness Invariants P21--P23}
+\label{sec:invariants-obligation}
+
+Recalls, collateral substitutions, margin deliveries, and close-out deadlines are event-triggered obligations. Obligations are first-class objects governed by three invariants, stated in full in Section~\ref{sec:obligation-invariants}. The three apply the ledger's core algebra to deadlines: an obligation must resolve by its deadline (P21), resolve without creating or destroying quantity (P22), and gain nothing from a repeated discharge (P23).
+
+\begin{description}[leftmargin=3.2em,style=nextline]
+\item[P21 Obligation liveness] For every obligation $o$ with deadline $t_d$: $\forall t>t_d,\ o.\mathit{state}\in\{\textsc{Discharged},\allowbreak\textsc{Compensated},\allowbreak\textsc{Defaulted}\}$. No obligation persists in \textsc{Pending} or \textsc{Attempted} past its deadline (Invariant~\ref{inv:P21}).
+\item[P22 Obligation conservation] Every discharging and every compensating move set satisfies $Q(u)=0$; the mechanism does not bypass the executor. Follows from P1 (Invariant~\ref{inv:P22}).
+\item[P23 Obligation idempotency] Discharging the same obligation twice (by $o.\mathit{id}$) has no incremental effect; the discharge predicate is checked before any move is emitted. Composes with P5 and P6 (Invariant~\ref{inv:P23}).
+\end{description}
+
+%------------------------------------------------------------------------------
+\subsection{Basis Invariants P24 and P25}
+\label{sec:invariants-basis}
+
+The basis layer contributes two testable invariants: the property form of the tip weld (Principle~\ref{prin:tip-weld}), and door soundness at the market-data boundary (\S\ref{sec:basis-contract}). In plain terms: the two ways of computing the basis coordinate never disagree (P24), and nothing crosses the market-data door without a registered unit and a committed basis point (P25).
+
+\begin{description}[leftmargin=3.2em,style=nextline]
+\item[P24 Basis tip agreement]\label{inv:P24} At every accepted prefix of the log, the booking-order status fold and the effective-order chain projection agree on \texttt{usBasis} for every registered unit (executable form in Appendix~\ref{app:properties}).
+\item[P25 Ingest-door soundness]\label{inv:P25} For every observation offered to the ingest door: on acceptance, every stamped unit is registered and every stamped basis id is a committed point of that unit's chain; on refusal, nothing is admitted and the payload is retained --- the refusal is the quarantine (executable form, with the boundary property catalogue P-DET through P-LAG, in \S\ref{sec:basis-contract}).
+\end{description}
+
+%------------------------------------------------------------------------------
+\subsection{Locate Invariant P26}
+\label{sec:invariants-locate}
+
+The locate layer contributes one testable property. Unlike P1--P20, it is neither structural nor discharged by a condition: over-location freedom is a \emph{precondition} on admission, not an \emph{invariant} of every reachable state. A lawful later sale of located stock lowers the capacity bound without touching a locate, so the property is enforced at the confirmation door (the locate-capacity weld, Principle~\ref{prin:locate-weld}) and witnessed at each confirmation position, not over reachable states. No artifact may restate it as a standing reachable-state invariant. Its full statement is in Section~\ref{sec:sbl-locates}; the runnable oracle and its generator are \texttt{p26} (\texttt{reference/Ledger.hs}, Part~G).
+
+\begin{description}[leftmargin=3.2em,style=nextline]
+\item[P26 Locate-capacity admission]\label{inv:P26-hub} At every commit position that admits a locate confirmation by an in-ledger lender $\ell$ in unit $u$, the summed remaining quantity of $\ell$'s active put-on-hold locates of $u$ is at most $\max\!\bigl(0,\ \mathrm{avail}(\ell,u)-\mathrm{regulatory\_hold}(\ell,u)\bigr)$, both sides at that position. Falsifiable by replaying the log alone (Invariant~\ref{inv:P26}). The companion short-sale drawdown of P14 is \emph{structural}: a short sale references a live locate and decrements its remaining quantity monotonically in the same admission; a converted or expired locate is absorbing. A double-spend is therefore a non-state.
+\end{description}
+
+%------------------------------------------------------------------------------
+\subsection{Producer and Vocabulary Invariants P27--P31}
+\label{sec:invariants-producer}
+
+The processor contract (\S\ref{sec:processor-contract}), the declared-operator discipline, the adjustment schedule, and the datum-kind registry (\S\ref{sec:state-basis}) contribute five testable invariants. Each runs in the property suite; the oracles are in \texttt{reference/Ledger.hs}, Part~L (P27, P28, P30) and with their gates (P29, P31).
+
+\begin{description}[leftmargin=3.2em,style=nextline]
+\item[P27 Producer agreement]\label{inv:P27} For every processor-originated transaction on a committed log, an independent recomputation from the log prefix alone --- declared terms, adjustment schedule, dimensions, datum-kind registry, stamped observations --- yields the identical transaction in canonical form (\texttt{canonicalTx}; equality on \texttt{Transaction}, zero diff). Oracle \texttt{recomputeOK}, higher-order over the processor; the terms leg is the named oracle \texttt{propTermsRecompute}; the corporate-action instance joins follow-ons on \texttt{txBoundary} $\cup$ \texttt{txCause}.
+\item[P28 Cause committed]\label{inv:P28} Every committed transaction carrying \texttt{txCause} names a boundary id committed strictly before it; a dangling or self-referential cause is refused (\texttt{CauseNotCommitted}), never admitted. Oracle \texttt{pCauseCommitted}.
+\item[P29 Schedule totality]\label{inv:P29} The witness of \hyperref[cond:C14]{C14}: registration and every terms append are admitted exactly when the written version's adjustment schedule yields one well-formed entry per (corporate-action class, field), the classes drawn from the closed \texttt{CAClass} (\S\ref{sec:basis-cdm}); the refusal channel is \texttt{ScheduleIncomplete} and only that. Oracle \texttt{propScheduleTotalGate}.
+\item[P30 Dimension invariance]\label{inv:P30} Under a boundary declaring $(f\neq0,c)$, the per-dimension action (Theorem~\ref{thm:dimension-invariance}) preserves the value identity for every declared field and every registered kind's components; the composite-kind oracle \texttt{dkDivSplitOK} checks the dividend-list identity and fails the misdeclared variant. Oracle \texttt{propDimInvariance}.
+\item[P31 Kind totality]\label{inv:P31} For every observation offered to the ingest door: on acceptance its claimed kind is in the pinned registry; on refusal of an unregistered kind nothing is admitted and the payload is retained (\texttt{UnregisteredKind}) --- the P25 shape at the vocabulary plane. Oracle \texttt{pKindTotal}.
+\end{description}
+
+\noindent Three further properties are conformance-tier: their executable forms live where \texttt{transport} lives, since the reference carries no operator arithmetic. P32 (confirmation gate: a pending boundary blocks consumption, and an empty declaration yields refusal, never identity --- \S\ref{sec:basis-cdm}); P33 (elective aggregate invariance, against the elective case of Principle~\ref{prin:invariance-weld}); P34 (basket joint consumption: the spin-off pair is derivable while any single-component projection is refused until fresh per-component stamps --- \S\ref{sec:basis-worked}). The transport-leg obligations of the composition law attach to Proposition~\ref{prop:composition-law} and ride P30's suite run.
+
+%------------------------------------------------------------------------------
+\subsection{The Conditions C1--C14}
+\label{sec:invariants-conditions}
+
+The state model imposes the conditions C1--C14. Each is defined once at the site that forces it: C1--C12 by the three-home construction (Section~\ref{sec:states}), C13 and C14 by the data plane's basis edge (Section~\ref{sec:state-basis}). A condition is not a test but a constraint on what can be written down: each renders an illegal state unrepresentable. The index below cross-links them; the discharge map (Section~\ref{sec:invariants-discharge}) gives the mechanism by which each acts.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{1cm}p{10.4cm}@{}}
+\toprule
+\textbf{Cond.} & \textbf{Content (defined in Section~\ref{sec:states}, except C7/C10 in Section~\ref{sec:unit-store} and C13/C14 in Section~\ref{sec:state-basis})} \\
+\midrule
+\endhead
+C1 & Position accessor returns Option; monotone carrier keeps the key set stable. \\
+C2 & Handler-level conservation per event class, vacuous base case included. \\
+C3 & Atomic \texttt{Transaction} across all three maps; partial application unrepresentable. \\
+C4 & Capability-scoped reads; cross-overlay reads forbidden; exports via \emph{UnitStatus}. \\
+C5 & \emph{UnitStatus} registration-total; product-declared defaults at registration. \\
+C6 & \emph{ProductTerms} versioned, append-only; no in-place mutation. \\
+C7 & \emph{ProductTerms} registration-total; first write at registration. \\
+C8 & Two-track amendment by a total fungibility predicate (Preserving / Breaking). \\
+C9 & Zero-holder handlers discharge $\sum=0$ vacuously. \\
+C10 & Re-registration is a hard error, never a silent reset. \\
+C11 & Each \emph{PositionState} field has a canonical writer set; an outside writer is a type error at authorship. \\
+C12 & All per-(wallet, mandate/strategy) economic state lives in \emph{PositionState}; the $W$-sector is empty by schema. \\
+C13 & Basis edge: every consumed datum names its joint basis; consumption requires pointwise agreement with the total assignment $\beta_t$ or a ledger-authored arrow---the data-plane sibling of P3. \\
+C14 & Adjustment-schedule totality: registration and every terms append admitted only if the schedule yields exactly one well-formed entry per (corporate-action class, field); witnessed by P29 (\hyperref[cond:C14]{C14}, \S\ref{sec:basis-schedule}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+C13 rests on three basis-layer correctness claims, stated once in Section~\ref{sec:state-basis} and indexed here:
+\begin{itemize}[nosep]
+\item \emph{single-basis consumption} (Invariant~\ref{inv:basis}): over each stamp's whole domain, every balance and every datum a valuation consumes either agrees pointwise with one total assignment $\beta_t$ or crosses by a ledger-authored arrow;
+\item the \emph{tip weld} (Principle~\ref{prin:tip-weld}): \texttt{applyTx} admits \texttt{SetBasis}\,$b$ only as the post-insertion effective-order tip, so the booking-order status fold and the effective-order chain projection agree on \texttt{usBasis} at every log prefix;
+\item the \emph{invariance weld} (Principle~\ref{prin:invariance-weld}): a basis-changing corporate action is admitted only if its moves and declaration jointly satisfy the invariance identity of Theorem~\ref{thm:basis-value-invariance}.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\subsection{Which Condition Discharges Which Invariant}
+\label{sec:invariants-discharge}
+
+The core of this section is the map from conditions to the guarantees they discharge, and the mechanism in each case. The guarantees carry the P1--P31 names this section fixes; Section~\ref{sec:states} presents the same map under its own local labels, and the names fixed here are canonical over them. P26 is not in the table below: it is an admission-gated precondition, not a guarantee discharged by a structural condition. P27 is likewise not below: it is a recomputation check over committed logs, not a structural discharge.
+
+``Unrepresentable'' is used precisely. An \emph{abstract type} whose only constructor is a checked smart constructor makes an illegal value impossible to build, so it never reaches the operation that would act on it. A \emph{non-empty list type} makes a versionless state untypable. A \emph{GADT write-tag} is a per-field marker checked at compile time, then erased once writes share a stored row. A \emph{value-level check} is a runtime guard returning an error, not a type fact. Conservation, by contrast, holds by construction: each \texttt{Move} edge names both parties, so the signed per-unit sum of any move list is the group identity \texttt{mempty}. That is a structural fact of the \texttt{Transaction} type, not a runtime check.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{3.5cm}p{1.6cm}p{6.4cm}@{}}
+\toprule
+\textbf{Guarantee} & \textbf{Cond.} & \textbf{Mechanism} \\
+\midrule
+\endhead
+P1 Conservation & C2, C3 & A \texttt{Transaction} carries its flow as \texttt{Move} edges; each edge contributes $\mathrm{qneg}\,q\mathbin{<\!\!>}q=\texttt{mempty}$, so the signed per-unit sum of any move list is the group identity by construction---the empty list (registration) included. No unconserved \texttt{Transaction} exists to reject, hence no validate gate. C3 makes one \texttt{Transaction} span all three maps, so partial application is unrepresentable. \\
+P8 Snapshot / replay & C1 & Replay is the \texttt{foldM} of the event stream, a catamorphism: replaying the events always rebuilds the exact value. It is therefore a homomorphism $\texttt{replay}(xs\mathbin{<\!\!>}ys)=\texttt{replay}\,xs \mathrel{>\!\!=\!\!>} \texttt{replay}\,ys$; the Kleisli $\mathbin{>\!\!=\!\!>}$ is glossed at mechanism note~(4). The monotone carrier (C1) keeps the key set stable across any checkpoint cut, so checkpoint-independence follows from the law, not a test. \\
+P6 Lifecycle idempotency & C5 & The lifecycle stage lives in \emph{UnitStatus}$[u]$, $u$-keyed and written by replacement, so re-applying a stage write is the identity (\texttt{EXPIRED} over \texttt{EXPIRED} is \texttt{EXPIRED})---structural at one key. Non-conserved \emph{PositionState} fields share the algebra (\texttt{hwm} by $\max$, \texttt{entry\_nav} write-once); conserved fields draw replay-safety from P1. \\
+Terms immutability (underpins P4) & C6, C7 & \emph{ProductTerms} is an append-only $\mathrm{NonEmptyList}[\mathit{TermsVersion}]$, so a versionless unit is untypable; registration totality fixes the first version at registration. \\
+Identity immutability (underpins P4) & C10, C8 & Re-registration is a hard error; a breaking amendment allocates a new unit $u_{\mathrm{new}}$ and never rewrites $u_{\mathrm{old}}$. \\
+P7 Isolation / read scoping & C4 & Isolation holds by the per-move locality predicate (both endpoints in one ledger), not by conservation; cross-overlay reads are forbidden at the capability layer wrapping the accessors, not in the data reference. \\
+Handler-field canon (underpins P9) & C11 & The canonical writer set per field is a \texttt{FieldWrite} GADT: a write by a field-writer outside the set is a type error at authorship, erased once writes share a delta row. \\
+Single-basis consumption (Invariant~\ref{inv:basis}) & C13 & Every consumed datum carries a joint basis stamp; the snapshot seam admits it only on pointwise agreement with $\beta_t$ over the stamp's whole domain, so mis-based value is a typed refusal, never a \texttt{Cash} (\S\ref{sec:basis-types}). \\
+Basis tip agreement (P24; underpins P6, P8) & C13 & The tip weld: \texttt{applyTx} admits \texttt{SetBasis}\,$b$ only as the post-insertion effective-order tip, so a retro-effective boundary re-asserts the standing tip and the coordinate never regresses (Principle~\ref{prin:tip-weld}). \\
+Value invariance at boundaries & C13 & The invariance weld: a basis-changing corporate action is admitted only if its moves and declaration satisfy the invariance identity, a value-level gate at the single door (Theorem~\ref{thm:basis-value-invariance}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The lifecycle-idempotency and snapshot guarantees rest on the status discipline. UnitStatus is a shared per-unit read cache of the event log, rebuilt exactly by replay: it holds the lifecycle stage, the basis coordinate \texttt{usBasis}, the last settle mark, and the successor pointer (\S\ref{sec:states-unitstatus}).
+
+Each mechanism above is a type or a value-level gate carrying a theorem. The Haskell rendering makes the correspondence explicit.
+
+\noindent\textbf{Types as theorems.} The five anchors below render the discharge mechanisms as Haskell, one type or function per guarantee. They are verbatim excerpts of the reference (\texttt{reference/Ledger.hs}, the three-home model of Section~\ref{sec:states}; see Appendix~\ref{app:properties}). Deriving clauses and the record fields marked `\texttt{...}' are elided. Quantities are exact \texttt{Integer} minor units forming an additive abelian group (\texttt{Qty}, \texttt{<>}~=~addition, \texttt{mempty}~=~zero). Floating point is excluded because conservation and replay are arithmetic facts it would forfeit.
+
+\paragraph{(1) P1 conservation --- \texttt{Move} edges / \texttt{unitDelta} (C2).} Conservation is a property of the \texttt{Transaction} type, not a checked side-condition. Each \texttt{Move} names both parties, so its per-unit contribution is $\mathrm{qneg}\,q\mathbin{<\!\!>}q=\texttt{mempty}$. Summing those contributions over any move list is a \emph{monoid homomorphism} from the free monoid of moves to \texttt{Qty}. Per unit, the column sum over wallets is taken edge by edge. The composite is identically \texttt{mempty} by the monoid laws. The empty list (a move-less registration or amendment) is \texttt{mempty}, so a zero-holder event (C9) conserves with no special case. Summing edges, never dividing by a holder count, excludes the divide-by-zero-holders bug class. There is no unconserved \texttt{Transaction} to reject, hence no validate gate.
+
+\begin{lstlisting}[language=Haskell]
+data Move = Move
+  { mFrom :: !WalletId, mTo :: !WalletId, mUnit :: !UnitId
+  , mQty  :: !PosQty, ... }   -- positive magnitude (sole door mkPosQty); from -= q, to += q
+
+-- Conservation witness: the signed per-unit sum over the edges. By construction:
+unitDelta :: UnitId -> Transaction -> Qty
+unitDelta u tx =
+  foldMap (\m -> if mUnit m == u then let n = unPosQty (mQty m) in qneg n <> n else mempty) (txMoves tx)
+-- law:  unitDelta u tau == mempty   for every unit u and transaction tau
+
+netDelta :: Transaction -> Qty
+netDelta tx = foldMap (\m -> let n = unPosQty (mQty m) in qneg n <> n) (txMoves tx)
+-- law:  netDelta tau == mempty   for every tau (the empty/registration case too)
+\end{lstlisting}
+
+\noindent A one-edge transfer shows there is nothing to reject: a \texttt{Move} names both endpoints, so a half-edge is unrepresentable. The fragment is illustrative usage, not reference text:
+\begin{lstlisting}[language=Haskell]
+-- Just m = move a b u (Qty 1000) t s   -- the checked door builds the PosQty edge
+-- tx = Transaction u [m] mempty [] Nothing Nothing Nothing
+netDelta tx == mempty           -- by construction; a one-sided delta cannot be built
+\end{lstlisting}
+
+\paragraph{(2) P4 terms immutability --- \texttt{NonEmpty} (C6/C7).} \texttt{ProductTerms} wraps a \emph{non-empty} list, so a ``registered but versionless'' unit is untypable, and \texttt{currentTerms} is total without a \texttt{Maybe}. No setter exists. The only growth operations are \texttt{register} (singleton) and \texttt{appendVersion} (append, never rewrite).
+
+\begin{lstlisting}[language=Haskell]
+newtype ProductTerms = ProductTerms (NonEmpty TermsVersion)    -- abstract
+
+currentTerms :: ProductTerms -> TermsVersion                  -- total: no Maybe
+currentTerms (ProductTerms vs) = NE.last vs
+
+appendVersion :: TermsVersion -> ProductTerms -> ProductTerms -- append-only (C6)
+appendVersion tv (ProductTerms vs) = ProductTerms (vs <> (tv :| []))
+\end{lstlisting}
+
+\paragraph{(3) P8 monotone carrier --- the Option accessor (C1).} \texttt{position} returns \texttt{Maybe}. \texttt{Nothing} is \emph{never held}; \texttt{Just zeroP} is \emph{held and currently flat}; the spec reads these as distinct states. The carrier is monotone by absence: \texttt{Ledger} is abstract, \texttt{applyTx} only inserts or updates a row, and no row-deleter is exported. The key set therefore never shrinks, and a checkpoint cut cannot lose a row.
+
+\begin{lstlisting}[language=Haskell]
+position :: Ledger -> WalletId -> UnitId -> Maybe PositionState
+position l w u = Map.lookup (w, u) (ledgerPS l)
+--  Nothing    = wallet has NEVER held this unit
+--  Just zeroP = held once, currently flat   (the two cannot be collapsed)
+\end{lstlisting}
+
+\paragraph{(4) P8 replay homomorphism --- Kleisli \texttt{>=>}.} Replay is an error-stopping fold. Determinism and checkpoint-independence are the homomorphism law $\texttt{replay}(xs\mathbin{<>}ys)=\texttt{replay}\,xs\mathrel{>\!\!=\!\!>}\texttt{replay}\,ys$, not a test: replaying two batches in sequence equals replaying them together. With the stable key set from (3), the placement of a cut cannot change the result.
+
+\begin{lstlisting}[language=Haskell]
+-- (>=>) runs the first Either-returning step, feeds its result to the next,
+-- and stops at the first error.
+replay :: [Transaction] -> Ledger -> Either LedgerError Ledger
+replay ds l0 = foldM (\l d -> applyTx d l) l0 ds
+\end{lstlisting}
+
+\paragraph{(5) Handler-field canon --- \texttt{FieldWrite} GADT (C11, underpins P9).} The GADT constructors \emph{are} the field-to-writer table: a write by a handler outside a field's writer set is a type error at authorship. A handler is typed by the \texttt{Handler} it speaks for, so the phantom type index constrains at a live call site, not merely in an alias. Once authored, the index is erased to \texttt{SomeWrite}: the check has already happened.
+
+\begin{lstlisting}[language=Haskell]
+data Handler = Settle | Trade | Transfer | FeeCrystallise | Subscribe
+
+-- The balance field is NOT in this table: its sole canonical writer is the Move
+-- edge (handler 'Transfer), applied in applyTx -- so a balance change without a
+-- conserving move is unrepresentable. The rest are non-balance per-position rows.
+data FieldWrite (h :: Handler) where
+  WAc       :: Qty -> FieldWrite 'Settle
+  WAcTrade  :: Qty -> FieldWrite 'Trade
+  WHwm      :: Qty -> FieldWrite 'FeeCrystallise
+  WEntryNav :: Qty -> FieldWrite 'Subscribe
+
+settleHandler :: [(WalletId, Qty)] -> Map WalletId [FieldWrite 'Settle]
+settleHandler legs = Map.fromList [ (w, [WAc q]) | (w, q) <- legs ]
+-- A settle body bumping hwm would emit WHwm :: FieldWrite 'FeeCrystallise and
+-- fail to typecheck against the declared 'Settle output -- C11 IS a type error.
+\end{lstlisting}
+
+%------------------------------------------------------------------------------
+\subsection{Invariants as Specification and Oracle}
+\label{sec:invariants-spec}
+
+The invariants define correctness independently of any implementation. The system is correct if and only if all of them hold, so any property-based test checking an invariant thereby tests the specification. An example-based test verifies one input/output pair; an invariant-based test verifies a property over a whole input class.
+
+A bond coupon payment illustrates the dual role. P1 requires $Q(\mathrm{USD})=0$ before and after the coupon move. P6 requires that paying the same coupon twice produces no additional moves. Applied to randomly generated bonds with random coupon schedules, these two checks exercise scenarios no hand-written suite would enumerate. The equation $Q(u)=0$ governs both the ledger and its test suite.
+
+%------------------------------------------------------------------------------
+\subsection{Property-Based Testing over the CDM Generator Universe}
+\label{sec:invariants-pbt}
+
+Each property has a \emph{generator} (the random-input space) and a \emph{postcondition} (the invariant). The framework draws inputs, applies the operation, and checks the postcondition. A failure yields a minimal counterexample. The executable pre/postcondition for each of P1--P10 and for P24, together with the totality and valid-transition oracles, is given once in Appendix~\ref{app:properties}. P25's, with its generators, is stated with the market-data contract (\S\ref{sec:basis-contract}).
+
+The generators draw from the CDM enumerations: product types, event types, party roles, date rules (Section~\ref{sec:cdm}). These enumerations are closed and finite, so the state space of any product's lifecycle is bounded and coverage is a checklist rather than a probability. Where a random fuzzer might miss a rare combination after millions of runs, the enum-driven generator covers every combination in its first pass. The strategy is compositional: draw a CDM product, draw a sequence of valid lifecycle events, map through $F$ to ledger transactions, and check every invariant.
+
+\paragraph{Completeness by enumeration.} The CDM \texttt{EventIntentEnum} is the closed set of lifecycle intents. For an equity option the applicable intents map one-to-one to unit-state transitions:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{EventIntentEnum} & \textbf{Unit-state transition} & \textbf{Status} \\
+\midrule
+\texttt{OPEN} & $\emptyset\to$ ACTIVE & Covered \\
+\texttt{EXERCISE} & ACTIVE $\to$ EXERCISED & Covered \\
+\texttt{EXPIRE} & ACTIVE $\to$ EXPIRED & Covered \\
+\texttt{ASSIGN} & ACTIVE $\to$ ASSIGNED & Covered \\
+\texttt{NOVATION} & ACTIVE $\to$ NOVATED & Covered \\
+\texttt{PARTIAL\_TERMINATION} & --- & Not applicable (option is all-or-nothing) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Because the enum is closed, the generator drawing intents uniformly from it achieves full intent coverage by construction. Incompleteness is surfaced, not hidden: a new enum value with no transition (say \texttt{RESTRUCTURING}) is produced by the generator, finds no matching rule, and is flagged by the valid-transitions oracle. A missing rejection is as much a bug as a missing acceptance. The \texttt{OptionTypeEnum} $\{$\texttt{CALL}, \texttt{PUT}, \texttt{PAYER}, \texttt{RECEIVER}, \texttt{STRADDLE}$\}$ bounds payout directionality the same way. Every variant must have payout logic; a missing case is a compile-time or test-time error, not a runtime surprise.
+
+%------------------------------------------------------------------------------
+\subsection{Specification-First Development}
+\label{sec:invariants-specfirst}
+
+The properties are written before the implementation. Typed state schemas make illegal field combinations unrepresentable. The core properties are executable specifications. The simplest lifecycle case anchors the simulation harness. The full product universe is reached using CDM enumerations as the generator source. Correctness is thereby defined independently of language, storage backend, or deployment, and the same properties hold from single-process prototype to distributed system. The approach is falsifiable: a property satisfiable by no reasonable implementation reveals a design contradiction before implementation begins.
+
+%==============================================================================
+

@@ -1,0 +1,41 @@
+\section{Reconciliation Failure Mode Taxonomy}
+\label{app:reconciliation}
+%==============================================================================
+
+For activity recorded in the ledger, each class of internal reconciliation break carries one of three assessments: \emph{structurally unreachable}, \emph{easier to detect}, or \emph{addressed by design}. Three modes are structurally unreachable: the architecture makes the divergent state unrepresentable. Six modes are easier to detect but not eliminable. Each of the six depends on an external actor that the ledger only mirrors. Securities-lending breaks are addressed by design: the split-system break no longer exists. Operational failures outside the architecture remain possible: incomplete booking, duplicate booking through external channels, and stale-data ingestion. These require operational controls.
+
+The table follows one pattern. Where the two sides of a historical break are a single object in the ledger, the divergent state does not exist, and the break is unreachable. Where one side lives in an external system, the ledger holds an independent record to compare against, and the break becomes visible rather than impossible.
+
+\begin{center}
+\begin{longtable}{p{4.3cm} p{3cm} p{5.7cm}}
+\toprule
+\textbf{Failure Mode} & \textbf{Assessment} & \textbf{Rationale} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Failure Mode} & \textbf{Assessment} & \textbf{Rationale} \\
+\midrule
+\endhead
+Trading / GL divergence & Structurally unreachable & Trade and accounting entry are one object \\
+\midrule
+PnL / balance-sheet mismatch & Structurally unreachable & Both project the same position set and price vector \\
+\midrule
+Inter-entity breaks (shared ledger) & Structurally unreachable & An inter-entity move is one atomic event \\
+\midrule
+Custodian / depot breaks & Easier to detect & The virtual wallet is an independent comparison point against the external system \\
+\midrule
+Nostro / vostro breaks & Easier to detect & The virtual wallet mirrors the external account; ISO~20022 feedback (deferred-settlement spec) narrows the window \\
+\midrule
+Corporate action mismatches & Easier to detect & Lifecycle events are transactions; idempotence prevents double-processing \\
+\midrule
+Collateral disputes & Easier to detect & Internal valuation is recorded; the counterparty may disagree. Posting and return are moves; eligibility, haircuts, and substitution under UMR are deferred to further specification \\
+\midrule
+FX rate discrepancies & Easier to detect & The dual-valuation framework (valuation spec) surfaces the differential \\
+\midrule
+Securities-lending breaks & Addressed by design & SBL integration (\S\ref{sec:gpm}) removes the split-system break \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+%==============================================================================
+

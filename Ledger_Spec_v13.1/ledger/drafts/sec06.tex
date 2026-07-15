@@ -1,0 +1,163 @@
+\section{Portfolio Valuation and PnL}
+\label{sec:valuation}
+
+Valuation follows from the wallet structure. Ownership is wallet balance. Conservation (\S\ref{sec:ledger}) keeps quantities consistent. Valuation multiplies each position by its price and sums.
+
+\subsection{Quantity versus value}
+
+\begin{mentalmodel}
+The units in the wallets are water sealed in a system of pipes: no operation changes the total volume of each kind, however the water is shifted. Value is not in the pipes. It is what the water would fetch if drained and sold at the rates on a price sheet posted outside the seal, carried back as a single reference currency. Because the sheet hangs outside the seal and its rates move on their own, this money total rises and falls with no water flowing through any pipe; unlike the sealed volumes, it obeys no conservation law.
+\end{mentalmodel}
+
+Conservation guarantees \emph{quantity} balance: the total quantity of each unit across all wallets is zero. This is an algebraic invariant of the move semantics. Conservation does not guarantee \emph{value} balance. Total portfolio value $V_t = \sum_u w_t(u)\,P_t(u)$ moves with prices. Prices are external inputs. They change independently of ledger activity. An FX trade conserves EUR and USD quantities separately. Yet at any rate other than the trade rate, the market value of the EUR received differs from the USD paid. Value conservation holds exactly only for deterministic lifecycle events (Property~\ref{prop:lifecycle-value-invariance}). Conservation secures quantity integrity. The valuation layer accounts for value change due to price movement.
+
+\subsection{Mark-to-market valuation}
+
+\noindent The value of a set of wallets is what unwinding every position at current prices would leave in the reference currency: each balance times its price, summed.
+
+\begin{definition}[Portfolio value]
+\label{def:portfolio-value}
+Let $P_t : \mathcal{U} \to \mathbb{R}$ be a price function at time $t$, with reference currency $P_t(\mathrm{USD}) = 1$. A portfolio is a non-empty set of wallets $W$---the real wallets of a book. Its value is the quantity of reference currency that would remain were every position in $W$ unwound at $P_t$:
+\[
+V_t(W) = \sum_{w \in W}\ \sum_{u \in \mathcal{U}} w_t(u)\,P_t(u).
+\]
+Summing over \emph{all} wallets gives zero by closure (\S\ref{sec:ledger}): real and virtual legs cancel, which is what makes the system closed. A meaningful valuation is therefore always of a chosen wallet scope, never the whole ledger. $P_t$ is an external input, not computed by the framework; it requires only a designated reference currency and a price per unit in that currency. Pricing methodology --- exchange quote, model output, or dealer quote --- and the choice of reference currency and FX rates are fixed by the valuation specification (satellite, out of scope here).
+\end{definition}
+
+\noindent\textbf{Qualification.} $P_t(u)$ presumes orderly, liquid markets. Under halts, closures, or counterparty default it may be stale, absent, or above achievable liquidation value.
+
+\medskip
+\noindent Valuation is one total function from a portfolio scope, a price vector, and a ledger to reference-currency cash. The full price methodology and reference-currency machinery live in the valuation satellite. Here, only the signature and the law it carries.
+
+\begin{lstlisting}[language=Haskell]
+-- Qty, Cash are exact additive groups (Integer minor units, never Float).
+-- Price carries NO Monoid: adding two prices is meaningless, so the type
+-- forbids the one wrong combination. Qty and Price meet only via markValue.
+newtype Qty   = Qty   Integer
+newtype Cash  = Cash  Integer   -- a Monoid: Cash a <> Cash b = Cash (a+b)
+newtype Price = Price Integer
+
+markValue :: Qty -> Price -> Cash         -- markValue (Qty q) (Price p) = Cash (q*p)
+cashSub   :: Cash -> Cash -> Cash         -- pointwise difference: a plus the
+                                          --   group inverse of b
+
+-- A price vector prices EVERY unit (a total function, not a partial lookup):
+-- "a held unit with no price" is unrepresentable; the reference unit prices to 1.
+newtype PriceVec = PriceVec { priceOf :: UnitId -> Price }
+
+-- A PORTFOLIO is a NON-EMPTY set of a book's real wallets; mkPortfolio is the sole
+-- door, so the empty scope -- which values to Cash 0 by the empty sum, the same
+-- degeneracy that makes a whole-ledger fold identically zero -- is unrepresentable.
+-- value is scope-first, total, and history-free: it depends ONLY on current
+-- balances in scope and prices. State-sufficiency is the signature, not a claim.
+newtype Portfolio = Portfolio (Set WalletId)     -- constructor NOT exported
+mkPortfolio :: [WalletId] -> Maybe Portfolio     -- Nothing on the empty scope
+
+value :: Portfolio -> PriceVec -> Ledger -> Cash
+value (Portfolio ws) (PriceVec p) l =
+  foldMap (\((w, u), ps) -> if w `Set.member` ws
+                              then markValue (psBalance ps) (p u) else mempty)
+          (Map.toList (ledgerPS l))
+
+-- A Snapshot pairs one price vector with one ledger, so an endpoint cannot be
+-- valued at the OTHER endpoint's prices. PnL is the difference of two snapshots'
+-- valuations (P10): each is fixed by its own endpoint, so any intermediate
+-- snapshot adds (v `cashSub` v) = mempty -- telescoping, hence path-independence.
+data Snapshot = Snapshot PriceVec Ledger
+pnl :: Portfolio -> Snapshot -> Snapshot -> Cash
+pnl port (Snapshot p0 l0) (Snapshot p1 l1) = value port p1 l1 `cashSub` value port p0 l0
+\end{lstlisting}
+
+\noindent Five illegal states fall out of the types. \emph{A held unit with no price} cannot occur: \texttt{PriceVec} is a total function, not a partial map. \emph{Adding two prices} cannot be written: \texttt{Price} has no \texttt{Monoid}. The only way out of \texttt{Price} is \texttt{markValue}, which lands in \texttt{Cash}. \emph{Path-dependence} cannot enter: \texttt{value} takes a portfolio scope, a \texttt{PriceVec}, and a \texttt{Ledger} --- and no transaction history. The type itself certifies state-sufficiency. \emph{An empty valuation scope} cannot be built: \texttt{Portfolio} is abstract, and \texttt{mkPortfolio} rejects the empty wallet set. The identically-zero whole-book valuation cannot be reached by omission. \emph{Valuing one endpoint at another's prices} cannot be written: an endpoint is one \texttt{Snapshot}, a price vector bound to its ledger. The two arguments of \texttt{pnl} cannot be cross-paired. The fold is total over a finite balance projection, and \texttt{markValue} is exact integer multiplication; \texttt{value} is therefore total and deterministic.
+
+\subsection{State-sufficiency}
+
+\noindent To value the book, the only inputs are where positions stand now and what they are worth now. How they got there does not enter.
+
+\begin{principle}[State-sufficiency]
+\label{prin:state-sufficiency}
+Given that every economically relevant state change is recorded, portfolio value at time $t$ depends only on current wallet balances, current unit state, and current prices. Transaction history is irrelevant.
+\end{principle}
+
+\noindent Unit state carries all embedded lifecycle state: accrued interest, exercise flags, barrier status. It is a materialised projection of the immutable event log (\S\ref{sec:unit-store}), not a separate source of truth. Computing $V_t$ therefore needs one snapshot of balances and one price vector, not a replay; that snapshot is coherent only when its balances and prices stand in one corporate-action basis, which single-basis consumption (Invariant~\ref{inv:basis}) requires. PnL is $O(n)$ in instruments, not $O(m)$ in moves.
+
+\subsection{Path-independent PnL}
+
+\noindent Profit and loss over a period depends only on its two endpoints. The trading in between, however much of it, leaves the total unchanged.
+
+\begin{theorem}[Path-independent PnL]
+\label{inv:P10}
+Profit and loss over $[t_0, t_1]$ is
+\[
+\mathrm{PnL} = V_{t_1} - V_{t_0},
+\]
+a function of the portfolio states at $t_0$ and $t_1$ alone, not of intermediate transactions. (Property~P10.)
+\end{theorem}
+
+\begin{proof}
+Each of $V_{t_0}$, $V_{t_1}$ is fixed by wallet balances and prices at its time, and balances are the cumulative effect of all prior moves. For any intermediate times $t_0 < s_1 < \cdots < s_k < t_1$,
+\[
+V_{t_1} - V_{t_0} = (V_{t_1} - V_{s_k}) + (V_{s_k} - V_{s_{k-1}}) + \cdots + (V_{s_1} - V_{t_0});
+\]
+the interior values cancel, and no path information survives.
+\end{proof}
+
+\noindent The mechanism is telescoping. The content is independence of trading activity. A portfolio that executed ten thousand intermediate trades has the same total PnL as one that executed none, given matching final positions and prices. PnL never requires replaying intermediate transactions: \texttt{pnl} above takes the two endpoints and nothing between them.
+
+\medskip
+\noindent\textbf{Qualification.} The result captures a state change only if it is recorded as a move. An unrecorded fee or an unbooked bilateral agreement falls outside it. PnL is defined as the change in the ledger's valuation, and the ledger records all economic activity within its scope.
+
+\medskip
+\noindent\textbf{Scope.} This is \emph{economic} PnL: the change in fair value. Accounting PnL under IFRS~9 or US~GAAP depends on instrument classification (FVTPL, FVOCI, amortised cost), which is outside the ledger's scope. The framework supplies the position quantities and economic valuations from which it is derived.
+
+\subsection{Price and flow decomposition}
+
+\noindent Total PnL splits in two. Price PnL is the revaluation of the opening holding at the new prices. Flow PnL is the net effect of the period's cash and position moves.
+
+\begin{proposition}[PnL attribution]
+\label{prop:pnl-attribution}
+\[
+\mathrm{PnL} = \mathrm{PnL}_{\text{price}} + \mathrm{PnL}_{\text{flow}},
+\]
+\[
+\mathrm{PnL}_{\text{price}} = \sum_i w_{t_0}(i)\,[P_{t_1}(i) - P_{t_0}(i)],
+\qquad
+\mathrm{PnL}_{\text{flow}} = \Delta w(\mathrm{USD}) + \sum_i \Delta w(i)\,P_{t_1}(i).
+\]
+\end{proposition}
+
+\noindent Worked example: USD reference, one risk unit AAPL.
+
+\begin{center}
+\begin{tabular}{l r r r}
+\toprule
+\textbf{Event} & \textbf{USD} & \textbf{AAPL} & \textbf{Price} \\
+\midrule
+State at $t_0$ \quad ($V_{t_0}=1000+10\cdot100=2000$) & 1000 & 10 & 100 \\
+\midrule
+Buy 5 @ 100 & $-500$ & $+5$ & \\
+Dividend & $+20$ & & \\
+Fees & $-5$ & & \\
+Financing & $-8$ & & \\
+\midrule
+State at $t_1$ \quad ($V_{t_1}=507+15\cdot110=2157$) & 507 & 15 & 110 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{align*}
+\mathrm{PnL} &= V_{t_1} - V_{t_0} = 157, \\
+\mathrm{PnL}_{\text{price}} &= 10\,(110-100) = 100, \\
+\mathrm{PnL}_{\text{flow}} &= (507-1000) + 5\cdot110 = -493 + 550 = 57, \\
+100 + 57 &= 157.
+\end{align*}
+
+\noindent Every cash flow is an explicit USD move: purchase, dividend, fee, financing. Price change revalues existing positions only.
+
+\subsection{Dual valuation}
+
+\noindent The same positions can hold more than one value at once: value is read from a price vector, and more than one price convention can apply.
+
+\medskip
+$V_t$ is a function of an externally supplied price vector, so distinct price conventions value the same positions differently. Applying Definition~\ref{def:portfolio-value} under two conventions, mark-to-market and mark-to-mid, yields the dual valuation. Its construction, the multi-exchange futures case, and its balance-sheet use are developed in \S\ref{sec:substantiation}.
+

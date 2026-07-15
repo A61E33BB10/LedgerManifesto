@@ -1,0 +1,81 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- encoding + clean PDF text extraction ---
+\usepackage{cmap}                 % must precede fontenc
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}              % must follow fontenc
+\input{glyphtounicode}\pdfgentounicode=1
+\AtBeginDocument{%
+  \DeclareFontShape{T1}{lmr}{m}{scit}{<->ssub*lmr/m/sc}{}%
+  \DeclareFontShape{T1}{lmr}{bx}{scit}{<->ssub*lmr/bx/sc}{}%
+}
+
+% --- math, tables, code, graphics ---
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{textcomp}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+\geometry{margin=1in}
+\setcounter{tocdepth}{2}
+\setlength{\emergencystretch}{3em}
+\newcommand{\EUR}[1]{\mbox{\texteuro#1}}
+
+% --- theorem-like environments (used sparingly: a handful of marked
+% propositions, each stated in plain prose first) ---
+\newtheorem{definition}{Definition}[section]
+\newtheorem{principle}[definition]{Principle}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+
+% --- Haskell listings (short illustrative snippets only, <= ~10 lines) ---
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=2em,
+  aboveskip=0.5em,
+  belowskip=0.5em,
+  language=Haskell,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\title{The Ledger: An Orchestrator of Smart Contracts\\[6pt]
+\large One Design, Shown on Real Products}
+\author{R.\ Delloye}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+% sec01 owns: the abstract, a short table of contents, and the thesis section.
+\input{drafts/sec01_thesis}
+
+% --- The mechanism (three sections), each visibly a consequence of the thesis ---
+\input{drafts/sec02_door_log}
+\input{drafts/sec03_declared_data}
+\input{drafts/sec04_contracts}
+
+% --- The product tour: eight stops, one trigger->contract->door->log cycle each ---
+\input{drafts/sec05_tour}
+\input{drafts/sec05a_equity_split}
+\input{drafts/sec05b_div_forecast}
+\input{drafts/sec05c_futures}
+\input{drafts/sec05d_structured_note}
+\input{drafts/sec05e_special_div}
+\input{drafts/sec05f_spinoff}
+\input{drafts/sec05g_merger}
+\input{drafts/sec05h_sbl}
+
+% --- Scope honesty, then the thesis restated with the tour behind it ---
+\input{drafts/sec06_framework}
+\input{drafts/sec07_conclusion}
+
+\end{document}

@@ -1,0 +1,166 @@
+\section{Glossary}
+\label{app:glossary}
+%==============================================================================
+
+Terms carry these meanings throughout. A defined term is used thereafter without
+re-explanation. Property identifiers $\mathrm{P}1$--$\mathrm{P}34$ and condition
+identifiers $\mathrm{C}1$--$\mathrm{C}14$ are stated where they are established,
+and referenced by identifier elsewhere. Each entry below gives the term, its meaning,
+and, where one exists, a pointer to the section that establishes it.
+
+\begin{description}[style=nextline]
+
+\item[Accumulated cost] Per-wallet signed sum $\sum_i(-\mathrm{qty}_i\times\mathrm{price}_i\times\mathrm{mult})$ over the trades of a futures position: negative net-long, positive net-short, zero when flat. A conserved field.
+
+\item[Adjustment schedule] The per-unit answer, carried in \textbf{ProductTerms} from registration, to ``what does each corporate-action class do to each terms field'': a class default, a declared override in a closed rule language, or a designated party owing \textbf{Resolved terms}. Total by condition C14 (\S\ref{sec:basis-schedule}).
+
+\item[Atomic move] The indivisible primitive: transfer of a positive quantity of one unit from a source wallet to a destination. It is the edge presentation of a conserved flow (\S\ref{sec:ledger}).
+
+\item[Balance-sheet substantiation] Demonstration that each balance-sheet figure is a projection of the move stream, reconciled against external authorities at the boundary (\S\ref{sec:substantiation}).
+
+\item[Basis id (\texttt{BasisId})] A unit's basis identifier: its origin or a boundary id. A unit's boundary events form its basis chain in effective order, the lexicographic total order on $(t_{\mathrm{eff}},\mathit{prec},\mathit{bid})$. Stamps and state store basis ids, never ordinals (Definition~\ref{def:basis-id}).
+
+\item[Basis projection (\texttt{BasisView})] The read-only, versioned view of the log the ingestion layer stamps against: per unit, the committed boundary chain in effective order and its tip. It has the same rank as \textbf{UnitStatus}: derivable, discardable, never authoritative. It is arithmetic-free: no operator kinds, parameters, or arrows, so no consumer can re-implement corporate-action logic (\S\ref{sec:basis-contract}).
+
+\item[Basis stamp] The joint basis named by a consumed datum: a finite map $\mathrm{UnitId}\to\mathrm{BasisId}$ assigned per (unit, source) at the ingest door of the \textbf{Market-data contract} (\S\ref{sec:basis-contract}). It is never defaulted from ledger state. Over the stamp's whole domain, consumption requires either pointwise agreement with the prevailing total assignment $\beta_t$ or a ledger-authored arrow (C13; Invariant~\ref{inv:basis}).
+
+\item[CAClass] The closed eight-member taxonomy of corporate-action classes a confirmed notice declares (\S\ref{sec:basis-cdm}). Declared data, never inferred from a name; the schedule totality gate C14 quantifies over it.
+
+\item[CDM] ISDA Common Domain Model: a standardised, machine-executable model of financial products and lifecycle events.
+
+\item[Clone\_at($t$)] Reconstruction of ledger state as of historical time $t$ by replaying the move stream and the logged state changes up to $t$.
+
+\item[Closed system] A system in which quantity is neither created nor destroyed, only moved between wallets (\S\ref{sec:ledger}).
+
+\item[Conservation law] The total quantity of each unit across all wallets is zero at all times: $Q(u)=0$ (P1).
+
+\item[Conserved field] A \textbf{PositionState} field whose per-event-class deltas sum to zero across wallets: $\sum_w\Delta f(w,u)=0$. The property is established per handler, with a vacuous zero-holder base case (C2, C9). Net quantity, accumulated cost, and variation margin are conserved fields.
+
+\item[Confirmation gate] The resolution/consumption boundary: an operator exists only from the W4-attested final-terms notice; between announcement and confirmation nothing adjusts and consumption fails closed or quarantines (\S\ref{sec:basis-cdm}; witnessed by P32).
+
+\item[Coordinate] A component of the position vector; a position type in the wallet model. Each coordinate passes the physical-action test: a distinct physical action modifies it and only it.
+
+\item[Datum-kind registry] The logged vocabulary of consumable market-datum kinds: each kind registers once, with a component dimension declaration and a mandatory invariance witness, before any datum of that kind can enter; an unregistered kind is refused at the door (\S\ref{sec:basis-kinds}; TA-KIND, P31).
+
+\item[Dimension declaration] The declaration every terms field and every registered datum component makes at definition --- quantity-of-$u$, price-in-basis, cash, or dimensionless --- fixing its map under any boundary's $(f,c)$ by the per-dimension action (Definition~\ref{def:dimension-declaration}; Theorem~\ref{thm:dimension-invariance}).
+
+\item[Dual valuation] Two price functions over the same position set: mark-to-market and mark-to-model.
+
+\item[Encumbrance] Owned but not freely deployable: $\mathrm{encumb}=\mathrm{onloan}+\mathrm{coll\_post}$.
+
+\item[Event sourcing] All state is a projection of an append-only log of events (moves).
+
+\item[Forgetful mapping] The CDM-to-ledger map $F$, which preserves economic substance while forgetting business intent and workflow lineage.
+
+\item[Idempotency] Applying the same operation twice has no incremental effect beyond the first application.
+
+\item[Invariance weld] \texttt{applyTx} admits a basis-changing corporate action only if the moves and the declaration jointly satisfy the invariance identity of Theorem~\ref{thm:basis-value-invariance}. Such an action is one atomic transaction carrying its entitlement moves, its \texttt{SetBasis}, and its declaration (Principle~\ref{prin:invariance-weld}).
+
+\item[Lifecycle event] A state transition on a unit (coupon, margin call, exercise, reset) expressed as a transaction.
+
+\item[Managed account] An internal book treated as a virtual portfolio with periodic cash settlement of accumulated PnL.
+
+\item[Market-data contract] The boundary contract for external pricing data (\S\ref{sec:basis-contract}). It has exactly two arrows: the \textbf{Basis projection} flows out; raw observations flow in through the single ingest door. At the door the ledger attaches the \textbf{Basis stamp} from the projection and the \textbf{Source basis convention}. Providers owe value, observation time, signed source, and unit reference only, and need not track corporate actions. A datum whose basis cannot be determined is quarantined, never guessed. Real-time, batch, and multi-vendor feeds face the same door (door soundness P25).
+
+\item[Monotone carrier] A state carrier whose accessor commutes with replay: the value rebuilt from the first $k$ events, then advanced by the rest, equals the value rebuilt from all events. Replay is therefore a single fold with no order dependence (C1; discharges P8).
+
+\item[Move stream] The immutable, append-only log of all atomic moves: the canonical internal record.
+
+\item[Obligation] A recorded commitment to perform a move by a stated time. Discharged when a matching committed transaction appears; liveness is read by a total discharge predicate (\S\ref{sec:temporal}).
+
+\item[One declaration, two consumers] A boundary's declared operator is consumed twice: at the effective time by the corporate-action processor, and forever after at the read seam as the standing conversion on pre-boundary arrivals (Principle~\ref{prin:one-decl-two-uses}).
+
+\item[Option accessor] The position read $\mathrm{position}(w,u)$ returns an optional value: \emph{None} until the first event touches $(w,u)$, a value thereafter. No row is fabricated on read (C1).
+
+\item[Own] First coordinate of the position vector, $\vec{w}_e(u)[\mathrm{own}]$: economic ownership, maintained by buy/sell, determines PnL.
+
+\item[Ownership consistency] $\mathrm{avail}=\mathrm{own}-\mathrm{onloan}+\mathrm{borr}$ for lendable securities. A definitional identity under the six-coordinate model (P20).
+
+\item[PnL] Profit and loss, $V_{t_1}-V_{t_0}$: depends only on initial and final portfolio states (P10).
+
+\item[Position vector] $\vec{w}_e(u)\in\mathbb{R}^6$: $(\mathrm{own},\mathrm{onloan},\mathrm{borr},\mathrm{coll\_post},\mathrm{coll\_recv},\mathrm{coll\_rehyp})$. Available inventory $\mathrm{avail}=\mathrm{own}-\mathrm{onloan}+\mathrm{borr}$ is a projection computed on read. For non-lendable instruments the vector degenerates to a scalar (\S\ref{sec:gpm}).
+
+\item[PositionState] Per-$(\text{wallet},\text{unit})$ economic state: the third state home, holding conserved-additive fields (balance, accumulated cost) and non-conserved fields (high-water mark, monotone by $\max$; entry NAV, write-once). All per-$(\text{wallet},\text{mandate})$ economic state lives here (C12); no flat per-wallet scalars. Read through the \textbf{Option accessor} (\S\ref{sec:states}).
+
+\item[PosQty] The abstract positive magnitude: a quantity known $>0$ by type, whose sole constructor is the parse boundary \texttt{mkPosQty} and whose reader is \texttt{unPosQty} (\S\ref{sec:futures}). It is the magnitude the reference \textbf{Move} carries and the futures trade boundary consumes; no \textbf{PositionState} field carries it.
+
+\item[Processor] The external, untrusted, verifiable machinery --- lifecycle or corporate-action --- that computes a settlement or an adjustment from logged data and submits it through the single door; bound by the processor contract and checked by recomputation (\S\ref{sec:processor-contract}; Principle~\ref{prin:admission-recomputation}, P27).
+
+\item[ProductTerms] The first state home: a unit's contractual terms, immutable, versioned, and append-only. It is a non-empty list of term versions, written first at registration (C6, C7) and never mutated in place. Amendment is two-track (C8).
+
+\item[Projection] Any view computed from the move stream rather than stored independently: balances, PnL, balance sheets, reports (\S\ref{sec:ledger}).
+
+\item[Property-based testing] Checking invariants against randomly generated inputs.
+
+\item[Purity] Lifecycle functions produce identical outputs for identical inputs, with no side effects (P9).
+
+\item[$Q(u)$] Total quantity of unit $u$ across all wallets, $Q(u)=\sum_{w\in\mathcal{W}}w_t(u)$. Zero by the conservation law: the framework is a closed double-entry system.
+
+\item[Real wallet] A wallet representing an actual portfolio position; changes affect PnL.
+
+\item[Reclassification] A move between wallets of the same entity with different position types (e.g.\ rehypothecation, $\mathrm{coll\_recv}\to\mathrm{coll\_rehyp}$).
+
+\item[Registration] Introduction of a unit, recorded as a move-less \textbf{Transaction} that writes the first \textbf{ProductTerms} version and the \textbf{UnitStatus} default together (C5, C7). Its move list is empty, so it is vacuously conserved. Re-registration of an existing identifier is a hard error (C10). It is the move-less instance of the one event type, not an operation standing outside it (\S\ref{sec:states}).
+
+\item[Resolved terms] Adjusted terms rendered by the party the \textbf{Adjustment schedule} designates, entering the log as a W4-attested terms append referencing the boundary --- the second admissible source of adjusted terms, beside the schedule's evaluator (\S\ref{sec:basis-schedule}).
+
+\item[Self-consistency] Internally inconsistent states are structurally unreachable within the ledger's scope, not merely detectable.
+
+\item[Settlement layer] The interface projecting committed ledger activity into external settlement infrastructure (\S\ref{sec:settlement}).
+
+\item[Single-Coordinate Move Principle] An atomic move modifies exactly one coordinate of one unit in the position vectors of the entities it connects.
+
+\item[Smart contract] A deterministic program mapping inputs and state to sequences of atomic moves.
+
+\item[Source basis convention] The per-(unit, source) declaration on file of how a source's dissemination relates to the unit's basis chain: tracks it, lags by a declared offset, pre-adjusts, declares a fixed basis, or makes no claim (O4, \S\ref{sec:basis-contract}). The ingest door consults it to compute the \textbf{Basis stamp}. It is versioned and logged, and owned by market-data operations under TA-BASIS.
+
+\item[State-sufficiency] Portfolio value depends only on current balances, current unit state, and current prices, not on transaction history.
+
+\item[Three homes] The three places unit state lives: \textbf{ProductTerms}, \textbf{UnitStatus}, and \textbf{PositionState} (\S\ref{sec:states}).
+
+\item[Time travel] Reconstruction of the ledger at any historical date and re-execution of lifecycle logic; the read side of \textbf{Clone\_at}.
+
+\item[Tip weld] \texttt{applyTx} admits \texttt{SetBasis}\,$b$ on unit $u$ only if $b$ is the post-insertion effective-order tip of $u$'s basis chain, so a basis regressed by a late notice is unrepresentable (Principle~\ref{prin:tip-weld}; property form P24).
+
+\item[Transaction] The one atomic event recorded in the log: an ordered list of moves together with the state delta they carry. The delta comprises per-wallet bookkeeping (accumulated cost, high-water mark, entry NAV), shared \textbf{UnitStatus} writes, and either a \textbf{ProductTerms} introduction (registration) or an append (preserving amendment). Conservation holds by construction from the signed edge-sum of the moves. The empty move list is conserved for free, so a move-less event needs no check (P1). A transaction is applied whole or rejected whole through the single operation \texttt{applyTx} (P2, C3). There is no separate validation step and no unconserved transaction to reject.
+
+\item[Transfer] A move between wallets of different entities.
+
+\item[Two planes] Entitlements and elections settle per holder as moves (the entitlement plane); the quoted series has one holder-independent fate per boundary, and operators live there (the quotation plane) (Principle~\ref{prin:two-planes}).
+
+\item[Transition function] The pure function carrying a unit's lifecycle state and an event to the next state and its moves (\S\ref{sec:lifecycle}).
+
+\item[TRS] Total return swap: a contract converting virtual ledger performance into real cash flows.
+
+\item[Unit] Any tradable or bookable object: currency, security, derivative, contract.
+
+\item[UnitStatus] The second state home: one value per unit, shared, read identically by every holder. The value changes over time, but UnitStatus is not a separate source of truth: the immutable event log is. Only a logged event changes it, and the stored value is overwritten in place solely as a read cache; replaying the events up to any point rebuilds the exact value that held then. A value exists from registration onward, product-declared defaults applied there (C5; \S\ref{sec:states}). Its content comprises the lifecycle stage, the basis coordinate \texttt{usBasis} (a \textbf{Basis id}, tip-welded; C13, \S\ref{sec:state-basis}), the last settle mark \texttt{usLastSettle}, and the successor pointer. It is the sole home of unit-level shared state.
+
+\item[Virtual ledger] A separate instance of the same framework in which every wallet is virtual, used for strategy simulation.
+
+\item[Virtual wallet] A wallet representing an external counterparty; exists to close the system for conservation.
+
+\item[Wallet] A named account holding quantities of units: a logical partition of position space, not a bank or custody account (\S\ref{sec:ledger}).
+
+\end{description}
+
+\paragraph{The conditions.}
+Each of C1--C14 renders a class of illegal state unrepresentable. They are established in \S\ref{sec:states} (C7 and C10 in \S\ref{sec:unit-store}, C13 and C14 in \S\ref{sec:state-basis}) and cross-referenced from the invariant hub (\S\ref{sec:invariants}).
+
+\begin{description}[style=nextline]
+\item[C1] Option accessor and monotone carrier, both.
+\item[C2] Handler-level conservation, per event class, with a vacuous base case.
+\item[C3] Atomic \textbf{Transaction} across the three state homes; partial application rejected.
+\item[C4] Capability-scoped reads; cross-$(w,u)$ overlay reads forbidden; strategy exports flow only through \textbf{UnitStatus}.
+\item[C5] \textbf{UnitStatus} registration-total; product-declared defaults applied at Unit Store registration.
+\item[C6] \textbf{ProductTerms} versioned, append-only; no in-place mutation.
+\item[C7] \textbf{ProductTerms} registration-total; first write at registration.
+\item[C8] Amendment two-track: a product-declared fungibility predicate decides \emph{Preserving} (append a term version) versus \emph{Breaking} (allocate a fresh unit, with \texttt{SupersededBy}).
+\item[C9] Handlers on zero-holder units discharge $\sum=0$ vacuously; the per-class proof obligation includes the empty case.
+\item[C10] Re-registration of a unit identifier is a hard error, never a silent reset.
+\item[C11] Each \textbf{PositionState} field is tagged with the canonical set of writers permitted to write it.
+\item[C12] All per-$(\text{wallet},\text{mandate})$ economic state lives in \textbf{PositionState}; no flat per-wallet scalars. Enforced by schema.
+\item[C13] Basis edge: every consumed datum names its joint basis; consumption requires pointwise agreement, over the stamp's whole domain, with the prevailing total assignment $\beta_t$ or a ledger-authored arrow (\S\ref{sec:state-basis}).
+\item[C14] Adjustment-schedule totality: registration and every terms append admitted only if the schedule yields exactly one well-formed entry per (corporate-action class, field); an append introducing a field extends the schedule in the same transaction (\S\ref{sec:basis-schedule}).
+\end{description}
+

@@ -1,0 +1,22 @@
+\section{Regulatory Obligations and the Direction of Travel}
+\label{sec:regulatory}
+%==============================================================================
+
+Post-trade regulatory reporting is the dominant compliance cost for derivatives market participants. The same economic event must be reported to multiple trade repositories, each in a jurisdiction-specific format: EMIR Refit (EU~2024/1856, 203 reportable fields), MiFIR (RTS~22, 65 fields), SFTR (Regulation~EU~2015/2365, 155 fields), and CFTC Parts~43 and~45 (rewritten 2022--2024). Dual-sided reporting under EMIR and SFTR makes the reconciliation burden structural. Both counterparties report every lifecycle event independently, and the two reports must match. Mismatches trigger regulatory queries. Firms therefore maintain parallel pipelines per regime, each with bespoke field mappings, validation, and exception management.
+
+\paragraph{CDM and Digital Regulatory Reporting.}
+The ISDA Common Domain Model, governed by FINOS, supplies a single machine-readable vocabulary for trade description. ISDA's Digital Regulatory Reporting (DRR) encodes each regime's reporting rules as executable code over the CDM. The interpretation of a regulation thus becomes a shared, testable artefact rather than a firm-specific implementation. DRR is in production, not sandbox. Four institutions file DRR-generated reports with live trade repositories, further institutions are in proof of concept, and reported acknowledgement rates under EMIR Refit exceed 98\%.\footnote{ISDA, ``Digital Regulatory Reporting: 2025 Year in Review,'' January 2026. Figures are pinned to that publication and not restated as current.} The convergence point is a unified post-trade stack: a trade described once in CDM, reports generated mechanically by DRR, settlement executed by CDM-native contracts.
+
+\paragraph{Framework alignment.}
+The architecture derives this alignment from its own primitives, not from a standard's mandate. Transactions are expressed in CDM (Section~\ref{sec:cdm}). Instruments are deterministic move-generating contracts (Section~\ref{sec:contracts}). The canonical internal record is the immutable event log (Section~\ref{sec:ledger}). The economic content of a DRR report is the lifecycle event, its quantities, and its timing. That content is already present in the move stream and is generated from it by projection. No separate trade-data pipeline is needed.
+
+Two boundaries limit the claim. First, a complete report (e.g.\ EMIR Refit's 203 fields) also requires reference-data enrichment: UTI generation, LEI validation, counterparty classification, collateral detail. This enrichment does not reside in the move stream. It is supplied by the reference-data authority at the ledger boundary (\S\ref{sec:scope-overview}), not by this framework. Second, the framework supplies technical substrate, not organisational compliance.
+
+\paragraph{Conformance checkpoints.}
+The event log satisfies the audit-trail requirements of BCBS~239 Principle~6 (accuracy and integrity) and Principle~11 (distribution): every report projects from one immutable record. The EU Digital Operational Resilience Act (DORA, Regulation~EU~2022/2554) sets testing and traceability requirements in Article~8 (ICT risk management) and Chapter~IV (digital operational resilience testing). Their technical substrate is the property-based testing strategy (Section~\ref{sec:invariants}), the deterministic lifecycle functions, and the immutable audit trail. Full DORA conformance requires operational and organisational measures outside the scope of a design specification.
+
+\paragraph{Mandate issuance reporting.}
+Representing a managed-account mandate as a unit creates an SFTR/EMIR reporting surface for mandate issuance. The framework supplies the mechanism (flag~F5). The \texttt{reportable} predicate on \texttt{ProductTerms} gates two things: whether a unit's issuance requires a UTI/LEI pair, and which units project into the reporting layer. The managed-account treatment (Section~\ref{sec:managed}) carries the construction. F5 remains flagged pending external regulatory sign-off (Section~\ref{sec:conclusion}).
+
+\clearpage
+%==============================================================================

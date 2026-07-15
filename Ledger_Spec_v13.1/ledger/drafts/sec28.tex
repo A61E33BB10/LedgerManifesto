@@ -1,0 +1,188 @@
+\section{The CDM Product Model---A Developer's Guide}
+\label{app:cdm-walkthrough}
+%==============================================================================
+
+The ISDA Common Domain Model defines a layered object hierarchy for financial products. Each layer maps to one ledger construct. The map yields a single result: the ledger unit is the CDM \texttt{Trade}, not the product. This appendix establishes that result through the six layers. It then exercises three boundaries the basic layers do not reach: payout composition, tokenised custody, and date resolution. Each boundary carries one worked instrument. Throughout, ``CDM'' denotes Common Domain Model v6.0.0 (FINOS-governed); field names follow the Rosetta/Rune schema.
+
+%----------------------------------------------------------------------
+\subsection{The Six-Layer Hierarchy}
+\label{sec:cdm-layers}
+%----------------------------------------------------------------------
+
+The layers narrow from shared to unique. Five are reusable infrastructure. Only the Payout is product-specific, and only the Trade is a unit.
+
+\paragraph{Layer 1 --- Observable.} The market quantity a contract references (an equity index, a rate). It is identical across product type, direction, and venue: an option and a future on the same index share one Observable. It is a market-data input to pricing and lifecycle observation. It is not a unit; it is never held or transferred.
+
+\paragraph{Layer 2 --- Payout.} A choice type, and the only truly product-specific layer. An option is one \texttt{OptionPayout}. A future is a \texttt{PerformancePayout} paired with a \texttt{FixedPricePayout}, mirroring an equity swap. CDM does not distinguish listed from OTC here: the economic logic of a listed and an OTC option is the same payout with different strike, expiry, and settlement currency. A put flips \texttt{optionType}. A short reverses direction (\texttt{buyerSeller} for options, \texttt{payerReceiver} for swap-like legs). Nothing else changes. The Payout is the move-generating logic of the smart contract: it defines what transfers occur under what conditions. It carries \emph{no} counterparty identity and \emph{no} collateral reference.
+
+\paragraph{Layer 3 --- EconomicTerms.} {\emergencystretch=3em Wraps the Payout with \texttt{effective\allowbreak Date}, \texttt{termination\allowbreak Date}, and calculation-agent metadata. It drives the lifecycle state machine: the effective date triggers ACTIVE, the termination date triggers expiry, exercise, or settlement observation. Its \texttt{collateral} field is product-intrinsic (repo haircuts, securities-lending collateral). The field is not the variation-margin CSA; that attaches at Trade.\par}
+
+\paragraph{Layer 4 --- NonTransferableProduct.} Wraps EconomicTerms with identifiers and ISDA taxonomy. It is the contract \emph{template}: the code, not the instance, shared by every trade with identical terms. CDM offers two product types. \texttt{Transferable\allowbreak Product} extends \texttt{Asset}; it is for instruments whose economics follow from ownership (equities, plain bonds). \texttt{Non\allowbreak Transferable\allowbreak Product} wraps EconomicTerms; it is for contracts whose payout must be explicitly modelled. Listed options and futures are \texttt{Non\allowbreak Transferable\allowbreak Product}: exchange-traded and fungible, but contracts with explicit payout logic, not assets transferred by ownership. Their exchange fungibility is captured by a shared template: all trades in one contract specification reference the same NonTransferableProduct.
+
+\paragraph{Layer 5 --- TradableProduct.} Binds a template to a \texttt{TradeLot} (agreed price and quantity) and counterparty roles. It is the instance before collateral attachment: counterparties and economics, no collateral terms. A product quoted at many prices to many parties is many TradableProducts. Confirmation makes one a Trade.
+
+\paragraph{Layer 6 --- Trade.} Extends TradableProduct with \texttt{tradeIdentifier} (UTI), \texttt{tradeDate}, resolved parties (LEIs), \texttt{executionDetails}, and \texttt{collateral}. A listed and an OTC trade on the same economic terms share everything up to here. They diverge completely at Trade: counterparty (named bilateral vs.\ CCP), collateral source (bilateral CSA vs.\ CCP rulebook), and venue.
+
+The table restates the hierarchy as a map from CDM layer to ledger construct. Two rows carry the identity result: the Payout is the only product-specific layer, and the Trade is the unit.
+
+\begin{center}\small
+\begin{tabular}{lll}
+\toprule
+\textbf{CDM layer} & \textbf{Ledger construct} & \textbf{Varies across instruments?} \\
+\midrule
+Observable & Market-data input & No \\
+Payout & Move-generating logic & \textbf{Yes---the only product-specific layer} \\
+EconomicTerms & Contract definition & No (structural wrapper) \\
+NonTransferableProduct & Contract template & Shared if terms identical \\
+TradableProduct & Priced instance & Trade-specific \\
+Trade & \textbf{Unit} & Always \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%----------------------------------------------------------------------
+\subsection{Unit Identity: Trade Is the Unit}
+\label{sec:cdm-trade}
+%----------------------------------------------------------------------
+
+Two trades on one product can differ in counterparty and collateral. A unit that equated them would lose that difference. The principle fixes the unit at the level where nothing is lost.
+
+\begin{principle}[Trade $=$ Unit]
+The ledger unit is the full CDM Trade object, including its \texttt{Collateral} field. Product identity is not unit identity.
+\end{principle}
+
+The unit key is the Trade identifier (UTI for OTC; contract specification for listed). The forgetful map $U:\mathbf{Trade}\to\mathbf{NonTransferableProduct}$ that strips counterparty and collateral is many-to-one: many distinct trades collapse to one product. The ledger operates on the source $\mathbf{Trade}$, never on the quotient. The Unit Store (Section~\ref{sec:unit-store}) enforces injectivity at registration: distinct Trades map to distinct units.
+
+\paragraph{The dual-CSA test.} Two OTC trades reference the same template: a European call on the same index at the same strike. One carries a USD CSA (SOFR discounting, New York law); the other a EUR CSA (ESTR discounting, English law). Because \texttt{Collateral} differs, the Trade objects differ, and the units differ. Two otherwise-identical options collateralised in different currencies are \textbf{different units}: different discount curves, margin flows, and settlement currencies.
+
+\paragraph{Listed and cleared.} For listed instruments the CCP interposes itself by novation as the sole counterparty, so all positions in one contract specification are fungible regardless of original counterparty. Listed-vs-OTC is therefore a Trade-level distinction, not a product-level one: counterparty becomes the CCP, collateral becomes the CCP rulebook, venue becomes the exchange. For futures, daily settlement is itself the PnL realisation rather than collateral against it. The cash mechanics are in the futures lifecycle (Section~\ref{sec:futures}).
+
+\paragraph{CCP margin is a CDM gap.} CDM v6.0.0 has no type for CCP margin rules distinct from bilateral collateral provisions; the \texttt{Collateral} type on Trade was built for bilateral CSAs. For cleared trades the margin framework is an external reference to the CCP rulebook. The two-contract design (payoff contract plus margin contract) handles both regimes. CDM's representation of the cleared case is the less mature.
+
+%----------------------------------------------------------------------
+\subsection{Payout Composition and the TransferableProduct Boundary}
+\label{sec:cdm-structured-note}
+%----------------------------------------------------------------------
+
+A structured equity note tests payout composition and the product-type boundary at once. BankCo issues a 1Y zero-coupon note on an equity index, EUR\,1{,}000{,}000 notional, to FundCo. Redemption is
+\[
+R \;=\; N \times \min\!\Bigl(1,\ \tfrac{S_T}{S_0}\Bigr),
+\]
+par if the index is flat or up, full downside if it falls. Economically the note is a zero-coupon bond \emph{plus} a short put struck at par. It has an ISIN, lists on an exchange, and settles through a CSD: a transferable security in law and market infrastructure.
+
+\paragraph{Result 1: economic decomposition is not CDM decomposition.} The correct representation is a single \texttt{PerformancePayout} with a return capped at 0\%, not a \texttt{FixedPricePayout} (par bond) plus an \texttt{OptionPayout} (short put). The decomposition is economically correct yet wrong as a CDM model, for three reasons. The embedded put has no independent exercise right: the redemption formula applies automatically, so there is no \texttt{OptionPayout}. The note has one contractual cash flow at maturity, not two. And CDM qualification recognises a capped \texttt{PerformancePayout} on an equity index as a known structure, but not a premium-less \texttt{OptionPayout}. Risk systems decompose into bond + put for Greeks; CDM models the contractual cash flow.
+
+\paragraph{Result 2: \texttt{Transferable\allowbreak Product} is narrower than ``transferable.''} The note is a \texttt{Non\allowbreak Transferable\allowbreak Product} despite being a transferable security. The criterion is not legal transferability but modelling complexity. \texttt{Transferable\allowbreak Product} is for instruments whose cash flows follow mechanically from ownership (a plain bond's coupon and par). Any instrument whose cash flows depend on an observable requires an explicit Payout tree and is therefore \texttt{Non\allowbreak Transferable\allowbreak Product}. The ISIN lives in the \texttt{Non\allowbreak Transferable\allowbreak Product} \texttt{identifier} field; carrying an ISIN does not require \texttt{Transferable\allowbreak Product}. The IFRS~9 SPPI test parallels the criterion: the note fails SPPI because of the equity-linked redemption and is measured at fair value. The signal is the same non-trivial payout that forces \texttt{Non\allowbreak Transferable\allowbreak Product} and trading-book scope (Section~\ref{sec:intro}).
+
+\paragraph{Result 3: one unit, three settlement paradigms.} The note is one security, one ISIN, one Trade, one ledger unit; the embedded put is not separately tradable, exercisable, or settlable. Issuance and redemption are two-move transactions that conserve per unit. In the index-down-20\% scenario redemption is EUR\,800{,}000:
+\[
+\text{Move}(\text{BankCo}\to\text{FundCo},\ \text{EUR},\ 800{,}000),\qquad
+\text{Move}(\text{FundCo}\to\text{BankCo},\ \text{note},\ 1).
+\]
+The ``missing'' EUR\,200{,}000 is the put payoff, already recognised through mark-to-market. Before maturity FundCo holds one note valued at EUR\,800{,}000; after maturity, EUR\,800{,}000 cash. The value jump at redemption is zero: lifecycle value invariance (Section~\ref{sec:intro}) holds. The note also exposes the settlement spectrum: bilateral CSA (well modelled), CCP margin (partially modelled, Section~\ref{sec:cdm-trade}), and CSD settlement (essentially unmodelled). CDM v6.0.0 has no \texttt{CSDSettlement} type, so settlement through Euroclear or Clearstream is carried in generic \texttt{executionDetails}. The gradient reflects CDM's OTC-derivative origin.
+
+%----------------------------------------------------------------------
+\subsection{Tokenised Securities: Double-Counting and the Flat Custodian}
+\label{sec:cdm-tokenized}
+%----------------------------------------------------------------------
+
+Where the structured note tested the product-type boundary, a tokenised equity tests custody. In the mirror/backed model a regulated custodian holds real shares in segregation and issues on-chain tokens 1:1. Each token is a beneficial claim on one share, held against the custodian. The underlying exposure, dividends, and corporate actions are unchanged. Four things are new: the identifier scheme (contract address, chain ID, token standard), the custodial layer, the settlement (on-chain atomic vs.\ T+1), and fractional divisibility.
+
+\paragraph{Two units, not one.} The share (NVDA) and the token (NVDA\_TOKEN) are distinct units in the Unit Store: different settlement mechanisms, different identifiers, and different risk profiles. The token carries custodian credit risk the share does not. Treating them as one unit would erase the distinction between a holder of real shares and a holder of tokenised claims.
+
+\paragraph{The double-counting problem and its resolution.} Distinct units invite a na\"ive aggregation of NVDA exposure that double-counts: 1{,}000{,}000 real shares in custody plus 1{,}000{,}000 tokens held by investors sums to 2{,}000{,}000, though only 1{,}000{,}000 shares of exposure exist. The position table nets the double-count away: the custodian's token liability cancels its share holding.
+
+\begin{center}\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Entity} & $\mathbf{own(NVDA)}$ & $\mathbf{own(NVDA\_TOKEN)}$ & \textbf{Net NVDA exposure} \\
+\midrule
+Custodian & $+1{,}000{,}000$ & $-1{,}000{,}000$ & $0$ \\
+Holders (all) & $0$ & $+1{,}000{,}000$ & $+1{,}000{,}000$ \\
+\midrule
+\textbf{System} & $+1{,}000{,}000$ & $0$ & $+1{,}000{,}000$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The zero in the custodian row is not an accident of the example; it holds in any backed structure.
+
+\begin{principle}[The custodian is flat]
+A backing custodian's net economic exposure is zero by conservation, not by choice. It is long the underlying and short the tokens it issued in equal measure: $own(\text{NVDA})=+1{,}000{,}000$ and $own(\text{NVDA\_TOKEN})=-1{,}000{,}000$, so a unit price move changes asset and liability identically.
+\end{principle}
+
+Economic exposure is the read-time projection $own(\text{NVDA})+own(\text{NVDA\_TOKEN})$ for any entity: zero for the custodian, $+100$ for a holder of 100 tokens. The token balance conserves to zero across issuer and holders; the share balance conserves against the virtual issuance wallet. If the custodian issued tokens without holding shares, the shortfall would surface as a conservation violation. The resolution is a consequence of system closure, not a modelling convention. The structure is the securities-lending custody problem (Section~\ref{sec:gpm}): possession is not ownership. SBL distinguishes them by the position vector's \texttt{own} and \texttt{onloan} coordinates; tokenisation distinguishes them by liability netting. The principle is identical.
+
+\paragraph{Variants.} Two cases avoid the problem because no backing inventory exists. A \emph{synthetic} token is a delta-one derivative on the underlier: a \texttt{Non\allowbreak Transferable\allowbreak Product} with a \texttt{PerformancePayout}, no custodian. A \emph{native-issuance} token \emph{is} the share on chain: a \texttt{Transferable\allowbreak Product} with blockchain-native identifiers. The mirror token is likewise a \texttt{Transferable\allowbreak Product}: the first the walkthrough presents, and the only one with a non-trivial custody layer.
+
+\paragraph{Four CDM v6.0.0 gaps for tokenised securities.}
+Each entry names the missing type, the workaround, and the severity.
+\begin{enumerate}[nosep]
+\item \textbf{No blockchain identifier type.} \texttt{ProductIdentifier}/\texttt{ProductIdSourceEnum} omit contract address, chain ID, and token standard. Workaround: \texttt{Other} with a scheme convention. Significant: every token needs an ad-hoc convention.
+\item \textbf{No custodial backing model.} No type relates a token to the underlying held by a custodian; backing ratio, custodian identity, and segregation are not representable. Workaround: trade-level \texttt{contractDetails}. Significant: the custodial relationship is the defining feature.
+\item \textbf{\texttt{DigitalAsset} underspecified.} The branch exists but neither extends \texttt{Transferable\allowbreak Product} nor carries \texttt{EconomicTerms}; built for crypto-native assets, not tokenised securities. Moderate.
+\item \textbf{No on-chain settlement type.} \texttt{SettlementTypeEnum} has no on-chain atomic value and no structure for chain, confirmation depth, or gas. Workaround: \texttt{Other}. Moderate.
+\end{enumerate}
+The gaps are incremental extensions, consistent with CDM's trajectory from bilateral OTC to cleared to tokenised; none requires an architectural change. On-chain delivery-versus-payment, when both legs settle on chain, is the strongest DvP: atomic within one transaction, it eliminates settlement risk. Mixed on/off-chain settlement degrades to conventional DvP risk, a settlement-layer concern (Section~\ref{sec:settlement}), not a ledger-layer one.
+
+%----------------------------------------------------------------------
+\subsection{Date Handling: Types, Resolution, and Gotchas}
+\label{sec:cdm-dates}
+%----------------------------------------------------------------------
+
+A contract date is never a bare date: it carries adjustment rules, calendar references, and resolution logic that fix the operational date. CDM composes these from small precise types in the \texttt{base.datetime} namespace. The types feed every dated computation in this document: the IRS move schedule and day-count fractions (Section~\ref{sec:contracts}), coupon adjustment (Section~\ref{sec:temporal-scheduler}), and settlement-date adjustment (Section~\ref{sec:settlement}). A wrong calendar, convention, or day count is a valuation error, not a rounding error.
+
+\subsubsection{The Type Taxonomy}
+\label{sec:cdm-date-types}
+
+The taxonomy runs from resolved output to composable inputs: \texttt{date} is the only resolved value; every other row specifies how to reach one.
+
+\begin{center}\small
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{0.60\textwidth}@{}}
+\toprule
+\textbf{Type / enum} & \textbf{Role} \\
+\midrule
+\texttt{date} & Resolved ISO~8601 calendar date; the output, not the input. \\
+\texttt{Period} & Multiplier + unit (D/W/M/Y); a zero-length period must be in days. \\
+\texttt{Offset} & \texttt{Period} + \texttt{dayType} (Business/Calendar/Exchange\ldots); \texttt{dayType} present only when in days. \\
+\texttt{BusinessDayConventionEnum} & FOLLOWING, MODFOLLOWING, PRECEDING, NEAREST, NONE\ldots \\
+\texttt{BusinessCenters} & Holiday calendars (USNY, GBLO, JPTO\ldots); a date is good only if good in \emph{all} listed. \\
+\texttt{BusinessDayAdjustments} & Convention + business centres: the reusable adjustment recipe. \\
+\texttt{AdjustableDate} & \texttt{unadjustedDate} (contractual) + adjustments $\to$ \texttt{adjustedDate} (operational). \\
+\texttt{RelativeDateOffset} & ``$n$ days/months from a reference date, adjusted by $C$ against $B$.'' \\
+\texttt{AdjustableOrRelativeDate} & Required-choice union of the two above; used throughout the product model. \\
+\texttt{CalculationPeriodFrequency} & Frequency + \texttt{rollConvention} (EOM, IMM, \_1..\_30); drives schedule generation. \\
+\texttt{DayCountFractionEnum} & ACT/360, ACT/365F, 30/360, ACT/ACT (ISDA/ICMA)\ldots; each a dispatched \texttt{YearFraction}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent MODFOLLOWING dominates OTC derivatives: it advances to the next business day unless that crosses a month boundary, then retreats. This keeps the payment date aligned with its calculation period. Two day-count formulas recur. ACT/360 is $\text{actual days}/360$; 30/360 (Bond Basis) is
+\[
+\frac{360(Y_2-Y_1)+30(M_2-M_1)+(D_2-D_1)}{360},\qquad D_1=\min(d_1,30),\ D_2=\min(d_2,30)\text{ if }D_1>29.
+\]
+
+\subsubsection{The Resolution Chain}
+\label{sec:cdm-date-resolution}
+
+An \texttt{AdjustableOrRelativeDate} resolves deterministically in three steps; \texttt{ResolveAdjustableDate} encapsulates them.
+\begin{enumerate}[nosep]
+\item \textbf{Resolve the reference.} If relative, offset from the anchor (\texttt{date\allowbreak Relative\allowbreak To}): \texttt{Add\allowbreak Business\allowbreak Days} when \texttt{dayType = Business}, calendar arithmetic otherwise. Yields the unadjusted derived date.
+\item \textbf{Apply business-day adjustment.} Test the unadjusted date against the centres; if not a good business day, shift by the convention.
+\item \textbf{The adjusted date is final}: the operational date for the cash flow, exercise, or settlement.
+\end{enumerate}
+A 5Y USD SOFR swap rolling on the 3rd under MODFOLLOWING/USNY illustrates the chain: 2026-10-03 (Sat) $\to$ Mon Oct~5; 2027-10-03 (Sun) $\to$ FOLLOWING within month $\to$ Mon Oct~4; weekday roll dates pass unadjusted. The first fixed period (2026-04-03 to 2026-10-05, 30/360) gives $\delta=(30\cdot6+2)/360=182/360\approx0.5056$. The first floating period (2026-04-03 to 2026-07-03, ACT/360) gives $91/360\approx0.2528$. These adjusted dates and fractions are exactly the reset dates $t_k$ and $\delta_k$ the IRS contract consumes (Section~\ref{sec:contracts}).
+
+\subsubsection{Gotchas}
+\label{sec:cdm-date-gotchas}
+
+Each is a bug class the type system prevents only when the types are used correctly.
+\begin{enumerate}[nosep]
+\item \textbf{Omitted business centres.} A convention with no centres adjusts against no calendar: every day is a business day and the convention is inert. Validate that any non-NONE convention has at least one centre.
+\item \textbf{Calendar vs.\ business days.} ``T+2'' from a Friday is Sunday under Calendar, Tuesday under Business. \texttt{dayType} is load-bearing, not decoration.
+\item \textbf{EOM vs.\ fixed-day roll.} \texttt{EOM} rolls to each month's last day (Feb 28/29, Mar 31); \texttt{\_28} always rolls to the 28th. Confusing them shifts payments by up to three days.
+\item \textbf{Joint-holiday intersection.} Multiple centres take the \emph{intersection} of business days: good in New York but a London holiday is not good for USNY+GBLO. More dates are non-business under joint calendars than either alone.
+\item \textbf{Stub periods.} An effective date off the roll cycle produces a short or long first period; \texttt{balanceOfFirstPeriod} places the stub. Ignoring it gives a wrong year fraction for that period.
+\item \textbf{Day-count mismatch.} For a 182-day semi-annual period, ACT/360 gives $0.5056$ and 30/360 gives $0.5000$. On EUR/USD\,50{,}000{,}000 at 4\%, the difference is $0.005556\times0.04\times50{,}000{,}000\approx\$11{,}111$: a valuation error, not a rounding error.
+\end{enumerate}
+

@@ -1,0 +1,239 @@
+\section{The Door and the Log}\label{sec:door}
+
+The ledger is a door, some checks, a log, views computed from the log, and one
+generic operation besides: at the read seam it applies a declared operator to
+pre-boundary market data, carrying an old number into a new frame. This section
+builds the door, the checks, the log, and the views from four primitives ---
+wallet, unit, move, and transaction; the read-seam operation is the subject of
+Section~\ref{sec:data}. Together these are the whole of what the ledger does.
+
+\subsection{Wallets, units, and the atomic move}
+
+A \emph{unit} is a thing that can be held --- a share, a currency, a futures
+contract, a bespoke note. A \emph{wallet} is a named partition of position space,
+and its entire state is one signed number per unit. A positive number is a long
+position; a negative number is a short. There is no separate machinery for shorts
+and no separate register of ownership standing beside the balance: economic
+ownership \emph{is} the wallet balance. If a wallet holds $+2{,}000$ of a unit, it
+owns 2{,}000 of that unit. For an outright holding, long or short, the scalar
+balance is the whole story: there is nothing else to keep in step. The one
+exception proves the rule. A securities loan carries coordinates the balance alone
+does not hold --- the borrow's recall risk, its fee accrual, the manufactured
+dividend owed on the lent line --- and those are not smuggled into the balance;
+they are added as their own units and moves at the securities-lending stop
+(Section~\ref{sec:tour-sbl}). An outright long or short has no such coordinates,
+and for it the balance says everything.
+
+The only way a balance changes is a \emph{move}.
+
+\begin{definition}[Atomic move]\label{def:move}
+A move transfers a positive quantity $q$ of one unit from a source wallet to a
+destination wallet in one indivisible step: the source decreases by $q$, the
+destination increases by $q$. The magnitude is positive; the direction is carried
+by which wallet is the source and which the destination.
+\end{definition}
+
+Two design decisions are folded into this definition, and both pay off later.
+First, the quantity is an exact integer in minor units --- never a floating-point
+number. A share count is an integer; a cash amount is an integer number of cents.
+Division does occur --- a withholding on an odd amount, cash in lieu of a
+fractional entitlement, an odd per-share dividend, a three-for-two on an odd lot
+--- but it never leaves an unbooked remainder. The rounding convention is itself
+declared data, and whatever a division cannot distribute evenly is booked
+explicitly, as a cash-in-lieu or rounding leg that is a move like any other. The
+conserved quantities stay exact not because nothing divides but because the
+remainder is never dropped: it is recorded. Conservation and replay are therefore
+matters of integer arithmetic, decided exactly at any scale. Second, a move carries a single positive magnitude and two wallets. It
+has no field in which a quantity could be created or destroyed. Just as a move
+has no endpoint beyond the two wallets it connects, the door admits no outcome
+beyond success and refusal. Its Haskell signature says exactly that:
+
+\begin{lstlisting}
+applyTx :: Transaction -> Ledger -> Either LedgerError Ledger
+\end{lstlisting}
+
+A transaction either produces a whole new ledger or a typed \texttt{LedgerError}.
+There is no third outcome and, in particular, no partially applied state.
+
+A \emph{transaction} is the atomic event recorded in the log: an ordered list of
+moves together with the non-balance changes that ride with them --- bookkeeping
+rows, status writes, an introduction or appending of terms. It applies in full or
+not at all. Atomicity is the property that pays off here: a corporate action that
+must double a share count, halve a strike, and set a basis marker does all three
+in one transaction or none of them, so no reader can ever observe a
+half-applied event.
+
+\subsection{Conservation, by construction}
+
+Here is the law the whole design is organised around: for every transaction and
+every unit, the total quantity across all wallets is unchanged. Nothing is created
+and nothing is destroyed; value only moves.
+
+The important thing is \emph{how} this law holds. It is not checked at the door.
+Look again at what a move does: it subtracts $q$ from one wallet and adds $q$ to
+another, so its net contribution to the total quantity of its unit is $q - q = 0$.
+A transaction is a list of moves, and the total change it makes is the sum of the
+per-move contributions, each of which is zero. The sum is zero because every term
+is zero, not because anything counted it and found it balanced. There is no
+transaction that fails to conserve waiting to be rejected --- such a transaction
+cannot be built, because the only tool for changing a balance is a move, and a
+move is a transfer.
+
+This is worth dwelling on because it is the pattern the design repeats
+everywhere. One could imagine a \texttt{set\_balance} operation that writes a
+wallet's balance directly, guarded by a runtime check that total value still sums
+to zero. That design has a hole: the check can be bypassed, disabled, or wrong,
+and the day it is, the books are unconserved and nobody knows. The design here has
+no \texttt{set\_balance}. Opening a position is not a special primitive; it is an
+ordinary move from a \emph{virtual wallet} that stands for the outside
+counterparty. Every counterparty outside the system is represented by a virtual
+wallet inside it, so every move has two endpoints inside the ledger and the system
+is closed. A conservation failure is therefore not a rejected financial event; it
+is an impossible one --- and if it ever appeared it would be an implementation
+bug, not a transaction the ledger admitted.
+
+\subsection{The single door and what it checks}
+
+Every change to the ledger goes through one function. Registration goes through
+it; a trade goes through it; a corporate action goes through it. There is no
+second way in, no privileged channel, and no writer of a balance other than a move
+applied by this door. This matters precisely because contracts are untrusted: a
+contract cannot hold write access, because write access does not exist as a thing
+to hold. A contract can only submit a proposal, and a proposal becomes fact only
+by passing through the same door as everything else.
+
+Since conservation cannot fail, the door does not check it. The door checks the
+things that \emph{can} fail:
+
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{Basis agreement.} A quantity and a price may be combined only when
+they are expressed in the same frame. When a transaction records or consumes an
+observation, the door checks that its basis marker agrees with the state it is
+being joined to. This is the check that a stale, pre-split price is not silently
+multiplied against a post-split share count; Section~\ref{sec:data} explains the
+frame it enforces.
+\item \textbf{Idempotence.} Each transaction carries an identifier derived from
+its cause. If the same transaction is submitted twice --- a processor retried
+after a crash, a timer that fired late and then fired again --- the door commits
+it once. A coupon due on one date is paid once even if its contract runs three
+times.
+\item \textbf{Legal status writes.} Facts other than balances --- a unit's
+lifecycle state, its basis marker, its last settlement --- are written only
+through a small closed set of status writes, each applied by a single writer as an
+absolute replacement. A contract cannot invent a new kind of status write or
+write a field that is not its to write.
+\item \textbf{The invariance weld.} A transaction that carries a unit across a
+basis boundary is admitted only if its booked entitlement moves realise the
+boundary's declared operator: for the boundary's $(f, c)$, each holder's quantity
+leg realises $q \mapsto q \cdot f$ and each cash leg equals $q \cdot c$. This welds
+an adjustment's moves to the operator the boundary declares, so a transaction
+cannot claim a boundary and then book moves that do not match it. Later sections
+apply the same weld in two forms derived from this one --- across two boundaries
+sharing an effective time, and per holder or in aggregate when holders elect ---
+but the check is this one, stated here.
+\end{itemize}
+
+Alongside these, the door refuses a transaction that references a unit never
+registered, that points its cause at an event not yet committed, or that would
+leave the adjustment schedule incomplete --- each a well-formedness condition,
+each returning a typed error and no state. The common thread is that the door
+never guesses and never repairs. A rejected transaction leaves no trace in the
+ledger's state and no entry in the log: \texttt{applyTx} returns either the whole
+new ledger or a typed error, and a typed error is a returned value, not a commit.
+The refusal carries the rejected payload back to whoever submitted it; at the datum
+ingest door this returned refusal \emph{is} the quarantine, holding the payload as
+a value without ever storing it inside the system of record. If a deployment keeps
+a durable journal of what it refused, that journal is an operational artifact on
+the submitting side, never a second log within the ledger. Defaults fail closed:
+an absent declaration is a refusal, not an assumed identity; an unregistered unit
+is refused with its payload returned, not admitted on optimistic terms. The door would rather stop than improvise, because improvising
+is exactly how a system of record acquires a fact nobody can account for.
+
+\subsection{The log, and why untrusted proposals are safe}
+
+What the door admits, it appends to a log that is never rewritten. The log is
+ordered and hash-chained: no earlier entry is edited in place, and any tampering
+with history is evident to any party holding a prior chain head --- anchoring that
+head outside the system is a deployment matter. Corrections are not edits; a mistake is
+repaired by a later, compensating transaction that is itself recorded, so the
+record of the mistake and the record of its repair both survive.
+
+We can now answer the question the thesis raises: if contracts are untrusted, why
+is it safe to record what they propose? Because admission and recomputation
+together bound what a bad proposal can do. A defective contract cannot break an
+invariant --- there is no unconserved proposal for the door to admit, no partial
+state it can leave, no row it can delete. The worst it can do is book wrong
+economics inside a well-formed transaction, and because everything it read is in
+the log, that error is not hidden: anyone can recompute the transaction from the
+log and find it. This detection is after the fact. The recomputation runs over the
+committed log, and nothing gates a view or the settlement projection on its having
+run first; the guarantee is that a wrong economics is always findable from the log
+and detected when the witness runs --- which the deployment must schedule --- not
+verified before it is consumed. What that buys is precise. The structural invariants are never
+breached --- not for an instant, because they hold by construction, not by a check
+a wrong contract might slip past. The error is confined to the \emph{economics} of
+the one well-formed transaction that carried it, and its repair is deterministic,
+with full lineage, through the compensating path. So the blast radius of a wrong
+contract is bounded above by ``a detectable, well-formed, wrong transaction,
+repaired by a recorded correction'', which is a bounded and repairable thing. It is
+never ``a corrupted ledger'', which is not. The gates that do act before
+consumption --- the confirmation gate that will not let a datum cross an unarmed
+boundary (a boundary is armed only once its operator is confirmed), the pending
+quarantine on a datum with no operator to carry it across ---
+guard boundary-\emph{crossing} consumption, not a producer's economics; they are
+not recomputation and must not be mistaken for it.
+
+Consider the first transaction any book records: a purchase of 1{,}000 shares of a
+company at \EUR{100}. It enters as one transaction with one move --- 1{,}000 of
+the share unit from the counterparty's virtual wallet into the book's wallet ---
+and a second move of \EUR{100{,}000} of cash the other way. The share count in the
+book's wallet is now $1{,}000$; the counterparty's virtual wallet is $-1{,}000$,
+which is the reconciliation point against the counterparty's own record of the
+same trade. Nothing here is a stored ``position'' that some later process must
+keep current. The position is $1{,}000$ because the log says one move of
+$1{,}000$ happened, and it will say so forever.
+
+\subsection{Every view is a fold of the log}
+
+A balance is the sum of the moves that touched a wallet. A valuation over a chosen
+set of wallets is the sum of their balances times an externally supplied price
+vector; profit and loss is the difference of two valuations. That difference
+depends only on the endpoints, not on the route between them --- but it measures
+performance only when no external contribution crossed into the wallet set between
+the two dates. A deposit or a withdrawal moves the valuation without being profit;
+performance is the endpoint difference \emph{less} the net external flow over the
+interval. Inside the closed system every such flow is itself a recorded move across
+the wallet set's boundary, so the adjustment is exact and computed from the log,
+never estimated. With flows accounted for, the endpoints alone fix the number.
+Value, unlike quantity, obeys no conservation law: a book can be worth more today
+than yesterday, and nothing is violated. What matters is that every one of these
+numbers is \emph{computed} from the log when asked, not stored beside it. The
+unit-status cache the ledger keeps for speed is exactly that --- a cache, derivable
+by replaying the events and safe to discard, never an authority. Replaying a
+unit's events to any past point rebuilds the exact value that held then.
+
+This is what makes the reconciliation failures of
+Section~\ref{sec:thesis} unrepresentable rather than rare. The balance sheet and
+the profit-and-loss statement are two folds of one log. For them to disagree,
+one fold would have to see an event the other does not, and there is only one log.
+
+\subsection{Time travel re-reads; it never re-executes}
+
+Because the log is complete and the views are folds of it, the ledger can
+reconstruct its exact state as of any past moment: replay the stream up to that
+moment and stop. Balances, unit state, and the basis coordinate all come back
+exactly as they stood. This reconstruction re-reads recorded transactions; it
+never re-executes a contract, and it fetches nothing from outside the log. The
+consequence is worth stating precisely.
+
+This is the property that makes an upgradeable, untrusted contract layer safe to
+live with: \emph{a contract can be upgraded, replaced, or discarded, and every
+past state of the ledger still reconstructs exactly}, because reconstruction reads
+the transactions a contract once produced and never re-runs the contract that
+produced them. A contract's output, once admitted, is a fact in the log like any
+other. Whether the contract still exists, still behaves the same way, or was
+thrown away years ago has no bearing on what the log says happened. Replay is
+deterministic and independent of where it is cut, so the same history
+reconstructs to the same state every time. The record does not depend on the
+machinery that fed it --- which is the property a system of record must have, and
+the reason the ledger can hold untrusted output without being at the mercy of it.

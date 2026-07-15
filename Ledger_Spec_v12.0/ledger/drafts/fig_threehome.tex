@@ -1,0 +1,50 @@
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.4mm]},
+    home/.style={draw, rounded corners, align=center, font=\small,
+                 minimum width=24mm, minimum height=11mm},
+    empty/.style={draw, dashed, align=center, font=\footnotesize,
+                  text=black, minimum width=24mm, minimum height=11mm},
+    aux/.style={draw, align=center, font=\footnotesize,
+                minimum width=20mm, minimum height=9mm},
+    val/.style={draw, thick, align=center, font=\small,
+                minimum width=52mm, minimum height=10mm},
+    ext/.style={draw, dashed, align=center, font=\footnotesize,
+                minimum width=40mm, minimum height=9mm},
+    derive/.style={->, thick},
+    reads/.style={->},
+  ]
+  % --- the 2x2 placement; three cells occupied, one empty ---
+  \node[font=\footnotesize\itshape] at (0,3.7)   {ledger-authored};
+  \node[font=\footnotesize\itshape] at (4.6,3.7) {externally authored};
+  \node[font=\footnotesize\itshape, align=right] at (-2.9,1.8) {per\\unit};
+  \node[font=\footnotesize\itshape, align=right] at (-2.9,0.0) {per\\(holder, unit)};
+
+  \node[home]  (us) at (0,1.8)   {UnitStatus\\[1pt]\footnotesize shared projection};
+  \node[home]  (pt) at (4.6,1.8) {ProductTerms\\[1pt]\footnotesize immutable};
+  \node[home]  (ps) at (0,0.0)   {PositionState\\[1pt]\footnotesize per (wallet, unit)};
+  \node[empty] (mt) at (4.6,0.0) {--- none ---};
+
+  % --- the load-bearing arrow: UnitStatus is derived from the event log ---
+  \node[aux] (log) at (-3.2,3.0) {Event log\\[1pt]\footnotesize immutable};
+  \draw[derive] (log.east) -- node[above, font=\scriptsize, pos=0.5]{derive} (us.north);
+
+  % --- valuation reads all three homes plus the external price vector ---
+  \node[val] (v) at (2.2,-2.0) {Valuation:\ \ $V_t=\sum_{u\in\mathcal{U}} w_t(u)\,P_t(u)$};
+  \draw[reads] (us.west) -- (-1.7,1.8) -- (-1.7,-2.0) -- (v.west);
+  \draw[reads] (pt.east) -- (6.4,1.8) -- (6.4,-2.0) -- (v.east);
+  \draw[reads] (ps.south) -- (v.north);
+  \node[ext] (px) at (2.2,-3.5) {price vector $P_t$ \footnotesize(external input)};
+  \draw[reads] (px.north) -- (v.south);
+  \node[font=\scriptsize, align=center] at (-2.1,-1.0) {reads};
+\end{tikzpicture}
+\caption{The three state homes and their dataflow. Each economic fact has one home, fixed by
+the placement above: \texttt{UnitStatus} (per unit, ledger-authored), \texttt{ProductTerms}
+(per unit, externally authored), and \texttt{PositionState} (per (wallet, unit)); the fourth
+cell---an externally authored per-position fact---is empty by construction (\S\ref{sec:states}).
+\texttt{UnitStatus} is not an authoritative store but a projection derived from the immutable
+event log, shown by the incoming arrow. Valuation reads all three homes together with an
+externally supplied price vector $P_t$.}
+\label{fig:threehome}
+\end{figure}

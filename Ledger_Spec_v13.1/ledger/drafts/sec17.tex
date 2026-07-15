@@ -1,0 +1,690 @@
+\section{Generalised Positions and Securities Borrowing and Lending}
+\label{sec:gpm}
+%==============================================================================
+
+The scalar model of Sections~\ref{sec:ledger}--\ref{sec:invariants} stores one number per (wallet, unit) pair. That one number is complete for every instrument whose ownership and possession never diverge: cash, equities, derivatives, swaps. It fails the instant they diverge: securities lending, repo, pledged collateral. This section generalises the scalar balance to a six-coordinate vector that resolves the failure. It then derives Securities Borrowing and Lending (SBL) from the framework's primitives. Repo, collateral management beyond SBL, and novation are open problems (Section~\ref{sec:conclusion}).
+
+%----------------------------------------------------------------------
+\subsection{Where the Scalar Model Breaks}
+\label{sec:scalar-breaks}
+%----------------------------------------------------------------------
+
+Alice owns 1{,}000 VOD. A single number records it, $w_{\mathrm{Alice}}(\text{VOD}) = 1{,}000$, and that number is complete. She lends 400 to Bob. A scalar balance now admits only three encodings, and each is wrong:
+
+\begin{enumerate}[nosep]
+\item \emph{Transfer:} $w_{\mathrm{Alice}} = 600$, $w_{\mathrm{Bob}} = 400$. Conservation holds, but Alice's PnL drops 40\%---wrong: under IFRS~9~\textsection3.2.6 the lender does not derecognise lent securities.
+\item \emph{Do not transfer:} $w_{\mathrm{Alice}} = 1{,}000$, $w_{\mathrm{Bob}} = 0$. Bob possesses 400 shares with no record of them.
+\item \emph{Credit both:} total $= 1{,}400$ against 1{,}000 in the external world. Conservation is violated.
+\end{enumerate}
+
+A scalar balance cannot encode two operational states at once. After the loan Alice holds 600 available and 400 on loan: two facts, and one number cannot carry both. ``On-loan'' is a coordinate because ``lend'' is a physical action that changes operational status without changing ownership.
+
+%----------------------------------------------------------------------
+\subsection{The Generalised Coordinate Vector}
+\label{sec:position-vector}
+%----------------------------------------------------------------------
+
+A \emph{coordinate} is a stored quantity that passes the \emph{physical-action test}: a distinct physical action modifies it and only it. A quantity fixed by other coordinates through an algebraic identity is a \emph{projection}. A projection is computed on read, never stored, and never written by a move.
+
+The intuition: one move changes one number; anything larger is a list of moves.
+
+\begin{principle}[Single-Coordinate Move]
+\label{princ:single-coord}
+An atomic move modifies exactly one coordinate of one unit across the two entities it connects: one move, one coordinate, one unit, source and destination. A move is the smallest state change. Any operation requiring multiple coordinate changes is a \emph{transaction}---a list of moves executed atomically.
+\end{principle}
+
+The scalar core is the one-coordinate case of this principle: there each entity has a single coordinate, and a move modifies one wallet of it. The vector model carries the same guarantee across six coordinates.
+
+\begin{mentalmodel}
+One number per holding becomes six. Each records a distinct operational fact about the same shares: how many the entity owns, how many it has lent out, how many it has borrowed, and how much collateral it has posted, received, and re-used. Only ownership carries economic value; the other five record where the shares sit, who holds title to them, and who owes them back. Unlike moving a crate to another aisle of a warehouse, which leaves it just as reachable, marking shares on-loan or posted-as-collateral removes them from what the entity may lend or sell again while moving no value out of ownership: the lent share stays the lender's asset, yet is no longer available. Available inventory is ownership less what is lent, plus what is borrowed, with the collateral coordinates holding shares aside. The familiar scalar balance is the degenerate case in which only the ownership number is non-zero.
+\end{mentalmodel}
+
+\begin{definition}[Position Vector]
+\label{def:position-vector-gpm}
+For entity~$e$ and unit~$u$, the position vector $\vec{w}_e(u) \in \mathbb{R}^6$ is
+\[
+\vec{w}_e(u) = \bigl(
+  w^{\mathrm{own}}_e(u),\;
+  w^{\mathrm{onloan}}_e(u),\;
+  w^{\mathrm{borr}}_e(u),\;
+  w^{\mathrm{coll\text{-}post}}_e(u),\;
+  w^{\mathrm{coll\text{-}recv}}_e(u),\;
+  w^{\mathrm{coll\text{-}rehyp}}_e(u)
+\bigr).
+\]
+Each coordinate passes the physical-action test:
+\begin{itemize}[nosep]
+\item $\mathrm{own}$: economic ownership. Modified by buy/sell. May be negative (short). Drives PnL.
+\item $\mathrm{onloan}$: securities lent out. Modified by lend\slash recall-return. Lender retains ownership.
+\item $\mathrm{borr}$: borrowed shares received (the return obligation count). Modified by borrow-receive\slash return. Non-negative. Unchanged when the borrower sells.
+\item $\mathrm{coll\_post}$: collateral delivered to a lender or triparty agent. Modified by post\slash release.
+\item $\mathrm{coll\_recv}$: collateral held from the borrower. Modified by receive\slash release.
+\item $\mathrm{coll\_rehyp}$: non-cash collateral re-used by the taker. Modified by rehypothecate/recall. Tracked for SFTR Article~15.
+\end{itemize}
+\end{definition}
+
+The first projection answers one operational question: how much of the unit the entity can trade right now.
+
+\begin{definition}[Available Inventory]
+\label{def:avail-projection}
+For every entity~$e$ and lendable unit~$u$, available inventory is the read-time projection
+\[
+\mathrm{avail}(e,u) \;\stackrel{\mathrm{def}}{=}\; \vec{w}_e(u)[\mathrm{own}] - \vec{w}_e(u)[\mathrm{onloan}] + \vec{w}_e(u)[\mathrm{borr}]
+\]
+---what is tradable equals what is owned, less what is lent, plus what is borrowed. Because $\mathrm{avail}$ is never stored, the identity holds by definition: no stored value can drift from the coordinates that determine it.
+\end{definition}
+
+The model's computational content is three pieces: the six-field record, \verb|avail| as a total projection, and \verb|applyMove| writing one coordinate.
+
+\begin{lstlisting}[language=Haskell]
+-- Qty: exact minor units, the additive abelian group reused from Sec.2.
+-- (One scale; own may be negative, the operational coords are guarded
+--  at value level, not by type -- see below.)
+newtype Qty = Qty Integer deriving (Eq, Ord, Show)
+instance Semigroup Qty where Qty a <> Qty b = Qty (a + b)
+instance Monoid    Qty where mempty = Qty 0
+qneg :: Qty -> Qty
+qneg (Qty n) = Qty (negate n)
+
+-- The position vector: one field per coordinate (Def. position-vector).
+data Position = Position
+  { own       :: !Qty   -- economic ownership; may be negative (short)
+  , onloan    :: !Qty   -- lent out; lender retains ownership
+  , borr      :: !Qty   -- borrowed; the return-obligation count
+  , collPost  :: !Qty   -- collateral delivered
+  , collRecv  :: !Qty   -- collateral held
+  , collRehyp :: !Qty   -- collateral re-used
+  } deriving (Eq, Show)
+
+zeroPos :: Position           -- the never-held position
+zeroPos = Position mempty mempty mempty mempty mempty mempty
+
+-- avail: a TOTAL projection, computed on read, never stored (Def. avail,
+-- P20). It cannot drift because no value holds it -- it IS this function.
+avail :: Position -> Qty
+avail p = own p <> qneg (onloan p) <> borr p
+
+-- A move names exactly ONE coordinate. The Coord tag is what makes the
+-- Single-Coordinate Move Principle hold by construction: there is no
+-- constructor that writes two fields.
+data Coord = Own | OnLoan | Borr | CollPost | CollRecv | CollRehyp
+  deriving (Eq, Show)
+
+applyMove :: Coord -> Qty -> Position -> Position
+applyMove Own       q p = p { own       = own p       <> q }
+applyMove OnLoan    q p = p { onloan    = onloan p    <> q }
+applyMove Borr      q p = p { borr      = borr p      <> q }
+applyMove CollPost  q p = p { collPost  = collPost p  <> q }
+applyMove CollRecv  q p = p { collRecv  = collRecv p  <> q }
+applyMove CollRehyp q p = p { collRehyp = collRehyp p <> q }
+\end{lstlisting}
+
+\noindent\textbf{avail is a group homomorphism.} The effect of any move on availability is fixed by the coordinate it writes: $\mathrm{avail}(\mathrm{applyMove}\ c\ q\ p) = \mathrm{avail}(p) \mathbin{<\!\!>} \delta_c(q)$ with $\delta_{\mathrm{Own}}=\delta_{\mathrm{Borr}}=q$, $\delta_{\mathrm{OnLoan}}=\mathrm{qneg}\,q$, and $\delta_c=\mathrm{mempty}$ for the three collateral coordinates. A \emph{stored} availability could therefore only drift; the projection cannot. After Alice lends 400 (\verb|applyMove OnLoan (Qty 400)| on $(1000,0,0,0,0,0)$) the record reads $(1000,400,0,0,0,0)$ and \verb|avail| returns \verb|Qty 600|. Ownership is untouched; availability is down by the loan.
+
+\begin{remark}[Discharged by construction]
+\verb|applyMove| is total (\verb|Coord| matched exhaustively; \verb|Qty| is a total group, so no input is rejected and none diverges) and deterministic; the \verb|Coord| tag makes a two-coordinate move \emph{unrepresentable}, discharging Principle~\ref{princ:single-coord}; \verb|avail| is a pure function of three stored fields, so P20 (Available-Inventory Identity) holds with no stored value to violate. Non-negativity of $\mathrm{onloan}$, $\mathrm{borr}$, and the collateral coordinates is \emph{not} typed away (they share \verb|Qty| with $\mathrm{own}$, which is legitimately negative); the listing's comment records this. It is a value-level pre-condition: the lending gate $\mathrm{avail}(e,u)\geq Q$ of Section~\ref{sec:projections}, enforced where the transaction is built, not here.
+\end{remark}
+
+\begin{remark}[Special cases]
+\hfill
+\begin{itemize}[nosep]
+\item Pure holder/lender ($\mathrm{borr}=0$): $\mathrm{avail} = \mathrm{own} - \mathrm{onloan}$.
+\item Non-SBL entity (all SBL coordinates zero): $\mathrm{avail} = \mathrm{own}$.
+\item Borrower who sold $Q$ of $N$ borrowed ($\mathrm{own}=-Q$, $\mathrm{borr}=N$): $\mathrm{avail} = N - Q$.
+\end{itemize}
+\end{remark}
+
+\noindent\textbf{Why $\mathrm{own}$ is a coordinate, not a projection.} Four reasons. (1)~PnL is a direct lookup: no summation, no regime-dependent read logic. (2)~For non-lendable instruments only $\mathrm{own}$ is non-zero, so the vector is a scalar. (3)~$\mathrm{own}$ is not derivable from the five operational coordinates: two states with identical operational vectors but distinct $\mathrm{own}$ exist whenever a borrower has sold some but not all borrowed shares. (4)~Buy/sell is a distinct physical action touching no other coordinate.
+
+Conservation needs no new idea: a move still takes a quantity from one slot and adds it to another; only the number of slots has grown.
+
+\begin{proposition}[Conservation in the Generalised Model]
+\label{prop:gpm-conservation}
+Each move subtracts $q$ from one (entity, coordinate) slot and adds $q$ to another, so the algebraic sum over all slots is preserved---the $\mathrm{src}\mathbin{{-}{=}}q;\ \mathrm{dst}\mathbin{{+}{=}}q$ pattern of the core framework (Section~\ref{sec:ledger}). For the physical-quantity check, substitute the $\mathrm{avail}$ projection. For each unit~$u$ the lender's $+\mathrm{onloan}$ and the per-relationship virtual wallet's $-\mathrm{onloan}$ cancel, leaving five terms per real entity:
+\[
+\sum_{e \in \mathcal{E}} \bigl( \vec{w}_e(u)[\mathrm{own}] + \vec{w}_e(u)[\mathrm{borr}] + \vec{w}_e(u)[\mathrm{coll\_post}] + \vec{w}_e(u)[\mathrm{coll\_recv}] + \vec{w}_e(u)[\mathrm{coll\_rehyp}] \bigr) = 0,
+\]
+$\mathcal{E}$ ranging over real entities and virtual wallets. The cancellation of $\mathrm{onloan}$ encodes the physical fact that lent shares are counted once---as the borrower's $\mathrm{borr}$.
+\end{proposition}
+
+\noindent Portfolio value uses $\mathrm{own}$ directly: $V_e(t) = \sum_{u} \vec{w}_e(u)[\mathrm{own}]\cdot P_t(u)$. This is the scalar formula of Section~\ref{sec:valuation} with $\mathrm{own}$ in place of the scalar balance; no projection or conditional logic enters.
+
+\noindent\textbf{In-flight collateral.} Trade-date accounting updates the position vector at execution. The unsettled delivery lives in the virtual wallet as the custodian contra-entry. SBL prepay collateral (IBP-177\footnote{IBP references denote clauses of the ISLA Best Practice Handbook: International Securities Lending Association, ``ISLA Best Practice Handbook,'' various editions.}) is instructed before the loan settles. The in-flight collateral is then a virtual-wallet entry; on settlement it resolves to a move writing $\mathrm{coll\_recv}$ (lender) or $\mathrm{coll\_post}$ (borrower). Custodian reconciliation checks $\mathrm{avail}(L,u) + \vec{w}_L(u)[\mathrm{onloan}] + \mathrm{inflight}(L,u) \stackrel{?}{=} \text{depot}(u)$. Substituting $\mathrm{avail}$ simplifies this to $\vec{w}_L(u)[\mathrm{own}] + \vec{w}_L(u)[\mathrm{borr}] + \mathrm{inflight}(L,u) \stackrel{?}{=} \text{depot}(u)$.
+
+%----------------------------------------------------------------------
+\subsection{Graceful Degeneration to the Scalar Model}
+\label{sec:degeneration}
+%----------------------------------------------------------------------
+
+\begin{remark}[Non-lendable instruments]
+For non-lendable instruments---OTC derivatives, listed options and futures, FX forwards, credit derivatives, cash---only $\mathrm{own}$ is non-zero: $\vec{w}_e(u) = (q,0,0,0,0,0)$. The $\mathrm{avail}$ projection yields $q$, valuation reduces to one lookup per unit, and the scalar model of Sections~\ref{sec:ledger}--\ref{sec:invariants} is recovered exactly. The generalisation is invisible when not needed.
+\end{remark}
+
+%----------------------------------------------------------------------
+\subsection{The Lending Resolution: Named Wallets}
+\label{sec:named-wallets}
+%----------------------------------------------------------------------
+
+After Alice lends 400 VOD to Bob:
+\[
+\vec{w}_{\mathrm{Alice}}(\text{VOD}) = (1000,400,0,0,0,0),\qquad \vec{w}_{\mathrm{Bob}}(\text{VOD}) = (0,0,400,0,0,0).
+\]
+Ownership is unchanged. $\mathrm{avail}_A = 1000-400+0 = 600$; $\mathrm{avail}_B = 0-0+400 = 400$. A per-relationship virtual wallet absorbs the delivery contra-entry: $w^{\mathrm{virtual}}_{A\leftrightarrow B}(\text{VOD}) = -400$. Proposition~\ref{prop:gpm-conservation} gives conservation:
+\[
+\underbrace{1000}_{\mathrm{own}_A} + \underbrace{0}_{\mathrm{borr}_A} + \underbrace{0}_{\mathrm{own}_B} + \underbrace{400}_{\mathrm{borr}_B} + \underbrace{(-400)}_{\text{virtual}} + \underbrace{(-1000)}_{\text{custodian}} = 0.
+\]
+Alice's PnL reads $\vec{w}_{\mathrm{Alice}}(\text{VOD})[\mathrm{own}] = 1{,}000$, correct.
+
+\noindent\textbf{Reclassification vs.\ transfer.} A reclassification is a two-move transaction within one entity: one coordinate down, another up. Rehypothecation is the example: $\mathrm{coll\_recv}\downarrow$, $\mathrm{coll\_rehyp}\uparrow$. A transfer is a move between entities. The primitive is identical; the distinction is entity identity. Lending writes $\mathrm{onloan}$; the drop in $\mathrm{avail}$ is read, not written.
+
+%----------------------------------------------------------------------
+\subsection{Analytical Projections and Encumbrance}
+\label{sec:projections}
+%----------------------------------------------------------------------
+
+Three read-time questions recur: what can be traded, what is physically held, and what is owned but locked. Each has a projection; none has storage.
+
+\begin{definition}[Projections]
+\label{def:projections}
+A \emph{coordinate-projection} is a function of the six stored coordinates. A \emph{store-projection} folds, in addition, over records in the Unit Store. Neither is stored or written by a move; a materialised aggregate of either is a rebuildable index, never an authority. The coordinate-projections:
+\begin{align*}
+\mathrm{avail}(e,u)   &= \vec{w}_e(u)[\mathrm{own}] - \vec{w}_e(u)[\mathrm{onloan}] + \vec{w}_e(u)[\mathrm{borr}] && \text{tradeable inventory}\\
+\mathrm{possess}(e,u) &= \mathrm{avail}(e,u) + \vec{w}_e(u)[\mathrm{coll\_recv}] && \text{physical custody}\\
+\mathrm{encumb}(e,u)  &= \vec{w}_e(u)[\mathrm{onloan}] + \vec{w}_e(u)[\mathrm{coll\_post}] && \text{owned, not tradeable}
+\end{align*}
+One store-projection exists: $\mathrm{reserved}(e,u,t)$, the sum of \texttt{remaining\_quantity} over $e$'s active put-on-hold locates in $u$ at $t$ (Section~\ref{sec:sbl-locates}). It is not a function of the six coordinates, which is why the second class is needed.
+\end{definition}
+
+\noindent An entity may sell $q$ only if $\mathrm{avail}(e,u) \geq q$. A scalar balance of 1{,}000 passes a sell of 500; with 700 on loan, only 300 are available. An in-ledger lender may lend or confirm locates only against
+\[
+\text{AvailableToLend}(e,u,t) = \max\bigl(0,\ \mathrm{avail}(e,u) - \mathrm{reserved}(e,u,t) - \mathrm{regulatory\_hold}(e,u,t)\bigr),
+\]
+$\mathrm{regulatory\_hold}$ a recorded, as-of-pinned restriction input.
+
+%----------------------------------------------------------------------
+\subsection{The SBL Smart Contract}
+\label{sec:sbl-contract}
+%----------------------------------------------------------------------
+
+The claim: SBL needs no new primitive, only new data and new invariants.
+
+\begin{principle}[SBL Representability]
+\label{princ:sbl-representable}
+SBL is a smart contract over existing primitives. It adds: (1)~an SBL loan unit type in the Unit Store; (2)~a \texttt{legal\_regime} field; (3)~invariants P11--P20 (Section~\ref{sec:sbl-invariants}). It changes neither the move primitive, the conservation law, nor the execution engine. Every SBL lifecycle event decomposes into moves satisfying Principle~\ref{princ:single-coord}.
+\end{principle}
+
+\begin{mentalmodel}
+A smart contract is a machine bolted into the sealed pipework, its gears fixed so that identical inputs always drive identical outputs, and its only outputs balanced transfers---each draining one tank by exactly what it fills into another. A wrong setting makes it compute the wrong transfer, the wrong quantity into the wrong tank, but never an unbalanced one: a faulty machine can misroute the water yet cannot create or destroy a drop. Unlike a general program, its fault corrupts the amounts it moves, never the conservation of what it emits --- the division \S\ref{sec:processor-contract} states precisely.
+\end{mentalmodel}
+
+\noindent\textbf{Why SBL is native, not a companion system.} The decisive argument is double-lending prevention. A companion system reintroduces a TOCTOU race: between querying inventory and executing the loan, another process lends the same shares. Cross-boundary conservation becomes unprovable. Collateral becomes invisible, breaking P13 (Section~\ref{sec:sbl-invariants}). Exposure requires a two-system join. The companion ``reserved'' bucket discards load-bearing information.
+
+The loan unit's lifecycle state is held in UnitStatus and read identically by every holder:
+
+\begin{lstlisting}
+SBLUnitState:
+    loan_id, lender, borrower, agent
+    isin, quantity, original_qty, term_type, maturity_date
+    fee_rate, rebate_rate
+    collateral_type, margin_pct, haircut_pct, collateral_ccy
+    triparty_agent, legal_regime, rehyp_consent
+    lifecycle_stage, settlement_status, recall_date, recall_qty
+    sftr_uti, slate_loan_id, execution_ts, trade_date
+    last_mark_date, accrued_fee, fee_accrual_log
+\end{lstlisting}
+
+\begin{remark}[Loan state is a projection of the log]
+UnitStatus is a projection of the event log (\S\ref{sec:states-unitstatus}). The loan unit's \texttt{lifecycle\_stage}, \texttt{settlement\_status}, and accrual fields are this cache; the SBL state machine (Section~\ref{sec:sbl-state-machine}) is the function the log replays.
+\end{remark}
+
+\noindent The SBL contract is a pure function $f_{\mathrm{SBL}}:(u_\ell,\mathrm{state}_t(u_\ell),e,\mathrm{data}) \to (\tau,\mathrm{state}_{t+1}(u_\ell))$.
+
+\noindent\textbf{Loan unit valuation (bond analogy).} The loan unit is priced. The lender holds $+1$, the borrower $-1$; the holdings conserve to zero. Its price is the accrued unpaid fee, $P_t(u_{\mathrm{loan}}) = \mathrm{loan\_value}(t)\times\mathrm{fee\_rate}\times\mathrm{DCF}(\mathrm{last\_settle},t)$. Fee payment is a cash move that resets the accrual. The price drops to zero; the cash move offsets; net PnL from payment is zero, as for a bond coupon. No standalone fee-accrual term enters the PnL formula. Under IFRS~9~\textsection3.2.6 the lender does not derecognise lent securities, because the risks and rewards of ownership are not transferred. Lent securities therefore remain in $\mathrm{own}$.
+
+%----------------------------------------------------------------------
+\subsection{SBL State Machine}
+\label{sec:sbl-state-machine}
+%----------------------------------------------------------------------
+
+The state machine is total: every (state, event) pair yields a valid transition or an explicit rejection. Terminal states are \texttt{RETURNED}, \texttt{CANCELLED}, \texttt{DEFAULTED}; $S_{\mathrm{live}} = \{\,$\texttt{ACTIVE}, \texttt{RECALLED}, \texttt{PARTIALLY\_RETURNED}$\,\}$. The table answers two questions for every event: which state follows, and which moves fire.
+
+\begin{center}
+\small
+\begin{tabular}{l l l l}
+\toprule
+\textbf{From} & \textbf{Event} & \textbf{To} & \textbf{Moves Generated} \\
+\midrule
+--- & \texttt{new\_loan} & \texttt{PENDING} & None \\
+\texttt{PENDING} & \texttt{loan\_settled} & \texttt{ACTIVE} & Securities + collateral \\
+\texttt{PENDING} & \texttt{cancel} & \texttt{CANCELLED} & None \\
+\texttt{ACTIVE} & \texttt{recall} & \texttt{RECALLED} & None (notification) \\
+\texttt{ACTIVE}/\texttt{RECALLED}/\texttt{PART.\ RET.} & \texttt{partial\_return} & \texttt{PART.\ RET.} & Partial securities + collateral \\
+\texttt{ACTIVE}/\texttt{RECALLED}/\texttt{PART.\ RET.} & \texttt{full\_return} & \texttt{RETURNED} & Remaining securities + collateral \\
+$S_{\mathrm{live}}$ & \texttt{rate\_change} & $S_{\mathrm{live}}$ & State-only \\
+$S_{\mathrm{live}}$ & \texttt{mark\_to\_market} & $S_{\mathrm{live}}$ & Margin call moves (if threshold) \\
+$S_{\mathrm{live}}$ & \texttt{collateral\_sub} & $S_{\mathrm{live}}$ & Paired collateral swap \\
+$S_{\mathrm{live}}$ & \texttt{corp\_action} & $S_{\mathrm{live}}$ & Manufactured payment \\
+$S_{\mathrm{live}}$ & \texttt{reallocation} & $S_{\mathrm{live}}$ & State-only (lender change) \\
+\texttt{ACTIVE} & \texttt{maturity} & \texttt{RETURNED} & Full securities + collateral \\
+$S_{\mathrm{live}}$ & \texttt{buy\_in} & \texttt{RETURNED} & Buy-in + close-out moves \\
+any non-terminal & \texttt{default} & \texttt{DEFAULTED} & Close-out moves per GMSLA \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%----------------------------------------------------------------------
+\subsection{Atomic Moves for SBL Lifecycle Events}
+\label{sec:sbl-moves}
+%----------------------------------------------------------------------
+
+Each lifecycle event is a move-carrying \texttt{Transaction} with $\mathtt{txIntroduce}=\texttt{Nothing}$ and $\mathtt{txAppend}=\texttt{Nothing}$: it operates on units already registered, introducing no unit and appending no terms. Its $\mathtt{txMoves}$ are the ordered moves below. Each move touches one coordinate per entity. Conservation holds by construction from the signed edge-sum, so there is no separate validation step. Loan value (IBP-163): $\mathrm{LV} = \lceil Q\times P\times M\%\times\chi \rceil_{0.01}$.
+
+\noindent\textbf{Loan initiation} (four moves):
+\begin{lstlisting}
+tau_new.txMoves:                         -- txIntroduce = Nothing
+    Move 1: Lender   onloan    += Q      -- securities, u_s
+    Move 2: Borrower borr      += Q
+    Move 3: Borrower coll_post += LV     -- collateral, ccy
+    Move 4: Lender   coll_recv += LV
+\end{lstlisting}
+Move~1 draws from $w^{\mathrm{virtual}}_{L\leftrightarrow B}$; Move~2 adds from it. Moves~3--4 pair; cash collateral writes $\mathrm{own}$ instead of $\mathrm{coll\_post}$, with the virtual wallet absorbing the non-cash contra-entry. No move writes the lender's $\mathrm{own}$: P18 holds. After: $\mathrm{avail}_L = 1000-400+0 = 600$ (down $Q$), $\mathrm{avail}_B = 0-0+400 = 400$ (up $Q$). When the loan converts a locate, the conversion transaction co-admits these four moves with the locate's drawdown and terminalisation; a partial conversion leaves a residual live locate (Section~\ref{sec:sbl-locates}).
+
+\noindent\textbf{Recall and return.} Collateral release on partial return: $\mathrm{LV}_{\mathrm{new}} = \lceil (Q_{\mathrm{out}}-Q_{\mathrm{ret}})\times P\times M\%\times\chi\rceil_{0.01}$, $C_{\mathrm{release}} = C_{\mathrm{held}}-\mathrm{LV}_{\mathrm{new}}$.
+\begin{lstlisting}
+tau_return.txMoves:                      -- txIntroduce = Nothing
+    Move 1: Borrower borr      -= Q_ret
+    Move 2: Lender   onloan    -= Q_ret
+    Move 3: Lender   coll_recv -= C_rel
+    Move 4: Borrower coll_post -= C_rel
+\end{lstlisting}
+Lender's $\mathrm{avail}$ rises by $Q_{\mathrm{ret}}$ ($\mathrm{onloan}\downarrow$); borrower's falls by $Q_{\mathrm{ret}}$ ($\mathrm{borr}\downarrow$).
+
+\noindent\textbf{Short sale.} Bob sells 400 borrowed VOD to Carol. This is a standard buy/sell writing only $\mathrm{own}$:
+\begin{lstlisting}
+tau_sell.txMoves:                        -- txIntroduce = Nothing
+    Move 1: Bob   own -= 400
+    Move 2: Carol own += 400
+\end{lstlisting}
+Bob's $\mathrm{borr}$ is untouched; it tracks the obligation, not possession. $\mathrm{avail}_B = -400-0+400 = 0$: Bob has consumed his available inventory.
+
+\noindent\textbf{Mark-to-market margin call} (one move per entity for the collateral unit):
+\begin{lstlisting}
+tau_margin.txMoves:                      -- txIntroduce = Nothing
+    Move 1: Borrower coll_post += delta_LV
+    Move 2: Lender   coll_recv += delta_LV
+\end{lstlisting}
+Cash collateral writes the borrower's $\mathrm{own}$; paired moves sum to zero.
+
+\noindent\textbf{Other events.} Collateral substitution (IBP-170) takes four moves: release old, post new. A manufactured dividend is one cash move per entity writing $\mathrm{own}$, of amount $\text{dividend}\times Q_{\mathrm{onloan}}$. Buy-in (GMSLA~9.3) comprises market purchase, close-out, collateral release, and cost attribution, each move satisfying Principle~\ref{princ:single-coord}.
+
+%----------------------------------------------------------------------
+\subsection{Title Transfer vs Security Interest}
+\label{sec:sbl-title-transfer}
+%----------------------------------------------------------------------
+
+The legal regime determines what the collateral taker may do with received collateral:
+
+\begin{center}
+\small
+\begin{tabular}{l p{4.2cm} p{4.2cm}}
+\toprule
+\textbf{Regime} & \textbf{Collateral Treatment} & \textbf{Rehypothecation} \\
+\midrule
+\texttt{TITLE\_TRANSFER} (GMSLA~2000/2010) & Receiver owns collateral & Permitted by default \\
+\texttt{SECURITY\_INTEREST} (GMSLA~2018) & Pledged; poster retains ownership & Forbidden absent GMSLA Schedule consent \\
+\texttt{US\_15C3\_3} & Regulated possession/control & Capped at 140\% of customer debit \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The wallet structure and the $\mathrm{avail}$ projection are identical under every regime. The regime affects only the PnL projection. The \texttt{legal\_regime} is set at inception and immutable.
+
+\begin{remark}[Pledge and the $\mathrm{own}$ coordinate]
+Under security interest the poster retains economic ownership of pledged collateral, so
+\[
+V_e^{\mathrm{SI}}(t) = \sum_u \bigl(\vec{w}_e(u)[\mathrm{own}] + \vec{w}_e(u)[\mathrm{coll\_post}]\bigr)\cdot P_t(u),
+\]
+whereas under title transfer $V_e^{\mathrm{TT}}(t) = \sum_u \vec{w}_e(u)[\mathrm{own}]\cdot P_t(u)$. The $\mathrm{own}$ coordinate therefore does not alone capture economic ownership under pledge: ownership splits between $\mathrm{own}$ (lent securities) and $\mathrm{coll\_post}$ (pledged collateral). The framework keeps $\mathrm{own}$ a single, regime-independent meaning (ownership from buy/sell/lend) and makes the pledge adjustment explicit in the valuation function---as the dirty-price function carries bond accrual rather than mutating the balance.
+\end{remark}
+
+%----------------------------------------------------------------------
+\subsection{Collateral and Margin}
+\label{sec:sbl-collateral}
+%----------------------------------------------------------------------
+
+Each collateralisation method reduces to a fixed pattern of moves; the table gives the mapping.
+
+\begin{center}
+\small
+\begin{tabular}{l p{3.5cm} p{5cm}}
+\toprule
+\textbf{Method} & \textbf{Mechanism} & \textbf{Ledger Representation} \\
+\midrule
+Cash rebate & Cash collateral; lender pays rebate & Single cash move per loan \\
+Non-cash bilateral & Securities B$\to$L directly & Securities to $w^{\mathrm{coll\text{-}recv}}_L$; haircut applied \\
+Non-cash triparty & Securities to triparty agent & RQV instruction; daily agreement (IBP-189) \\
+Cash pool (standard) & Single pool per cpty-ccy & Aggregate marking; single margin move (IBP-322) \\
+Cash pool (EU) & Per-loan margin tracking & Individual marks; net movement (IBP-323) \\
+Uncollateralised & No collateral & No collateral moves (IBP-326) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Exposure (IBP-163): $\mathrm{LV} = \lceil Q\times P_{\mathrm{close}}\times M\%\times\chi\rceil_{0.01}$. Margin calls are conservation-preserving transfers between the borrower's $\mathrm{coll\_post}$ (or $\mathrm{own}$ for cash) and the lender's $\mathrm{coll\_recv}$. Rehypothecation is a reclassification: two moves carrying $\mathrm{coll\_recv}\downarrow$, $\mathrm{coll\_rehyp}\uparrow$ within the taker's position. Substitution demands and top-up obligations with deadlines are formalised as obligations under the obligation workflow (Section~\ref{sec:obligation-liveness}). A worked SBL substitution is at Section~\ref{sec:obligation-example-sbl}.
+
+%----------------------------------------------------------------------
+\subsection{Short Selling and Inventory}
+\label{sec:sbl-short-selling}
+%----------------------------------------------------------------------
+
+Short selling creates a negative $\mathrm{own}$ coordinate; a negative $\mathrm{own}$ is the defining feature of a short position. Alice borrows 1{,}000 NVDA from Bob, then sells 500:
+\[
+\text{borrow:}\quad \vec{w}_{\mathrm{Bob}} = (1000,1000,0,0,0,0),\quad \vec{w}_{\mathrm{Alice}} = (0,0,1000,0,0,0),
+\]
+\[
+\text{after sale:}\quad \vec{w}_{\mathrm{Alice}} = (-500,0,1000,0,0,0),\quad \mathrm{avail}_{\mathrm{Alice}} = -500-0+1000 = 500.
+\]
+The sale writes only $\mathrm{own}$. $\mathrm{borr}$ stays at 1{,}000 because the return obligation is unchanged. The negativity lives in the economic dimension alone; no operational coordinate goes negative.
+
+\noindent\textbf{Locate and available-to-lend.} EU Short Selling Regulation (SSR) Article~12(1) requires a reasonable expectation of borrowing before short selling. The gate realises the AvailableToLend projection of Section~\ref{sec:projections}:
+\begin{lstlisting}
+def available_to_lend(entity, security, t):
+    # entity: an in-ledger lender; t: the admitting transaction's log timestamp
+    pos = position_vector(entity, security, t)
+    avail = pos.own - pos.onloan + pos.borr
+    reserved = sum(loc.remaining for loc in active_locates(entity, security, t)
+                   if loc.kind == PUT_ON_HOLD)
+    regulatory_hold = regulatory_restrictions(entity, security, t)
+    return max(0, avail - reserved - regulatory_hold)
+\end{lstlisting}
+\texttt{active\_locates} is the activity predicate of Section~\ref{sec:sbl-locates}, decidable from the committed log alone; the due-event scheduler's terminal sweep at expiry is hygiene, not authority. \texttt{regulatory\_restrictions} is a recorded, as-of-pinned input. Fail-to-deliver (FTD) close-out: Reg~SHO Rule~204 (T+3); CSDR daily cash penalties.
+
+%----------------------------------------------------------------------
+\subsection{Cash Collateral Reinvestment}
+\label{sec:sbl-reinvestment}
+%----------------------------------------------------------------------
+
+US cash-collateral lending falls under Rule~15c3-3, which subjects the cash to possession-or-control and reserve-formula requirements. The lender reinvests received cash collateral. Two economic positions then exist and must be tracked independently:
+
+\begin{enumerate}[nosep]
+\item \textbf{Collateral obligation}: the duty to return cash collateral on termination---a fixed amount (mark-adjusted) in the loan unit state (\texttt{collateral\_amount}), reflected in the lender's $\mathrm{coll\_recv}$.
+\item \textbf{Reinvestment asset}: the money-market fund (MMF) units, paper, or repo bought with the cash---a separate position in the lender's $\mathrm{own}$ for the reinvestment instrument, carrying its own market risk.
+\end{enumerate}
+
+Reinvestment is a standard buy/sell transaction. Cash leaves $\mathrm{coll\_recv}$; the reinvestment unit enters $\mathrm{own}$; the MMF takes the cash for its units. Conservation holds per leg. The cash collateral is thereby transformed: $\mathrm{coll\_recv}(\text{USD})$ falls to zero while $\mathrm{own}(\text{MMF})$ holds the reinvestment. The return obligation persists, fixed in the loan unit state. The separation is the point: the reinvestment asset may move in value while the obligation does not.
+
+\noindent\textbf{Reinvestment risk.} If the MMF breaks the buck (NAV below \$1.00), the reinvestment position falls below the fixed obligation. The gap is uncollateralised credit risk borne by the lender. This risk materialised in September~2008 (Reserve Primary Fund). SEC Rule~2a-7 reforms have not eliminated it for institutional prime MMFs.
+
+\noindent\textbf{Unwind on return.} Termination sells the reinvestment units back for cash, restoring $\mathrm{coll\_recv}$. The loan-return transaction then releases it. CDM: the reinvestment buy/sell is a standard \texttt{Transfer} (no gap); the obligation maps to \texttt{SecurityLendingPayout.collateral}. The full numeric walkthrough is in Appendix~\ref{app:us-sbl-example} (US SEC~15c3-3 worked example).
+
+%----------------------------------------------------------------------
+\subsection{On-Lending Chains}
+\label{sec:sbl-onlending}
+%----------------------------------------------------------------------
+
+Borrowed shares may be re-lent, forming on-lending chains of independent bilateral loans. The six-coordinate model handles them unmodified. Alice owns 1{,}000 XYZ and lends 1{,}000 to Bob ($\ell_1$); Bob re-lends 500 to Charlie ($\ell_2$). Each loan is its own unit with its own fee, collateral, and reporting. Columns abbreviate the coordinates: onl = onloan, c\_p = coll\_post, c\_r = coll\_recv, c\_rh = coll\_rehyp; avail = own $-$ onl $+$ borr is the read projection.
+
+\begin{center}\small
+\begin{tabular}{l r r r r r r l}
+\toprule
+\textbf{Entity} & own & onl & borr & c\_p & c\_r & c\_rh & avail \\
+\midrule
+Alice   & 1{,}000 & 1{,}000 & 0      & 0     & $C_1$ & 0 & 0 \\
+Bob     & 0       & 500     & 1{,}000 & $C_1$ & $C_2$ & 0 & 500 \\
+Charlie & 0       & 0       & 500     & $C_2$ & 0     & 0 & 500 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Verification: $\mathrm{avail}_{\text{Alice}} = 0$ (all lent), $\mathrm{avail}_{\text{Bob}} = 0-500+1000 = 500$, $\mathrm{avail}_{\text{Charlie}} = 500$; system $\mathrm{own} = 1{,}000$ (physical shares unchanged).
+
+\noindent\textbf{P18 scope.} P18 (Lender Ownership Invariance) fixes $\mathrm{own}$ across lending for \emph{pure} lenders ($\mathrm{borr}=0$). It applies to Alice, not to Bob ($\mathrm{borr}=1{,}000$, $\mathrm{onloan}=500$); Bob's exposure is through $\mathrm{borr}$. For an intermediary re-lender ($\mathrm{own}=0$, $\mathrm{borr}>0$) the binding identity is $\mathrm{onloan}\leq\mathrm{borr}$: an entity cannot re-lend more than it has borrowed plus what it owns. The identity follows from the lending pre-condition $\mathrm{avail}(e,u)\geq Q_{\mathrm{lend}}$, i.e.\ $\mathrm{own}-\mathrm{onloan}+\mathrm{borr}\geq Q_{\mathrm{lend}}$.
+
+\noindent\textbf{Cascade recall.} When Alice recalls 1{,}000 from Bob, Bob can return $\mathrm{avail}=500$ at once and must recall the remaining 500 from Charlie. Charlie returns 500; Bob's vector becomes $(0,0,1000,C_1,0,0)$ with $\mathrm{avail}=1000$. Bob returns 1{,}000 to Alice. The cascade carries settlement-timing risk: a downstream failure fails the upstream return, triggering CSDR penalties or Reg~SHO close-out.
+
+The cascade is orchestrated as a saga: a long-running workflow split into steps, each with a compensating action that undoes it on failure (Section~\ref{sec:obligation-liveness}). The steps are: compute $\mathrm{avail}$; return immediately what is available; recall the shortfall from downstream loans where the entity is lender, itself possibly cascading; await downstream returns under a settlement-deadline timeout; then execute the upstream return. On timeout the saga compensates by market buy-in with cost attribution per GMSLA~9.3 (IBP-328).
+
+Individual recalls and returns map to CDM \texttt{QuantityChange}/\texttt{Termination}. The coordinated cascade has no CDM equivalent (gap); it is orchestration, not a single business event.
+
+%----------------------------------------------------------------------
+\subsection{Locates}
+\label{sec:sbl-locates}
+%----------------------------------------------------------------------
+
+A \emph{locate} is a pre-trade confirmation by a lender (or agent lender) to a prospective short seller that the requested securities are identified and deliverable. A locate is \emph{not} a ledger move: no securities or collateral move, no coordinate changes, conservation is not engaged. Conservation engages only when the locate is converted into a borrow (the loan-initiation transaction of Section~\ref{sec:sbl-moves}).
+
+\begin{mentalmodel}
+A locate is a cloakroom attendant glancing at the rack and saying ``yes, there is a coat here you could borrow''---without lifting it off the rack, so the same coat may be promised to the next caller too, and the holder is free never to come for it. It moves no garment and conserves nothing. Only the put-on-hold kind actually takes the coat off the rack and sets it aside.
+\end{mentalmodel}
+
+\noindent\textbf{Regulatory basis.} EU SSR Article~12(1)(c): a person may short sell only where a third party has confirmed the share is located and measures taken give a reasonable expectation of settlement (ESMA~70-448-10 proposes reinforcing the locate provider's commitment). Implementing Regulation~(EU) No~827/2012 Article~6 fixes four confirmation types: standard, same-day, easy-to-borrow, and put-on-hold. US Reg~SHO Rule~203(b)(1): before a short sale the broker-dealer must borrow, arrange to borrow, or have reasonable grounds to believe the security can be borrowed for delivery when due; easy-to-borrow reliance rests on Rule~203(b)(1)(ii).
+
+\noindent\textbf{Lifecycle.} The stages are: request ($u$, $Q$, kind) $\to$ admission $\to$ a confirmed locate with $\texttt{remaining\_quantity}=Q$ and an expiry fixed at confirmation $\to$ drawdown by short-sale admissions (P14) $\to$ conversion to a borrow or expiry. Admission has two cases: for an in-ledger lender it is the capacity condition of the locate-capacity weld below; for an external lender it is attestation.
+
+\noindent\textbf{Modelling.} A locate is registered as a time-limited unit (TTL) in the Unit Store, carrying lender, security, kind, expiry, and \texttt{remaining\_quantity}. It has no position-vector entries. A locate is \emph{active} at $t$ iff it is confirmed, its remaining quantity is positive, and $t$ precedes its expiry, with $t$ the admitting transaction's log timestamp. This predicate is the sole authority for activity: decidable from the committed log, exact under replay, immune to scheduler lag. The due-event scheduler's terminal sweep at expiry is hygiene, not authority; no status read decides activity. The unit satisfies the EU SSR / ESMA~70-448-10 record-keeping obligation natively; a purely external trading-system locate does not.
+
+\begin{remark}[Why a unit and not a coordinate]
+\label{rem:locate-unit}
+A coordinate holds an anonymous, conserved quantity and is written only when something legally moves. A locate fails this on every axis. It is plural: several stand against one security at once, each with its own lender, quantity, kind, and expiry---a relation, and a per-lender relation has no home in a scalar slot on the security's shared status. It is identified: each confirmation carries its own record-keeping obligation and one-shot lifecycle. It is non-conserved: confirmation moves nothing, so there is no quantity for a coordinate to conserve. The remaining candidate, a reservation coordinate written free$\to$reserved at confirmation, would record an encumbrance the law does not create: under SSR Article~12(1)(c) and Reg~SHO Rule~203(b)(1) a locate confirms deliverability and blocks nothing---the lender may lawfully sell located stock the next instant. Freedom from over-location is therefore a condition at the moment of confirmation, not an invariant of the states that follow. A property of that shape is enforced at the admission door---the locate-capacity weld below---while identity, expiry, and audit belong to a unit. Only the put-on-hold confirmation binds the provider to hold the quantity, and there the bound is law, not policy: it enters the reserved deduction and, where binding, an obligation record (Section~\ref{sec:obligation-liveness})---still no move. Should ESMA~70-448-10's reinforcement be enacted, the locate's commitment strengthens as a gate parameter and an obligation; the primitive's type does not change.
+\end{remark}
+
+\noindent\textbf{Over-location prevention.} A lender must not confirm more locates than inventory supports. The gate is one inequality, and the deduction lives in one place: \texttt{available\_to\_lend} (Section~\ref{sec:sbl-short-selling}) already nets outstanding locates, and the locate under confirmation is not yet active, so nothing is subtracted twice:
+\begin{lstlisting}
+def confirm_locate(lender, security, quantity, kind, t):
+    # lender: in-ledger; t: the transaction's log timestamp
+    atl = available_to_lend(lender, security, t)
+    return CONFIRMED if atl >= quantity else DECLINED
+\end{lstlisting}
+The chain reads: owned $\to$ minus on-loan $\to$ plus borrowed $\to$ minus reserved (active put-on-hold locates) $\to$ minus regulatory holds $=$ available to lend. For a put-on-hold confirmation the bound is the provider's legal undertaking; for the other three kinds it is firm policy, and the kind may lawfully over-locate.
+
+The gate is total only over in-ledger lenders. An inbound locate from an external or agent lender is an attested boundary observation: admitted as a unit on its attestation, ungated, since capacity is the issuer's obligation. Under SSR Article~12(1)(c) the confirming party is a third party, so the attested case is P14's main case, not an edge.
+
+\begin{principle}[Locate-capacity weld]
+\label{prin:locate-weld}
+Locate confirmation is a move-less transaction. \texttt{applyTx} admits a locate confirmation by an in-ledger lender $\ell$ for security $u$ and quantity $Q$ only if $\text{AvailableToLend}(\ell,u,t) \geq Q$, with $t$ the transaction's log timestamp. The condition is decidable from the committed log and the transaction alone, evaluated at the transaction's position in the total order.
+\end{principle}
+
+Race-freedom is inherited from the total order, not argued case by case. Two confirmations are totally ordered, and the later one's fold sees the earlier's locate. Confirmation against conversion cannot tear: conversion's loan moves, drawdown, and terminalisation commit as one transaction (Section~\ref{sec:sbl-moves}). Confirmation against expiry is not a race: expiry is a timestamp predicate, not an event, so there is nothing to tear against. A per-(lender, security) workflow owner would not suffice: capacity is also written from outside any locate family---a sale writes $\mathrm{own}$---and only the one admission door owns those writers too.
+
+\begin{invariant}[P26---Locate-Capacity Admission]
+\label{inv:P26}
+At every commit position $p$ carrying a locate confirmation by an in-ledger lender $\ell$ in unit $u$,
+\[
+\sum_{\mathit{loc}\,\in\,\mathrm{activeHold}(\ell,u,p)} \texttt{remaining}(\mathit{loc}) \;\leq\; \max\bigl(0,\ \mathrm{avail}(\ell,u) - \mathrm{regulatory\_hold}(\ell,u)\bigr),
+\]
+both sides evaluated at $p$, $\mathrm{activeHold}$ the set of active put-on-hold locates. The property is step-indexed to confirmation positions and falsifiable by replaying the log alone.
+\end{invariant}
+
+Over-location freedom is a condition at the moment of confirmation, not an invariant of the states that follow: a lawful later operation---a sale of located stock---lowers the right-hand side without touching a locate. No artifact, in specification, test, or reconciliation, may restate P26 as a standing reachable-state invariant or a solvency identity over locates.
+
+\noindent\textbf{Executable oracle.} P26 is log-shaped, like P4, P8, and P24: it quantifies over the commit positions of a run, not over single transactions. The oracle replays the command stream, re-evaluating the fold at every position that admits an in-ledger confirmation. The oracle splits as in P1/P2: a wrongful \emph{decline} falls on the vacuous side, and completeness is discharged by the split metamorphic below. The check reads the committed run alone---no cached aggregate to vouch for itself, since \texttt{reserved} is a fold, never stored. The oracle and its kernel are verbatim from the reference (Part~G); \texttt{avail} is the six-coordinate projection of Section~\ref{sec:sbl-invariants}, and $t$ the command's log position (the $k$-th command commits at \texttt{Timestamp}~$k$).
+
+\begin{lstlisting}[language=Haskell]
+-- Activity is a TIMESTAMP PREDICATE and the sole authority: no status read
+-- competes with it; the scheduler's terminal sweep is hygiene, not authority.
+locActive :: Timestamp -> Locate -> Bool
+locActive t loc = locState loc == LocLive
+               && locRemaining loc > mempty && t < locExpiry loc
+
+-- reserved: a read-time fold over the ACTIVE PUT-ON-HOLD locates -- never
+-- stored, so no counter drifts and the deduction lives in ONE place.
+locReserved :: LocLedger -> LenderId -> UnitId -> Timestamp -> Qty
+locReserved ll e u t = foldMap locRemaining
+  [ loc | loc <- Map.elems (llLocs ll)
+        , locOrigin loc == LocInLedger e, locSecurity loc == u
+        , locKind loc == LocPutOnHold, locActive t loc ]
+
+-- P26 Locate-capacity admission: at every ADMITTED in-ledger confirmation
+-- position, reserved <= max(0, avail - regulatory_hold), both sides at that
+-- position (the admitted put-on-hold locate already in the fold). Attested
+-- external locates are OUTSIDE the quantification -- ungated by design.
+p26 :: [LocCmd] -> Bool
+p26 = go (1 :: Integer) locEmpty
+  where
+    go _ _  []       = True
+    go k ll (c : cs) =
+      let t = Timestamp k; (d, ll') = locStep t c ll
+          ok = case (c, d) of
+                 (LConfirm e u _ _ _, LocConfirmed _) ->
+                   locReserved ll' e u t
+                     <= qmax mempty (avail (locPosOf ll' e u)
+                                       <> qneg (locHoldOf ll' e u))
+                 _ -> True
+      in ok && go (k + 1) ll' cs
+\end{lstlisting}
+
+\noindent The confirmation gate is \texttt{locStep}'s \texttt{LConfirm} arm: it admits iff $\texttt{locAtl}\,\ell\,u\,t \geq Q$, where \texttt{locAtl} subtracts \texttt{reserved} once and the locate under confirmation is not yet in the fold. The generator \texttt{genLocCmds} draws command streams over a small lender/security pool: confirmations of all four kinds with near expiries; attested external locates; draws and conversions against the deterministic mint sequence; and inventory writes, including sales that lower \texttt{own} from outside any locate family. This is exactly the interleaving that defeats a per-(lender,\,security) workflow owner. It is paired with \texttt{shrinkLocCmds} (prefixes first, then pointwise quantity shrinking).
+
+\noindent\textbf{P14, structural.} A short sale is admissible only by referencing a live locate unit and decrementing its \texttt{remaining\_quantity} in the same admission. Drawdown is monotone, terminal states (converted, expired) are absorbing, and a double-spend of a locate is a non-state under the unit's serialised lifecycle. The capacity bound stays at the confirmation door (P26); the drawdown is structure, not a check.
+
+\noindent\textbf{Records.} Locate has no CDM equivalent (gap, Section~\ref{sec:sbl-cdm}, which fixes the lineage carried by the conversion's \texttt{ContractFormation}). The locate unit is retained in the Unit Store for the retention obligation.
+
+\noindent\textbf{Test obligations.} Four checks, none stated as a standing invariant, each a runnable oracle in the reference (Part~G):
+\begin{itemize}[nosep]
+\item the split metamorphic (\texttt{locSplitOK}): one put-on-hold confirmation of $Q$ is admitted iff two successive put-on-hold confirmations of $Q/2$ are---the one check that kills a double-counted deduction;
+\item the conversion postcondition (\texttt{locConvertNeutralOK}): converting a put-on-hold locate leaves $\text{AvailableToLend}$ unchanged, since the loan write and the drawdown are one atomic command;
+\item the drawdown-monotonicity check (\texttt{locDrawMonotoneOK}), P14's structural half;
+\item the P26 replay check (\texttt{p26}).
+\end{itemize}
+Byte-equality of the \texttt{CONFIRMED}/\texttt{DECLINED} stream under replay is discharged by the type: \texttt{locRun} is a total pure function of the command list, so a run-it-twice oracle would be vacuous. \texttt{regulatory\_restrictions} and the kind parameter are recorded, as-of-pinned inputs.
+
+%----------------------------------------------------------------------
+\subsection{Cross-Border Regulatory Treatment}
+\label{sec:sbl-crossborder}
+%----------------------------------------------------------------------
+
+A single loan can span jurisdictions, triggering SFTR and FINRA SLATE simultaneously. A loan from BNP~Paribas (EU, SFTR) to Goldman~Sachs (US, SLATE) carries both \texttt{sftr\_reportable}\slash\allowbreak\texttt{sftr\_uti} and\allowbreak{} \texttt{slate\_reportable}\slash\allowbreak\texttt{slate\_loan\_id} in the unit state. Both workflows fire per lifecycle event, independently. The schemas are distinct. The identifiers are distinct: LEI for SFTR; LEI + FINRA Loan ID for SLATE. The deadlines are distinct: T+1 for SFTR; same-day before 8pm~ET for SLATE.
+
+The \texttt{legal\_regime} is fixed at inception by the governing agreement:
+
+\begin{center}\small
+\begin{tabular}{l l l}
+\toprule
+\textbf{Governing Agreement} & \textbf{Use} & \textbf{\texttt{legal\_regime}} \\
+\midrule
+GMSLA~2010 (title transfer) & EU/UK bilateral & \texttt{TITLE\_TRANSFER} \\
+GMSLA~2018 (security interest) & EU/UK pledge & \texttt{SECURITY\_INTEREST} \\
+MSLA & US bilateral & \texttt{US\_15C3\_3} \\
+PBA & US prime broker & \texttt{US\_15C3\_3} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Venue, not domicile.} The locate regime is fixed by the trading venue: EU SSR Article~12(1) for EU venues, US Reg~SHO Rule~203(b)(1) for US venues. A cross-border short may face both. Settlement discipline is fixed by the settlement venue: a loan settled through an EU CSD faces CSDR cash penalties; one settled through DTC faces Reg~SHO Rule~204 (T+3) and FINRA Rule~4320. Each is independent of the counterparty's domicile.
+
+%----------------------------------------------------------------------
+\subsection{External Reconciliation}
+\label{sec:sbl-external}
+%----------------------------------------------------------------------
+
+Four participants each see a slice of the same state; the table names the ledger object each slice reads.
+
+\begin{center}
+\small
+\begin{tabular}{l p{4.5cm} p{3.5cm}}
+\toprule
+\textbf{Participant} & \textbf{View} & \textbf{Ledger Mapping} \\
+\midrule
+Beneficial owner & On-loan; collateral; fee income & $w^{\mathrm{onloan}}_L$, $w^{\mathrm{coll\text{-}recv}}_L$, fee accrual \\
+Agent lender & Pool across BOs & Aggregate $\mathrm{own}$ \\
+Borrower & Borrowed; collateral posted; fee expense & $w^{\mathrm{borr}}_B$, $\mathrm{avail}(B,\mathrm{ccy})$ \\
+Custodian & Depot position & Nostro/depot wallet \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Contract compare (IBP-153/155) runs daily at COB. Custodian reconciliation, substituting the $\mathrm{avail}$ projection, is $\vec{w}_L(u)[\mathrm{own}] + \vec{w}_L(u)[\mathrm{borr}] + \mathrm{inflight}(L,u) \stackrel{?}{=} \text{depot}(u)$: owned plus borrowed plus in flight equals what the custodian holds. CSDR penalty attribution is tracked per instruction. Settlement-instruction generation branches by collateral type: non-cash bilateral yields two FOP instructions; cash rebate one FOP plus one CASH; cash pool one FOP.
+
+%----------------------------------------------------------------------
+\subsection{CDM Alignment and Regulatory Reporting}
+\label{sec:sbl-cdm}
+%----------------------------------------------------------------------
+
+Each SBL event maps to a CDM type and an SFTR action; three events have no CDM home.
+
+\begin{center}
+\small
+\begin{tabular}{l l l}
+\toprule
+\textbf{SBL Event} & \textbf{CDM Type} & \textbf{SFTR Action} \\
+\midrule
+New loan & \texttt{ContractFormation} & NEWT \\
+Rate change & \texttt{TermsChange} & MODI \\
+Partial return & \texttt{QuantityChange} & MODI \\
+Full return & \texttt{Termination} & ETRM \\
+Recall & \emph{No CDM equivalent (gap)} & --- \\
+Margin call & \texttt{Transfer} (collateral) & COLU \\
+MTM & \texttt{Observation} + \texttt{Valuation} & VALU \\
+Substitution & \texttt{Transfer} $\times$ 2 & COLU \\
+Locate & \emph{No CDM equivalent (gap)} & --- \\
+Rehypothecation & \emph{No CDM equivalent (gap)} & COLU \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+CDM gaps: Recall, Locate, Rehypothecation. The locate lifecycle is off-model; the conversion's \texttt{ContractFormation} carries the locate id as lineage (retention: Section~\ref{sec:sbl-locates}). SFTR: both counterparties report, UTI per ESMA waterfall. FINRA SLATE: same-day reporting, 24 required fields. Tokenised securities posted as collateral occupy $\mathrm{coll\_post}/\mathrm{coll\_recv}$ with the token unit, not the underlying (Section~\ref{sec:cdm-tokenized}). The haircut covers both the underlying's market risk and the tokenisation platform's operational risk. CDM has no native type for tokenised-collateral eligibility: a fourth gap.
+
+%----------------------------------------------------------------------
+\subsection{SBL-Specific Invariants (P11--P20)}
+\label{sec:sbl-invariants}
+%----------------------------------------------------------------------
+
+SBL adds ten invariants that narrow the valid states without relaxing any core invariant: every transaction satisfying P11--P20 also satisfies P1--P10. Worked correctness witnesses are in Appendix~\ref{app:eu-sbl-example} (European GMSLA~2010) and Appendix~\ref{app:us-sbl-example} (US SEC~15c3-3); eight-scenario $\mathrm{avail}$ verification in Appendix~\ref{app:avail-identity}.
+
+\begin{invariant}[P11--P20]
+\label{inv:P11}\label{inv:P20}
+\begin{enumerate}\setcounter{enumi}{10}
+\item \textbf{P11---Paired Legs.} Every SBL settlement transaction carries both a securities and a collateral leg (exceptions: uncollateralised, cash pool, triparty RQV).
+\item \textbf{P12---On-Loan Consistency.}
+\[ w^{\mathrm{onloan}}_e(u) = \sum_{\substack{u_\ell:\,\mathrm{lender}(u_\ell)=e\\ \mathrm{isin}(u_\ell)=u,\ \mathrm{stage}(u_\ell)\in S_{\mathrm{live}}}} \mathrm{quantity}(u_\ell). \]
+\item \textbf{P13---Collateral Sufficiency.} Held collateral covers loan value; three formulations---per-loan cash, cash pool, non-cash bilateral.
+\item \textbf{P14---Locate Drawdown.} Every short-sale admission draws down a named, live locate: the admission references the locate unit and decrements its \texttt{remaining\_quantity}; drawdown is monotone and terminal states are absorbing. Structural under the locate unit's serialised lifecycle; the capacity bound at confirmation remains an admission condition (Principle~\ref{prin:locate-weld}).
+\item \textbf{P15---Partial Return Monotonicity.} Loan quantity is monotonically non-increasing.
+\item \textbf{P16---SFTR Completeness.} Each reportable event has exactly one SFTR report.
+\item \textbf{P17---Settlement State Monotonicity.} Settlement states advance monotonically.
+\item \textbf{P18---Lender Ownership Invariance.} For pure lenders under title transfer, excluding buy-in, $\vec{w}_e(u)[\mathrm{own}]$ is constant across lending operations. By construction under Principle~\ref{princ:single-coord}: initiation and return write the lender's $\mathrm{onloan}$, never $\mathrm{own}$; MTM, substitution, and dividend write collateral or cash coordinates only. Buy-in is excluded because its market purchase writes $\mathrm{own}$.
+\item \textbf{P19---Rehypothecation Regime Compliance.} Rehypothecation is validated against the legal regime.
+\item \textbf{P20---Available Inventory Identity.} For all $e$ and lendable $u$, $\mathrm{avail}(e,u) = \vec{w}_e(u)[\mathrm{own}] - \vec{w}_e(u)[\mathrm{onloan}] + \vec{w}_e(u)[\mathrm{borr}]$. Under the six-coordinate model this is a definition, not a cross-check: $\mathrm{avail}$ is computed on read from three stored coordinates and cannot be violated because it is never stored.
+\end{enumerate}
+\end{invariant}
+
+\clearpage
+
+\subsection*{Key Invariants and Consequences}
+
+Obligations and the six-coordinate position vector generalise the scalar core without
+relaxing any of P1--P10: every transaction satisfying P11--P23 also satisfies P1--P10. Each
+guarantee carries its canonical number in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{Conservation generalises (P1).} The scalar conservation law extends unchanged
+to the six-coordinate vector: each move writes exactly one coordinate of one unit across the
+two entities it connects (Single-Coordinate Move Principle), so the signed sum over all
+coordinate slots is preserved. (\S\ref{sec:gpm}, Proposition~\ref{prop:gpm-conservation}.)
+\item \textbf{Available-inventory identity (P20).}
+$\mathrm{avail}(e,u)=\vec w_e(u)[\mathrm{own}]-\vec w_e(u)[\mathrm{onloan}]+\vec
+w_e(u)[\mathrm{borr}]$, computed on read from three stored coordinates and never stored,
+hence not violable. (\S\ref{sec:sbl-invariants}, Invariant~\ref{inv:P20}.)
+\item \textbf{SBL narrows without relaxing (P11--P19).} Paired legs (P11), on-loan
+consistency (P12), collateral sufficiency (P13), locate drawdown (P14), partial-return
+monotonicity (P15), and lender ownership invariance under title transfer (P18, by
+construction---lending writes \emph{onloan}, never the lender's \emph{own}) narrow the
+valid states. (\S\ref{sec:sbl-invariants}.)
+\item \textbf{Locate-capacity admission (P26).} At every locate-confirmation commit
+position, the lender's active put-on-hold reservations are bounded by available inventory
+net of regulatory holds. Step-indexed and log-checkable; a later lawful sale may falsify
+the inequality, so it is never restated as a standing state invariant.
+(\S\ref{sec:sbl-locates}, Invariant~\ref{inv:P26}.)
+\item \textbf{Obligation liveness (P21).} For every obligation $o$ with deadline $t_d$:
+$\forall t>t_d,\ o.\mathit{state}\in\{\textsc{Discharged},\textsc{Compensated},\textsc{Defaulted}\}$;
+none persists in \textsc{Pending} or \textsc{Attempted} past its deadline.
+(\S\ref{sec:obligation-invariants}, Invariant~\ref{inv:P21}.)
+\item \textbf{Obligation conservation (P22).} Every discharging and every compensating move
+set satisfies $Q(u)=0$; the mechanism does not bypass the executor. Follows from P1.
+(\S\ref{sec:obligation-invariants}, Invariant~\ref{inv:P22}.)
+\item \textbf{Obligation idempotency (P23).} Discharging the same obligation twice by
+$o.\mathit{id}$ has no incremental effect; it composes with P5 and P6.
+(\S\ref{sec:obligation-invariants}, Invariant~\ref{inv:P23}.)
+\end{itemize}
+
+

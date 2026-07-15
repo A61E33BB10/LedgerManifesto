@@ -1,0 +1,28 @@
+\section{CDM Type Mapping Tables}
+\label{app:cdm-mapping}
+
+The mapping $F$ of Section~\ref{sec:cdm} is a set of translation rules, one per CDM type. Types carrying economic substance map to ledger primitives: products, events, transfers. Types carrying business context are preserved as event-log metadata: workflow steps and lineage.
+
+Each row of the table states one rule: the CDM type, the ledger concept it becomes, and the shape of the correspondence.
+
+\begin{center}
+\begin{tabular}{l l l}
+\toprule
+\textbf{CDM Type} & \textbf{Ledger Concept} & \textbf{Notes} \\
+\midrule
+\texttt{Product} & Unit type ($u \in \mathcal{U}$) & One product $\to$ one or more units \\
+\texttt{TradeState} & Unit state ($\text{state}_t(u)$) & Lifecycle position and flags \\
+\texttt{BusinessEvent} & Transaction ($\tau$) & One or more moves \\
+\texttt{PrimitiveEvent} & Move ($m$) & Atomic transfer \\
+\texttt{Transfer} & Move ($m$) & Cash or securities movement \\
+\texttt{QuantityChange} & Move ($m$) & Position adjustment \\
+\texttt{Party} & Wallet ($w$) & One party $\to$ one or more wallets \\
+\texttt{Account} & Wallet ($w$) & Direct correspondence \\
+\texttt{WorkflowStep} & Transaction metadata & Event-log payload \\
+\texttt{Lineage} & Transaction metadata & Event-log payload \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The unit state $\text{state}_t(u)$ to which \texttt{TradeState} maps is a materialised projection of the immutable event log. Its value at $t$ is rebuilt by replaying the events up to $t$; the state is never an authoritative store written off-log.
+

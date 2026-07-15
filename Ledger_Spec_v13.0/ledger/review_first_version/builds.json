@@ -1,0 +1,12 @@
+{
+  "A": {
+    "pass": true,
+    "pages": 166,
+    "notes": "latexmk exit 0; 0 fatal (^!); 0 undefined refs; 0 undefined citations. 6 LaTeX warnings, all cosmetic: \\texteuro invalid in math mode (lines 2441, 3016, 3034), which also cause 3 'Missing character ) in nullfont' messages \u2014 euro glyph silently dropped, fix by wrapping in \\text{} or using eurosym. 18 overfull hboxes total, 0 exceed 20pt (max 14.05pt at lines 7034-7035). Clean build."
+  },
+  "B": {
+    "pass": true,
+    "pages": 166,
+    "notes": "latexmk exit 0, no fatal errors, no undefined refs/citations (0 in log and .aux). 33 sections. Warnings: 6 real LaTeX warnings, all identical issue '\\texteuro invalid in math mode' at lines 2432/3007/3025 (euro symbol via textcomp \\texteuro used inside math mode; non-fatal but renders wrong \u2014 fix with \\text{\\texteuro}). Overfull hboxes: 18 total, 0 exceeding 20pt (worst 14.05pt). No underfull/vbox warnings. Engine: pdflatex (utf8 inputenc, T1 fontenc). The 'infwarerr' grep hit is a package banner, not a warning."
+  }
+}

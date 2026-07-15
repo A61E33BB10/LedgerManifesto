@@ -1,0 +1,37 @@
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.4mm]},
+    state/.style={draw, rounded corners, align=center, font=\small,
+                  minimum width=22mm, minimum height=9mm},
+    term/.style={draw, double, rounded corners, align=center, font=\small,
+                 minimum width=22mm, minimum height=9mm},
+    tr/.style={->, thick},
+  ]
+  % --- a generic instrument's machine ---
+  \node[state] (live) at (0,0) {Live};
+  \node[term]  (exd)  at (4.2,1.4)  {Exercised};
+  \node[term]  (exp)  at (4.2,-1.4) {Expired};
+
+  % --- entry ---
+  \draw[tr] (-3.9,0) -- node[above, font=\scriptsize]{register / first trade} (live.west);
+
+  % --- the two optionality-resolving transitions ---
+  \draw[tr] (live.east) -- node[above left, font=\scriptsize, pos=0.6]{exercise} (exd.west);
+  \draw[tr] (live.east) -- node[below left, font=\scriptsize, pos=0.6]{expiry}   (exp.west);
+
+  % --- idempotent self-loops on the terminal (absorbing) states ---
+  \draw[tr] (exd.east) .. controls +(1.2,0.7) and +(1.2,-0.7) .. (exd.east);
+  \draw[tr] (exp.east) .. controls +(1.2,0.7) and +(1.2,-0.7) .. (exp.east);
+  \node[font=\scriptsize, align=left] at (7.6,1.4)  {replay\\(idempotent)};
+  \node[font=\scriptsize, align=left] at (7.6,-1.4) {replay\\(idempotent)};
+\end{tikzpicture}
+\caption{Lifecycle as a state machine, for a generic instrument: from \emph{Live}, exercise
+leads to \emph{Exercised} and expiry to \emph{Expired}. The terminal states are absorbing;
+their self-loops depict the idempotence of replay---re-applying a settled event produces no
+further effect (\S\ref{sec:lifecycle}). There is no single global machine: the transitions
+are determined by \texttt{ProductTerms} per unit-type. The concrete futures machine
+\textsc{Registered} $\to$ \textsc{Active} $\to$ \textsc{Expired} $\to$ \textsc{Closed} is one
+instance (\S\ref{sec:sec08}).}
+\label{fig:lifecycle}
+\end{figure}

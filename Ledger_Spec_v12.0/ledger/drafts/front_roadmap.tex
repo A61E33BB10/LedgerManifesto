@@ -1,0 +1,51 @@
+\section*{Roadmap and Reading Guidance}
+\addcontentsline{toc}{section}{Roadmap and Reading Guidance}
+
+The title names three pillars, each developed in its own parts. The architecture---one
+closed system, the atomic move, conservation, and the three-home state model---is
+Parts~I--II (\S\S1--4). The instrument lifecycle---valuation, contracts, deterministic and
+optional lifecycle events, and the generalisation to obligations and securities
+lending---is Parts~III and~V (\S\S5--8, \S14, \S15). CDM integration, with accounts,
+reporting, and the settlement interface, is Part~IV (\S\S9--13). Part~VI (\S16, \S\S17--20)
+states the formal properties, limitations, and context.
+
+The reading paths below give, for each audience, the shortest route to a working
+understanding, what to add when more depth is required, and what carries no cost on a first
+pass.
+
+\begin{longtable}{@{}p{0.16\textwidth}p{0.30\textwidth}p{0.28\textwidth}p{0.18\textwidth}@{}}
+\toprule
+\textbf{Audience} & \textbf{Minimal path} & \textbf{Then if needed} & \textbf{May skip on first pass} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Audience} & \textbf{Minimal path} & \textbf{Then if needed} & \textbf{May skip on first pass} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Regulator &
+Preface, \S1, the conservation core of \S2, \S17, \S18 &
+\S12, \S19, \S20, App.~C, App.~H, App.~I &
+the Haskell, \S4 construction detail, \S6, \S8 detail, \S\S14--16 internals \\
+\addlinespace
+Implementer &
+\S2, \S3, \S4, \S6, \S7, \S11, \S16 &
+\S8, \S12, \S13 + App.~F, \S14, \S15, App.~A/B/G &
+\S5 profit-and-loss derivations, \S9, \S10, \S17, worked examples \\
+\addlinespace
+Quant &
+\S2, \S5, \S10, App.~D &
+\S8, \S15 &
+\S3, \S11, \S12, \S\S13--14 mechanics, \S17 \\
+\addlinespace
+Risk manager &
+\S2, \S5, \S7, \S9, \S10, \S15 &
+\S17, App.~C &
+\S3, \S6 internals, \S11, \S\S13--14, the Haskell \\
+\bottomrule
+\end{longtable}
+
+The progression from scalar to vector is deliberate. The scalar wallet balance carries the
+whole argument through Parts~I--IV; the six-coordinate position vector and securities
+lending wait until Part~V, introduced only once obligations are in hand.

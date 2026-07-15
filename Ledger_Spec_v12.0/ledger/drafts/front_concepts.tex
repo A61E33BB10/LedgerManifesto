@@ -1,0 +1,92 @@
+\section*{Key Concepts and Terminology}
+\addcontentsline{toc}{section}{Key Concepts and Terminology}
+
+This is an orientation list: a one-line gloss of each core term with a pointer to where it
+is formally defined. Appendix~E (Glossary) is the authoritative reference; where this list
+and the formal definition appear to differ, the formal definition governs.
+
+\begin{description}[style=nextline,leftmargin=1.5em,itemsep=3pt]
+
+\item[\textbf{Wallet}] A named account holding quantities of units; a logical partition of
+position space, not a bank or custody account (\S2).
+
+\item[\textbf{Unit}] Any tradable or bookable object: currency, security, derivative,
+contract (\S2).
+
+\item[\textbf{Atomic move}] The single primitive operation: an indivisible transfer of a
+positive quantity of one unit from a source wallet to a destination (\S2).
+
+\item[\textbf{Conservation law}] The total quantity of each unit across all wallets is zero
+at all times, $\sum_w w(u)=0$; the system is closed (\S2).
+
+\item[\textbf{Closed system}] A system in which quantity is neither created nor destroyed,
+only moved between wallets (\S2).
+
+\item[\textbf{Event log / move stream}] The immutable, append-only log of every atomic
+move; the sole canonical internal record (\S2).
+
+\item[\textbf{Projection}] Any view---balances, P\&L, balance sheets, reports---computed
+from the move stream rather than stored independently (\S2).
+
+\item[\textbf{The three homes}] The three places unit state lives: ProductTerms,
+UnitStatus, and PositionState (\S4).
+
+\item[\textbf{ProductTerms}] First home: a unit's contractual terms, immutable, versioned,
+and append-only (\S4).
+
+\item[\textbf{UnitStatus}] Second home: one shared value per unit, read identically by
+every holder; a materialised projection of the event log, not an authoritative mutable
+store (\S4).
+
+\item[\textbf{PositionState}] Third home: per-(wallet, unit) economic state holding
+conserved fields such as accumulated cost and entry net asset value (NAV) (\S4).
+
+\item[\textbf{Position vector}] The six-coordinate generalisation of the wallet balance:
+owned, on-loan, and borrowed quantities together with three collateral coordinates (posted,
+received, rehypothecated); it degenerates to a scalar for non-lendable instruments (\S15).
+
+\item[\textbf{Smart contract (move generator)}] A deterministic program mapping inputs and
+state to sequences of atomic moves (\S6).
+
+\item[\textbf{Lifecycle event}] A state transition on a unit---coupon, reset, margin call,
+exercise---expressed as a transaction (\S7).
+
+\item[\textbf{Transition function}] The pure function carrying a unit's lifecycle state and
+an event to the next state and its moves (\S7).
+
+\item[\textbf{Replay}] Reconstruction of any historical state by folding the move stream
+and logged state changes up to a chosen time (\S2).
+
+\item[\textbf{Idempotence}] Applying the same lifecycle operation twice has no effect beyond
+the first application (\S7).
+
+\item[\textbf{Path-independent PnL}] Profit and loss $V_{t_1}-V_{t_0}$ depends only on the
+initial and final states, not on the path between them (\S5).
+
+\item[\textbf{State-sufficiency}] Portfolio value depends only on current balances, unit
+state, and prices, not on transaction history (\S5).
+
+\item[\textbf{Balance-sheet substantiation}] Demonstration that each balance-sheet figure
+is a projection of the same move stream, reconciled against external authorities at the
+boundary (\S10).
+
+\item[\textbf{Settlement layer}] The interface projecting committed ledger activity into
+external settlement infrastructure (\S12).
+
+\item[\textbf{CDM}] ISDA Common Domain Model: the canonical vocabulary for products and
+lifecycle events, and the input space for property-based testing (\S13).
+
+\item[\textbf{Managed account}] An internal book treated as a virtual portfolio with
+periodic cash settlement of accumulated PnL (\S9).
+
+\item[\textbf{TRS (total return swap)}] A contract converting virtual ledger performance
+into real cash flows (\S9).
+
+\item[\textbf{SBL (securities borrowing and lending)}] The lending and borrowing of
+securities, modelled by the position vector's loan and collateral coordinates (\S15).
+
+\item[\textbf{Obligation liveness}] The state of a recorded commitment to perform a move,
+read by a total discharge predicate: live until a matching committed transaction appears
+(\S14).
+
+\end{description}

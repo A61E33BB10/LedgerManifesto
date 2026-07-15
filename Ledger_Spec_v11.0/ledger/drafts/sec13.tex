@@ -1,0 +1,133 @@
+\section{ISDA CDM Integration}
+\label{sec:sec13}\label{sec:cdm}
+%==============================================================================
+
+The framework needs a canonical vocabulary for products and lifecycle events: one normalised description of what is traded, one of how obligations evolve, and one deterministic rule for when a transition is permitted. The ISDA Common Domain Model (CDM), governed by FINOS, supplies all three. The ledger adopts it as its domain model, deriving the correspondence from the framework's own primitives---wallet, unit, move, transaction, conservation---and then storing each CDM record intact alongside the transaction it generates.
+
+\subsection{The CDM}
+
+The CDM is a machine-readable, machine-executable model of financial products and their lifecycle events, expressed in the Rune domain-specific language and distributed as open-source executable code. It comprises five components:
+
+\begin{enumerate}[nosep]
+\item A \textit{product model}: tradable contracts and instruments in normalised form (quantity, price, parties, payouts, legal agreements).
+\item An \textit{event model}: lifecycle events as state transitions built from a fixed set of primitive operators---execution, quantity change, terms change, reset, transfer.
+\item A \textit{process and workflow model}: pre- and post-trade steps---proposals, acceptances, rejections, allocations, novations.
+\item A \textit{reference-data model}: parties, legal entities, and the static data needed to interpret trades and events.
+\item A \textit{mapping layer} (synonyms): a machine-readable correspondence between CDM objects and external message formats and identifiers---FpML, FIX, ISO~20022.
+\end{enumerate}
+
+A single instrument traces the abstractions: a European call on AAPL, strike \$200, expiry 2026-06-20, 100 contracts, cash-settled in USD, bought by Firm~A from Firm~B on 2026-03-15. The CDM describes it as an \texttt{OptionPayout} (underlier, option type, strike, expiry, settlement terms), wraps it in a \texttt{Trade} that binds counterparties and execution context, and records its exercise as a \texttt{BusinessEvent} whose \texttt{before} \texttt{TradeState} (ACTIVE) becomes its \texttt{after} \texttt{TradeState} (EXERCISED). The chain is \emph{product} (what the contract is) $\to$ \emph{tradable product} (who traded it) $\to$ \emph{business event} (what happened) $\to$ \emph{ledger moves} (how value transfers). The full product walkthrough is in Appendix~\ref{app:cdm-walkthrough}.
+
+\subsection{Derivation: CDM Maps to the Framework Primitives}
+
+Each framework primitive has a CDM counterpart, so the integration follows from the definitions rather than from adoption.
+
+\paragraph{Products as units.} The wallet universe $\mathcal{U}$ instantiates directly from the CDM product model: each CDM trade or contract corresponds to a unit type or a bounded set of unit types (underlyings, legs, payouts), managed by the Unit Store (Section~\ref{sec:unit-store}). CDM's normalised quantity, price, and party are the primitives of wallet balances and move units.
+
+\paragraph{Event model as state graph.} The CDM event model already treats each lifecycle event as a functional state transition. \texttt{TradeState} and \texttt{State} are the nodes of the lifecycle state graph; the primitive operators composed in a \texttt{BusinessEvent} are its edges; the lineage between \texttt{before} and \texttt{after} states, and between \texttt{WorkflowStep}s, is the evidence chain that reconstructs any path through the graph. CDM is thus a concrete state machine for the abstract lifecycle.
+
+\paragraph{Embedded logic as transition contracts.} CDM embeds executable Rune logic---primitive functions, validation rules, event-qualification functions---which are the deterministic predicates a transition contract requires. A CDM function applied to a \texttt{TradeState} is a transition-contract instance; its validation and state-transition checks are the proof of execution that must pass before moves are emitted. The ledger treats CDM functions as the authoritative contracts above which wallet moves are generated.
+
+\paragraph{Mapping layer as oracle interface.} External messages are oracle outputs; synonym mappings are deterministic transforms from those messages into CDM trades and events; CDM functions then drive transition contracts and emit moves. Because the mapping is explicit and shared, no bilateral adapter is required per counterparty.
+
+CDM describes \textit{what} trades and events are; the closed ledger describes \textit{how} value moves between wallets in response.
+
+\subsection{The Synonym Layer and Ingestion}
+
+Each external message---an FpML confirmation, a FIX execution report, an ISO~20022 settlement instruction---maps to a CDM object through a declared synonym. The mapping is deterministic, versioned, and machine-readable, and is reused across systems in place of bespoke bilateral adapters. Ingestion is a fixed pipeline:
+
+\begin{center}
+raw message $\to$ CDM synonym mapping $\to$ CDM object $\to$ lifecycle function $\to$ moves and state changes
+\end{center}
+
+The only bespoke code is at the transport layer; the semantic mapping is shared.
+
+The move stream stores CDM objects that may originate from earlier CDM versions, so version coexistence is required: each stored event carries its CDM version identifier, and the lifecycle engine either processes an older-version event natively or applies a version migration before processing. A CDM enumeration addition---a new lifecycle intent or product type---requires a corresponding update to the lifecycle state machines and the test generators.
+
+\subsection{The Forgetful Map \texorpdfstring{$F$}{F}}
+
+Let $\mathbf{CDM}$ be the collection of CDM states and business events and $\mathbf{Ledg}$ the collection of ledger states and transactions. The map $F : \mathbf{CDM} \to \mathbf{Ledg}$ sends each \texttt{BusinessEvent} to a boundary record carrying its economic content---the moves---and stores the originating CDM event as that record's payload. The moves it carries are exactly the edges a core ledger \texttt{Transaction} records, so the boundary record projects onto the core transaction; it is not itself the core \texttt{Transaction} and keeps a distinct name. $F$ is \textit{forgetful}: it drops the legal and ISDA-business detail the ledger does not track and keeps only the moves. Nothing is lost, because the dropped detail survives verbatim in the payload.
+
+\medskip
+$F$ has the signature below: it consumes a CDM \texttt{BusinessEvent} and produces a boundary \texttt{CdmTransaction} that projects onto the core ledger \texttt{Transaction}.
+
+\begin{lstlisting}[language=Haskell]
+-- The CDM side. A BusinessEvent carries the primitive operators F reads, the
+-- lifecycle states it transitions between, and the business detail F forgets.
+data Intent         = Execution | Exercise | Termination | QtyChange | ResetIntent
+data LifecycleState = ActiveS   | Exercised | Terminated | SettledS
+newtype TradeState  = TradeState LifecycleState
+
+data PrimitiveInstruction
+  = PiTransfer  WalletId WalletId UnitId Qty   -- value leg  (cash or asset)
+  | PiQtyChange WalletId WalletId UnitId Qty   -- position leg (contracts)
+  | PiTerms                                    -- amendment: no move
+  | PiReset                                    -- observation/reset: no move
+
+data BusinessEvent = BusinessEvent
+  { beInstructions :: [PrimitiveInstruction]  -- read by F (economic content)
+  , beBefore       :: TradeState              -- lifecycle before / after: read for
+  , beAfter        :: TradeState              --   sequencing only
+  , beIntent       :: Intent                  -- FORGOTTEN: business intent
+  , beLineage      :: [String]                -- FORGOTTEN: workflow lineage
+  , beStructure    :: String                  -- FORGOTTEN: product structure, legal terms
+  }
+
+-- F emits the canonical Sec. 2 Move (mFrom, mTo, mUnit, mQty, mTime, mSource). A
+-- Move names BOTH parties, so a single Move conserves BY CONSTRUCTION (a credit
+-- with no offsetting debit is unrepresentable); the whole event's conservation is
+-- then the signed edge-sum of its move list -- mempty for the empty list, so a
+-- move-less event (amendment, reset) is conserved for free. There is no separate
+-- validation step, and none is representable.
+--
+-- CdmTransaction is the CDM BOUNDARY type, kept DISTINCT from the core ledger
+-- Transaction (Sec. 4): its ctMoves ARE the edges a core Transaction records, so it
+-- PROJECTS onto the core Transaction; ctPayload keeps the originating event verbatim.
+data CdmTransaction = CdmTransaction
+  { ctMoves   :: [Move]         -- economic content the ledger acts on (-> core txMoves)
+  , ctPayload :: BusinessEvent  -- originating CDM event, kept verbatim (recoverable)
+  }
+
+-- F = forget. Total over every BusinessEvent; deterministic (pure). Move
+-- extraction is `concatMap instructionMoves`, a MONOID HOMOMORPHISM from the free
+-- monoid of instruction lists to the free monoid of move lists --- meaning it
+-- distributes over concatenation, moves (xs <> ys) = moves xs <> moves ys. The
+-- restricted composition and sequencing properties below are consequences of this
+-- one law, not separate guarantees.
+instructionMoves :: PrimitiveInstruction -> [Move]
+instructionMoves (PiTransfer  a b u q) = [Move a b u q (Timestamp 0) (SourceId "cdm")]
+instructionMoves (PiQtyChange a b u q) = [Move a b u q (Timestamp 0) (SourceId "cdm")]
+instructionMoves PiTerms               = []          -- move-less event (FAQ Q6)
+instructionMoves PiReset               = []
+
+forget :: BusinessEvent -> CdmTransaction
+forget be = CdmTransaction (concatMap instructionMoves (beInstructions be)) be
+\end{lstlisting}
+
+\noindent A move-less event (an amendment, a reset) maps to a \texttt{CdmTransaction} with \texttt{ctMoves~=~[]} and the full payload---\texttt{forget} is total there, it does not fail. \texttt{forget} is \emph{forgetful} in code: \texttt{ctPayload} retains the whole event, so the detail dropped from \texttt{ctMoves} (intent, lineage, structure) is recoverable verbatim, e.g.\ \texttt{ctPayload (forget e) == e}.
+
+\paragraph{Worked example: exercising the AAPL call.} Firm~A exercises the 100-contract call on 2026-06-20 at settlement price $S_T = 215$. The arriving \texttt{BusinessEvent} carries an \texttt{Exercise}\allowbreak\texttt{Instruction} with \texttt{before} TradeState (ACTIVE, 100 contracts) and \texttt{after} TradeState (EXERCISED). $F$ reads the primitive instruction---a cash \texttt{Transfer} of $100 \times \max(215 - 200, 0) = \text{USD}\,1{,}500$ from seller to buyer---and emits \texttt{Move(seller[Firm~B],}\allowbreak{} \texttt{buyer[Firm~A],}\allowbreak{} \texttt{USD,}\allowbreak{} \texttt{1500)}. Firm~B's USD balance falls by 1{,}500 and Firm~A's rises by 1{,}500; the net change is zero, so conservation holds. The option unit's state becomes EXERCISED and accepts no further events. The full CDM \texttt{BusinessEvent}---exercise terms, counterparty identifiers, product structure, workflow lineage---is stored in the generated \texttt{CdmTransaction}'s payload for audit and reporting.
+
+\begin{remark}
+UnitStatus holds one value per unit, shared---read identically by every holder. Its value changes over time, but UnitStatus is not a separate source of truth: the immutable event log is. Every change is caused by a logged event; the stored value is overwritten in place only as a read cache. Replaying the events up to any point rebuilds the exact value that held then, so nothing is lost by overwriting and there is no other way to change the value. A value exists from registration onward. The exercise above changes the option unit's status to EXERCISED solely by logging its \texttt{BusinessEvent}; the stored EXERCISED flag is the replay of that log.
+\end{remark}
+
+\paragraph{What \texorpdfstring{$F$}{F} preserves.}
+\begin{itemize}[nosep]
+\item \textbf{Composition (restricted).} For referentially independent events $e_1, e_2$---neither referencing the other's state---$F(e_2 \circ e_1) = F(e_2) \circ F(e_1)$. This is the monoid-homomorphism law of \texttt{concatMap instructionMoves} above---move extraction distributes over concatenation---so $F$ assembles the composite's moves from the parts without reference to neighbours. Events that carry cross-references (a novation referencing the original trade) or dependent cascades (a margin call triggered by a reset on the same unit) must first be resolved and processed in causal order; composition then holds for the resolved sequence, provided the resolution is deterministic and alters no event's economic content.
+\item \textbf{Conservation.} Every business event maps to a transaction satisfying the conservation law; $F$ neither creates nor destroys value.
+\item \textbf{Sequencing.} The temporal order of CDM events is the order of the resulting move stream.
+\item \textbf{Idempotency.} If a CDM event is idempotent, so is its transaction. Exercising the same option twice produces no additional moves: the absorbing lifecycle guard (\texttt{Exercised} accepts no further exercise, as \texttt{Expired} is absorbing for futures, Section~\ref{sec:sec08}) makes the second event inert before $F$ runs.
+\end{itemize}
+
+\paragraph{What \texorpdfstring{$F$}{F} forgets.} Business intent (why the trade was placed), workflow lineage (the approval and negotiation history), product structure (payout schedules and legal terms), and regulatory classification (IFRS~9 measurement category---see Section~\ref{sec:regulatory}). Each is preserved in the CDM payload, not in ledger state.
+
+\begin{principle}
+The ledger carries economic substance---positions, cashflows, conservation; CDM carries business meaning---intent, structure, classification. Embedding full CDM graphs in ledger state would enlarge it without strengthening any guarantee, since balance computation and conservation do not depend on business intent. The forgetfulness of $F$ is therefore forced by the separation of the two abstractions, and the dropped detail is recoverable from the payload at all times.
+\end{principle}
+
+The concrete per-type translation rules that implement $F$---which CDM types map to ledger primitives and which are preserved as metadata---are tabulated in Appendix~\ref{app:cdm-mapping}.
+
+\subsection{CDM Enumerations as Generator Universe}
+
+The CDM enumerations---product types (interest rate, equity, credit, FX, commodity), event types (execution, termination, novation, exercise, reset, transfer, quantity change), party roles, date-adjustment rules, settlement types---form a closed, finite universe of valid constructs. Combined with the CDM validation rules for which event types are valid for which product types, they define the generator universe for the property-based tests of Section~\ref{sec:invariants}: the test framework enumerates the valid (product, event) combinations and verifies that $F$ produces a conservation-satisfying transaction for each.

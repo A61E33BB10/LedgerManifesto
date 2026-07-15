@@ -1,0 +1,21 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.lof
+*.lot
+# Haskell build
+build/
+*.hi
+*.o
+dist-newstyle/
+# editor / OS
+.claude/
+*~
+.DS_Store

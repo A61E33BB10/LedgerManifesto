@@ -1,0 +1,68 @@
+\section{Scope and Limitations}
+\label{sec:sec18}
+\label{sec:scope-limitations}
+%==============================================================================
+
+The framework's guarantees hold for activity recorded within the ledger boundary fixed in \S\ref{sec:intro}. This section states the boundary in full: what is inside, what is outside, and what the framework does not do. It establishes no new result; it bounds the claims of the preceding sections.
+
+\subsection{Inside the Boundary}
+
+The following are governed by the framework's invariants.
+
+\begin{itemize}[nosep]
+\item Positions: wallet balances, the generalised position vector, and the conservation law.
+\item Moves: atomic transfers of quantity between wallets, with full provenance.
+\item Conservation: $\sum_w w_t(u) = 0$ for every unit at all times.
+\item Lifecycle: unit state transitions, recorded as transactions with CDM event metadata.
+\item Valuation: portfolio value $V_t = \sum_u w_t(u)\cdot P_t(u)$ given an externally supplied price vector $P_t$ (valuation mechanics are specified in the valuation specification).
+\item Time travel: reconstruction of historical state by replay of the immutable event log.
+\item Internal reconciliation: the trading-system, general-ledger, and balance-sheet views are projections of one record.
+\end{itemize}
+
+\subsection{Outside the Boundary}
+
+The following depend on external systems and are not governed by the framework.
+
+\begin{itemize}[nosep]
+\item Price formation: $P_t$ is an external input. The framework does not compute, validate, or guarantee executable prices.
+\item Legal agreements: ISDA Master Agreements, GMSLAs, GMRAs, CSAs, and custody agreements determine legal rights. The ledger records economic positions; it does not determine legal ownership or enforceability.
+\item Settlement infrastructure: CSD connectivity, payment-system access, settlement finality, and real-world DvP depend on external infrastructure (DTC, Euroclear, Clearstream, CLS, TARGET2).
+\item Regulatory gateways: trade reporting (EMIR, MiFIR, SFTR, Dodd--Frank), transaction reporting (MiFID~II RTS~25), and prudential reporting (CRR, FRTB) require submission infrastructure beyond the ledger.
+\item Reference-data authority: instrument master data (ISINs, contract specifications, corporate-action terms) is consumed from external sources, not created by the ledger.
+\item Model governance: pricing models, risk models, and their validation are external.
+\item Accounting policy: IFRS~9 classification (FVTPL, FVOCI, amortised cost), hedge-accounting designation, and impairment assessment are accounting decisions outside the ledger's scope.
+\end{itemize}
+
+\subsection{What the Framework Does Not Do}
+
+The following limitations are inherent in the design.
+
+\begin{enumerate}
+\item \textbf{Does not guarantee executable prices or replace pricing models.} $P_t$ is an external input; the framework is agnostic to pricing methodology and requires only that prices be supplied. Under stress, $P_t$ may be stale, unavailable, or detached from achievable liquidation values.
+
+\item \textbf{Does not replace legal documentation or determine legal ownership.} Legal ownership depends on custodial arrangements, nominee structures, registrar entries, and governing law, all outside the boundary.
+
+\item \textbf{Does not guarantee settlement finality.} The ledger provides ledger-level atomicity: all moves in a transaction commit or none do. Real-world finality is a property of the external settlement system and its governing law (e.g.\ the EU Settlement Finality Directive).
+
+\item \textbf{Does not determine accounting policy.} IFRS~9 classification, hedge-accounting designation under IAS~39/IFRS~9, expected-credit-loss provisioning under IFRS~9, and fair-value-hierarchy classification under IFRS~13 require judgment beyond the ledger's data. The framework supplies the position and valuation data that support these decisions; it does not make them.
+
+\item \textbf{Does not eliminate market, credit, or operational risk from external systems.} The framework eliminates classes of internal reconciliation failure. It does not eliminate price risk, counterparty-default risk, liquidity risk, or operational failure in custodians, payment systems, or exchanges.
+
+\item \textbf{Does not replace model governance or validation.} Pricing and risk models and their independent validation (CRR Article~368, SR~11-7) are external. The framework records model outputs; it does not validate the models.
+
+\item \textbf{Does not eliminate external reconciliation at the boundary.} Virtual wallet balances reconcile against custodian statements, counterparty confirmations, and CSD records. The framework makes this reconciliation narrowly scoped and detectable but cannot eliminate it: external systems are independent actors.
+
+\item \textbf{Does not replace regulatory submission infrastructure.} The framework supplies the economic content of regulatory reports. Formatting, submission to trade repositories, acknowledgement handling, and query response require infrastructure beyond the ledger.
+
+\item \textbf{Does not guarantee reproducibility without dependency versioning.} Replay reproduces results identically only under identical versions of market-data snapshots, reference data, and pricing-model parameters. An implementation must version-pin these dependencies; the framework specifies the requirement, not the versioning infrastructure.
+\end{enumerate}
+
+\subsection{Theorems and Modelling Choices}
+
+Several results stated as theorems are consequences of the framework's modelling choices, not independent mathematical discoveries. The conservation law ($Q(u)=0$) is an algebraic identity forced by the move semantics ($\mathrm{src}\mathbin{{-}{=}}q$; $\mathrm{dst}\mathbin{{+}{=}}q$). Path-independent valuation follows from defining portfolio value as a function of current state. State-sufficiency follows from making unit state carry all economically relevant information. Their formal value is that any implementation that violates one exhibits a bug, and any extension that breaks an invariant must justify the violation; they serve as executable specifications for property-based testing.
+
+\subsection{Architecture and Operational Reality}
+
+The framework specifies a target architecture, not an operational system. The architecture reduces the structural complexity of post-trade processing; it does not remove the need for operational controls. Four-eyes trade approval, exception management, manual intervention for settlement failures, regulatory query response, and business-continuity planning remain necessary. The architecture makes these controls more effective by supplying better data and removing certain failure modes; it does not replace them.
+
+\clearpage

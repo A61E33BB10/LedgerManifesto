@@ -1,0 +1,129 @@
+\section{Purpose, Scope, and Properties}
+\label{sec:intro}
+
+\subsection{The Problem}
+
+Conventional post-trade infrastructure records the same economic reality in many places: trading systems, risk engines, general ledgers, custodian records, regulatory reports. Each carries its own copy of positions, valuations, and histories. Reconciliation is the work of verifying that these independent records agree. It is the dominant operational cost and the primary source of breaks. The cause is architectural: a design with many sources of truth admits inconsistency by construction.
+
+\subsection{The Solution}
+
+The post-trade activities within scope use a single primitive: the atomic move of a quantity between wallets. A financial instrument is a deterministic contract that emits a sequence of moves; this covers equities, bonds, derivatives, swaps, managed accounts, and quantitative investment strategies (QIS). Only the moves are stored. Everything else is recomputed from them on demand and never kept as a second copy. An immutable move stream records every move with full provenance; it is the sole canonical record. Every other view is a projection of it: balances, profit and loss, balance sheets, reports.
+
+The framework satisfies six properties by construction. Four constrain the record itself: atomicity, conservation, determinism, state-sufficiency. Two describe its behaviour over time: value invariance across deterministic lifecycle events, and reconstruction of any historical state.
+
+\begin{enumerate}
+\item \textbf{Atomicity.} Every transaction is an indivisible operation with complete provenance.
+
+\item \textbf{Conservation.} The system is closed: the \emph{quantity} of each unit is neither created nor destroyed. This is double-entry accounting reduced to one equation, $\sum_w w(u) = 0$. Conservation governs quantities per unit, not market values; value changes from price movements are captured by the valuation layer (Section~\ref{sec:valuation}).
+
+\item \textbf{Determinism.} Given inputs and conditions, execution is reproducible.
+
+\item \textbf{State-Sufficiency.} Portfolio value depends only on current state---wallet balances, unit state (including embedded lifecycle state: accrued coupons, exercise status, barrier flags), and the current price vector---not on transaction history. Where unit state lives is fixed by the three-home model (Section~\ref{sec:states}).
+
+\item \textbf{Lifecycle Value Invariance} (restricted form). \label{prop:lifecycle-value-invariance} {\setlength{\emergencystretch}{2em}For contractual lifecycle events involving only deterministic cash flows---\allowbreak coupon and dividend payments, resets, principal redemptions---\allowbreak the total value of all wallets under a given price vector is invariant: the jump in the instrument's price is exactly offset by the explicit cash move. Lifecycle processing reshuffles value between units and cash; it creates and destroys no PnL. This invariance is conservation's counterpart for value.\par}
+
+\textit{Qualification.} For lifecycle events involving optionality---exercise, expiry, barrier knock-in/out, callable redemption---the invariance holds only for intrinsic value. Time value and embedded option value are extinguished when optionality resolves: exercising an option destroys time value; calling a bond extinguishes the holder's above-market coupon stream. This is not a conservation violation, because those components reflect probabilistic expectations that cease to exist when uncertainty resolves.
+
+\item \textbf{Time Travel.} \label{prop:time-travel} The exact ledger state at any historical timestamp is reconstructed by replaying the immutable move stream and unit-state events up to that time; the operation \texttt{clone\_at($t$)} performs this reconstruction as of time $t$. Combined with pure lifecycle functions, this yields historical truth: the ledger is restored to what was known at time $t$ and re-simulated. ``Time travel to what was known at $t$'' (market data as captured at $t$) and ``time travel to $t$ with today's corrected data'' (restated data) are distinct and are not conflated.
+\end{enumerate}
+
+These properties make the ledger a deterministic function of its event history: given the same transactions and market data, the state at any time is uniquely determined.
+
+\subsection{Three Unreachable Internal Breaks}
+
+When the ledger is the sole system of record for the activities it covers, three of the most damaging reconciliation failures are structurally impossible within that scope: trading-system / general-ledger divergence, PnL / balance-sheet mismatch, and inter-entity breaks. Each is a disagreement between two views of the same activity. By construction both views are projections of one record, so the disagreement is not representable. The mechanism per break, and the scope of the guarantee, are given in Section~\ref{sec:ledger}.
+
+\subsection{Architecture}
+
+A \textit{wallet} holds quantities of \textit{units} (currencies, securities, derivatives, or any contractual obligation). A \textit{move} transfers a quantity of a unit between two wallets. A \textit{transaction} is a finite set of simultaneous moves satisfying conservation. A \textit{smart contract} is a deterministic program mapping inputs and state to sequences of moves. Unit state records each unit's lifecycle position. The immutable \textit{move stream} records every move with full provenance. All other views are derived projections of it. External authorities---central securities depositories (CSDs), share registrars, regulators---maintain independent records at the boundary.
+
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.4mm]},
+    node distance=0pt,
+    box/.style={draw, rounded corners, align=center, font=\small,
+                inner sep=4pt, minimum height=9mm},
+    stream/.style={draw, very thick, align=center, font=\small,
+                   minimum width=28mm, minimum height=14mm},
+    proj/.style={draw, align=center, font=\footnotesize,
+                 minimum width=24mm, minimum height=8mm},
+    ext/.style={draw, align=center, font=\footnotesize,
+                minimum width=20mm, minimum height=8mm},
+    derive/.style={->, thick},
+    edge/.style={dotted, thick},
+  ]
+  % --- internal: source and canonical record ---
+  \node[box]    (con) at (0,0)   {Contracts};
+  \node[stream] (str) at (3.6,0) {Move stream\\[1pt]\footnotesize canonical, immutable};
+  \draw[derive] (con.east) -- node[above, font=\scriptsize]{emit}
+                              node[below, font=\scriptsize]{append} (str.west);
+
+  % --- internal: projections (derive only, one-way) ---
+  \node[proj] (bal) at (8,1.95)  {Balances};
+  \node[proj] (pnl) at (8,0.65)  {PnL};
+  \node[proj] (bs)  at (8,-0.65) {Balance sheet};
+  \node[proj] (rep) at (8,-1.95) {Reports};
+  \foreach \t in {bal,pnl,bs,rep}{\draw[derive] (str.east) -- (\t.west);}
+  \node[font=\scriptsize\itshape, align=center] at (3.6,-1.7) {projections:\\derive only (one-way)};
+
+  % --- the ledger boundary ---
+  \draw[dashed, rounded corners]
+    (-1.5,-2.75) rectangle (9.7,2.9);
+  \node[font=\footnotesize\itshape] at (4.0,2.6)
+    {Ledger boundary --- single system of record};
+
+  % --- external authorities, outside, touching only at the edge ---
+  \node[ext] (csd) at (1.0,-3.9) {CSD};
+  \node[ext] (reg) at (4.0,-3.9) {Registrar};
+  \node[ext] (rgl) at (7.0,-3.9) {Regulator};
+  \foreach \e in {csd,reg,rgl}{\draw[edge] (\e.north) -- (\e.north |- 0,-2.75);}
+  \node[font=\scriptsize\itshape] at (4.0,-4.6)
+    {external records --- reconciled only at the boundary};
+\end{tikzpicture}
+\caption{The single source of truth. Contracts emit moves that are appended to one
+immutable move stream; every internal view---balances, PnL, the balance sheet, and
+reports---is a one-way \emph{projection} of that stream. The arrows are derivations, not
+synchronisations: there is no second internal record, hence nothing to reconcile within the
+boundary. External authorities lie outside the boundary and are reconciled against only at
+its edge.}
+\label{fig:overview}
+\end{figure}
+
+
+\subsection{Scope}
+
+The scope is trading books measured at fair value through profit or loss under International Financial Reporting Standards (IFRS) and US Generally Accepted Accounting Principles (US~GAAP).\footnote{IFRS~9 \S\S4.1.2, 4.1.4, 5.7.1--5.7.7; ASC~815, ASC~320/321, ASC~820.} Positions are marked to market using price vectors consistent with IFRS~13 and ASC~820 fair-value guidance. Banking-book activities are out of scope: amortised-cost loans, held-to-collect debt, hedge accounting for structural positions. When added, they extend the same primitives.
+
+The International Swaps and Derivatives Association (ISDA) Common Domain Model (CDM) is the canonical vocabulary. It defines the unit universe $\mathcal{U}$, drives lifecycle state transitions, bounds the input space for property-based testing, and maps ledger transactions to ISO~20022 settlement messages. CDM integration, the product hierarchy, and its layer-by-layer justification are developed in Section~\ref{sec:cdm} and Appendix~\ref{app:cdm-walkthrough}.
+
+\subsection{The Ledger Boundary}
+\label{sec:scope-overview}
+
+The framework's guarantees hold for activity recorded inside the ledger boundary. The boundary is stated here, once. The dividing line is uniform: inside is what the move stream and its projections determine; outside is what the ledger consumes from, or reports to, external authorities but does not govern.
+
+\medskip
+\noindent\textbf{Inside} (governed by the framework's invariants):
+\begin{itemize}[nosep]
+\item Positions: wallet balances, the generalised position vector, the conservation law $\sum_w w_t(u) = 0$.
+\item Moves: atomic transfers of quantity between wallets, with full provenance.
+\item Lifecycle events: state transitions on units, recorded as transactions with CDM event metadata.
+\item PnL: portfolio valuation $V_t = \sum_w w_t(u)\,P_t(u)$ for an externally supplied price vector $P_t$.
+\item Time travel: reconstruction of historical state by move-stream and unit-state replay.
+\item Internal reconciliation: the guarantee that trading-system, general-ledger, and balance-sheet views are projections of one record.
+\end{itemize}
+
+\medskip
+\noindent\textbf{Outside} (external systems, not governed by the framework):
+\begin{itemize}[nosep]
+\item Price formation: $P_t$ is an external input; the framework does not compute, validate, or guarantee executable prices.
+\item Legal agreements: ISDA Master Agreements, Global Master Securities Lending Agreements (GMSLAs), GMRAs, CSAs, and custody agreements determine legal rights. The ledger records economic positions, not legal ownership or enforceability.
+\item Settlement infrastructure: CSD connectivity, payment-system access, settlement finality, and real-world delivery-versus-payment (DvP) depend on external infrastructure (DTC, Euroclear, Clearstream, Continuous Linked Settlement (CLS), TARGET2).
+\item Regulatory gateways: trade, transaction, and prudential reporting (EMIR, MiFIR, Securities Financing Transactions Regulation (SFTR), Dodd-Frank, MiFID~II RTS~25, CRR, FRTB) require submission infrastructure beyond the ledger.
+\item Reference-data authority: instrument master data (International Securities Identification Numbers (ISINs), contract specifications, corporate-action terms) is consumed from external sources, not created by the ledger.
+\item Model governance: pricing and risk models and their validation.
+\item Accounting policy: IFRS~9 classification (FVTPL, FVOCI, amortised cost), hedge-accounting designation, and impairment assessment.
+\end{itemize}
+
+\noindent Every ``within scope'' qualifier elsewhere in this document refers to the inside list above.
+

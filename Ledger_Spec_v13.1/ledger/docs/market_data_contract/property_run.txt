@@ -1,0 +1,24 @@
+# Property suite execution — reference/Ledger.hs
+# GHC 9.10.3; `make props`; 12 properties x 1000 deterministic seeds.
+
+/home/renaud/.ghcup/bin/ghc -O0 -Wall -ireference -outputdir build test/RunProps.hs -o build/runprops
+[1 of 3] Compiling Ledger           ( reference/Ledger.hs, build/Ledger.o )
+[2 of 3] Compiling Main             ( test/RunProps.hs, build/Main.o )
+[3 of 3] Linking build/runprops
+build/runprops
+Property suite over reference/Ledger.hs  (1000 deterministic seeds each)
+
+  PASS  P24  tip-weld agreement           1000 cases
+  PASS  P25  door soundness               1000 cases
+  PASS  P-DET  stamp purity               1000 cases
+  PASS  P-MODE  mode equivalence          1000 cases
+  PASS  P-PERM-N  notice-order irrel.     1000 cases
+  PASS  P-PERM-O  arrival-order irrel.    1000 cases
+  PASS  P-CRASH  crash recovery           1000 cases
+  PASS  P-REPRO  as-of reproducibility    1000 cases
+  PASS  P-CLONE-STAMP  time-travel stamp  1000 cases
+  PASS  P-LAG  lag arithmetic             1000 cases
+  PASS  P-PARTITION  basis separation     1000 cases
+  PASS  F8  Cum/Ex fibre                  1000 cases
+
+ALL PROPERTIES PASSED

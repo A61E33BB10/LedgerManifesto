@@ -1,0 +1,14 @@
+**Change log** (all edits in `/home/renaud/Ledger/Ledger_Spec_v13.0/ledger/ledger_v13_0.tex`; build `latexmk -pdf` clean — exit 0, no undefined/multiply-defined refs, only the pre-existing benign `\texteuro` missing-character warning):
+
+1. *Findings 1/3/7/10 — stale section pointer.* Line 2226: `futures lifecycle (sec.8)` → `(sec.9)`. Line 2313: `handle (sec.8, G1-G5)` → `(sec.9, G1-G5)`. The futures lifecycle and G1–G5 are §9; verified in PDF.
+2. *Findings 5/11 — duplicated ordinal.* Line 1132: deleted `, \S7` after `Section~\ref{sec:lifecycle}`. Renders "Section 7)" alone.
+3. *Findings 2/4/8 — phantom P24 oracle, two sites.* §8 tip-weld paragraph: clause "— an equality witnessed by the retro-insertion permutation oracle (Appendix~B), not merely asserted" deleted; the sentence now ends at "agree on `usBasis` at every log prefix", carried by the preceding derivation ("consequently"). Key-Invariants bullet: "— witnessed by the retro-insertion permutation oracle (P24 family, Appendix~B), not asserted" → `(Principle~\ref{prin:tip-weld})`. No occurrence of `P24`/`retro-insertion` remains; canonical P1–P23 numbering intact.
+4. *Finding 9 (M3) — StatusWrite coherence.* §8 listing header comment now announces both changes: "the closed status-writer set under the discipline: one new case, one refined settle mark" (was "extended by ONE case"); the retype comment gains the word "refined:". Appended to the same listing the mechanically forced propagation: `usLastSettle :: Maybe (Price, BasisPoint)` (comment) and the two `applyStatus` equations (`SetBasis`, `SetLastSettle`), so §8's constructors are now applicable by a shown writer. `def:usbasis` prose untouched — its "one new constructor" quantifies over `usBasis` writes only and is exact.
+5. *Findings 6/12 — source-syntax leak.* Line 4660: `Sec.~ledger` → `Sec. 2` (in-listing plain-number convention, matching `sec.4`/`Sec. 2` elsewhere).
+
+**Flags (returned to subject-matter agents; not filled by prose):**
+
+- **Missing test witness.** The booking-order/effective-order agreement on `usBasis` now rests on its derivation from the tip weld alone. If a property-test witness is wanted, an oracle must be authored into Appendix `app:properties` and numbered (P24 would extend the P1–P23 catalogue); STYLUS did not draft it.
+- **Reference-code divergence (outside .tex).** `reference/Ledger.hs` (lines ~295–315) still carries `SetLastSettle Qty`. §4's verbatim claim remains true of §4's listings, and §8's refinement is a declared discipline layer — but whether the reference core should carry the refined type is a design/code decision for the responsible agent, not a prose matter.
+
+Memory updated: `/home/renaud/Ledger/Ledger_Spec_v13.0/ledger/.claude/agent-memory/stylus-prose-authority/ledger-v13-structure.md` (iteration-6 state, open items above recorded).

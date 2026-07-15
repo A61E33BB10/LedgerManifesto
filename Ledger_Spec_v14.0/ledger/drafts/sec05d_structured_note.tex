@@ -1,0 +1,95 @@
+\section{A Structured Note, Model-Free}\label{sec:tour-note}
+
+If any product should break a ledger that refuses to run a pricing model, it is a
+structured note: a coupon, a barrier, a payoff computed by proprietary machinery that
+takes a quant team to reproduce. This stop runs one through the machine and shows that
+the ledger never needs to open that machinery. The specific structure here --- a
+periodic coupon with a knock-out barrier --- is an illustrative composition of real,
+separately specified mechanisms; the note's price is a black box, and no pricing
+formula appears anywhere in this stop, because none ever crosses the door. What crosses
+are contractual cash flows and stamped observations, and those are all the ledger ever
+needs.
+
+\subsection{The coupon: a scheduled cash move}
+
+The book holds 1{,}000 notes, quoted \EUR{102} cum-coupon, each paying a \EUR{2}
+coupon. A coupon date is a dated obligation, so it is a scheduled trigger, and the
+lifecycle contract that catches it reads the declared terms and the holding and
+submits one transaction. Economically the coupon is the ordinary-dividend boundary
+with $(f, c) = (1, 2)$: it books cash $1{,}000 \times 2 = \EUR{2{,}000}$ and advances
+the quote from cum to ex, \EUR{102} to \EUR{100}. Value is invariant across the date
+up to the cash paid: $1{,}000 \times 102 = \EUR{102{,}000}$ beforehand is
+$1{,}000 \times 100 + \EUR{2{,}000}$ after. Because the coupon and the ex-move ride in
+one atomic transaction, the two ways it could corrupt --- cash paid while the quote
+stays cum, so the coupon is counted twice; or the quote gone ex with no cash, so the
+coupon is lost --- are both unreachable. The contract records the coupon as paid in the
+unit's status, so a re-fire on the same date pays it once.
+
+\subsection{The barrier: an observation, not an opinion}
+
+The note carries a knock-out barrier. Say, illustratively, the barrier sits at
+\EUR{80} on the underlying --- a price-in-basis terms field --- and on the fixing date
+the official close prints \EUR{78.40}. The ledger does not decide whether a barrier
+``should'' have breached, and it runs no model that would form such a view. The close
+enters through the ingest door as a stamped observation, and the contract reads it
+against the declared barrier level. If it knocks, the knock is first a recorded change
+of the unit's lifecycle state --- ACTIVE to TERMINATED. Whether that termination also
+owes cash is a separate matter of the terms: many knock-out structures pay a rebate or
+the accrued coupon at termination, and where they do, that leg is a dated settlement
+obligation, discharged on its own value date when it falls due, not conjured at the
+instant of the breach. The state-change transaction itself is still move-less: the
+breach is recorded now, and any cash it triggers settles later as its own obligation.
+
+A move-less transaction may look like a transaction that does nothing, but it is
+load-bearing. Without the recorded state change, a later reconstruction of the ledger
+as of that date could not tell ``terminated by breach'' from ``still active, and
+merely held by no one'' --- two economically distinct states that would otherwise look
+identical in the balances. The state change is what the note's changed liability
+consists of, so it is recorded even though no cash moved. Consumption of the fixing is
+legal only under single-basis consumption: the stamp's basis must agree with the frame
+it is read into.
+
+\subsection{Expiry, and the two layers on one number}
+
+At expiry the note settles, and the settlement is where a wrong contract can do its
+worst --- and where the ledger's answer to that is exact. Suppose the declared terms
+owe \EUR{100} per note, and a defective contract submits a settlement paying \EUR{98}.
+
+The first thing to see is that the door admits it. That \EUR{98} transaction is
+balanced, conserving, and basis-consistent; every structural property the door checks
+holds. The door has no ground to refuse it, and it should not --- refusing well-formed
+transactions on suspicion is exactly how a system of record starts improvising. So the
+book now carries $1{,}000 \times 98 = \EUR{98{,}000}$ where \EUR{100{,}000} was owed.
+This is the structural layer doing its job: it guarantees the transaction cannot break
+the ledger, and it says nothing about whether the economics are right, because it
+never depended on the contract being right.
+
+The second thing to see is that the error cannot hide. Everything the settlement was
+computed from --- the terms, the adjustment schedule, the registered kinds, the stamped
+observations --- is in the log. So the settlement is recomputed from the log prefix and
+compared with what was recorded, in canonical form. The recomputation yields \EUR{100},
+the record says \EUR{98}, and the comparison reports a difference of \EUR{2} per note,
+\EUR{2{,}000} on the 1{,}000-note holding. That nonzero difference is the defect,
+located exactly, and it is a defect in the contract, not in the ledger --- the ledger's
+part, admitting only well-formed transactions and recording them faithfully, is exactly
+the part that was guaranteed. The repair is a later compensating transaction, itself
+recorded --- and it is worth separating two things that are easy to run together. That
+the error cannot hide is guaranteed by the ledger: the \EUR{2} per note is in the log
+for anyone to recompute. That the \EUR{2{,}000} actually comes back is not a ledger
+operation at all --- the \EUR{98{,}000} already left the door to an external holder, and
+recovering the shortfall is a claims process at the boundary, outside the system of
+record. The ledger makes the error undeniable and the correction recordable; it does
+not reach across the boundary and unwind a payment already made.
+
+Nothing in this stop asked what the note was worth. The pricing machinery that decided
+the coupon, the barrier, and the settlement terms is on the far side of a wall the
+ledger never crosses: it records the moves the contract emits and the observations
+stamped into the log, and it recomputes those from the log, and that is all. Were an
+event to reprice the note, the reprice would enter only as a fresh stamped observation;
+the ledger never manufactures a new price by transforming an old one, and any gap
+between a transported old price and the next fresh print is left as market profit and
+loss, not absorbed into a boundary. \emph{Lifecycle runs on declared terms and stamped
+observations alone --- a pricing model's output enters only as a stamped
+observation carrying its basis, never as an authoritative number the door interprets or
+trusts; the door catches the transactions that are broken, and recomputation from the
+log catches the ones that are merely wrong.}

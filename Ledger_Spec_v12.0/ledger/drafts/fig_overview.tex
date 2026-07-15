@@ -1,0 +1,52 @@
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.4mm]},
+    node distance=0pt,
+    box/.style={draw, rounded corners, align=center, font=\small,
+                inner sep=4pt, minimum height=9mm},
+    stream/.style={draw, very thick, align=center, font=\small,
+                   minimum width=28mm, minimum height=14mm},
+    proj/.style={draw, align=center, font=\footnotesize,
+                 minimum width=24mm, minimum height=8mm},
+    ext/.style={draw, align=center, font=\footnotesize,
+                minimum width=20mm, minimum height=8mm},
+    derive/.style={->, thick},
+    edge/.style={dotted, thick},
+  ]
+  % --- internal: source and canonical record ---
+  \node[box]    (con) at (0,0)   {Contracts};
+  \node[stream] (str) at (3.6,0) {Move stream\\[1pt]\footnotesize canonical, immutable};
+  \draw[derive] (con.east) -- node[above, font=\scriptsize]{emit}
+                              node[below, font=\scriptsize]{append} (str.west);
+
+  % --- internal: projections (derive only, one-way) ---
+  \node[proj] (bal) at (8,1.95)  {Balances};
+  \node[proj] (pnl) at (8,0.65)  {PnL};
+  \node[proj] (bs)  at (8,-0.65) {Balance sheet};
+  \node[proj] (rep) at (8,-1.95) {Reports};
+  \foreach \t in {bal,pnl,bs,rep}{\draw[derive] (str.east) -- (\t.west);}
+  \node[font=\scriptsize\itshape, align=center] at (3.6,-1.7) {projections:\\derive only (one-way)};
+
+  % --- the ledger boundary ---
+  \draw[dashed, rounded corners]
+    (-1.5,-2.75) rectangle (9.7,2.9);
+  \node[font=\footnotesize\itshape] at (4.0,2.6)
+    {Ledger boundary --- single system of record};
+
+  % --- external authorities, outside, touching only at the edge ---
+  \node[ext] (csd) at (1.0,-3.9) {CSD};
+  \node[ext] (reg) at (4.0,-3.9) {Registrar};
+  \node[ext] (rgl) at (7.0,-3.9) {Regulator};
+  \foreach \e in {csd,reg,rgl}{\draw[edge] (\e.north) -- (\e.north|-{(0,-2.75)});}
+  \node[font=\scriptsize\itshape] at (4.0,-4.6)
+    {external records --- reconciled only at the boundary};
+\end{tikzpicture}
+\caption{The single source of truth. Contracts emit moves that are appended to one
+immutable move stream; every internal view---balances, PnL, the balance sheet, and
+reports---is a one-way \emph{projection} of that stream. The arrows are derivations, not
+synchronisations: there is no second internal record, hence nothing to reconcile within the
+boundary. External authorities lie outside the boundary and are reconciled against only at
+its edge.}
+\label{fig:overview}
+\end{figure}

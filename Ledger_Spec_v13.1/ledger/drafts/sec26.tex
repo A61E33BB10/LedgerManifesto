@@ -1,0 +1,43 @@
+\section{Coordination Between Pricing, Contract State, and Market Data}
+\label{app:pricing-coordination}
+
+A unit's valuation and the cash recorded in wallets are consistent at every instant:
+the atomicity of the lifecycle event (\hyperref[cond:C3]{C3}) commits a coupon's or
+dividend's cash flow and its state transition as one indivisible transaction, so
+their divergence is structurally unreachable. The worked coupon and dividend, with
+the two corruptions atomicity excludes, are in \S\ref{sec:basis-worked}; this
+appendix fixes the one-step vocabulary that the State-Basis Discipline
+(\S\ref{sec:state-basis}) generalises.
+
+The pricing of a unit $u$ is state-aware:
+\[
+P_t(u) = P\big(u,\, \mathrm{state}_t(u),\, \text{market data at } t\big).
+\]
+The state tells the pricer how to read the quote; the quote alone is never a price.
+The pricing-relevant slice of state is the pair \lstinline|Cum| / \lstinline|Ex|~$d$:
+the distribution is either still embedded (\lstinline|Cum|) or detached and paid
+(\lstinline|Ex|~$d$, carrying the paid amount, so the adjustment is total and ``ex
+but amount unknown'' is unrepresentable). The external quote may lag the ledger's
+own ex transition by one step --- the first ex quote may appear only at the next
+market open --- and the flag \lstinline|mQuoteEx| records whether the quote has
+itself gone ex. The price is a total, pure function of that state \emph{and} the
+quote: cum reads the quote as is; ex with a caught-up quote is the identity; ex
+with a lagging quote removes the paid amount exactly once, $q-d$, so total value
+(cash plus mark) is continuous through the event. A pricer typed on the quote alone
+could not see the state and would double-count by construction. The reference
+implements the pricer as \texttt{statePrice} (\texttt{reference/Ledger.hs},
+Part~F), checked for all $(u,q,d)$ by the witness \texttt{fibreOK} (Part~L) --- an
+unnumbered finite algebraic identity of one function, not a ledger invariant.
+
+This appendix is the one-step, $f=1$ fibre of the market-data contract
+(\S\ref{sec:basis-contract}): its two basis points are \lstinline|Cum| and
+\lstinline|Ex|~$d$; its conversion is the generator \texttt{Shift}~$(-d)$; and
+\lstinline|mQuoteEx| is the per-(unit, source) basis stamp in degenerate form ---
+the source basis convention (O4) collapsed to \texttt{True} as
+\texttt{TracksChain} and \texttt{False} as \texttt{LagsBy}~1, under TA-BASIS, with
+the lag-only cases as its domain. A quote gone ex while the unit is still cum lies
+outside the one-bit model, since the flag carries no refusal channel; the general
+discipline handles that case fail-closed, by W3 partition quarantine
+(\S\ref{sec:basis-failure}). The construction and provenance of the external quote
+feeding $P_t(u)$ lie outside the ledger boundary (\S\ref{sec:scope-overview}); the
+contract the quote crosses to enter is \S\ref{sec:basis-contract}.

@@ -1,0 +1,160 @@
+\section{What the Full Framework Adds}\label{sec:framework}
+
+The tour ran eight products through one machine and watched it hold. A book that
+runs this machine for real needs more than the machine, and it would be dishonest
+to close without saying what. This section names that additional machinery. The
+point worth making first is that none of it is a second architecture bolted to the
+side. Each piece is a consequence of the door, the log, and the views already
+built: a reporting obligation is a view, an industry mapping is a function over the
+log, a correctness claim is a check that runs against the log, the timer service is
+named infrastructure outside the trust boundary, and the standing scope limits are
+the same boundary the ledger reconciles against rather than governs. Where this
+account does not carry a piece to its full depth, it stops and says so, rather than
+implying the depth is not there.
+
+\subsection{Regulatory reporting is a projection, not a second record}
+
+A trading book must report its activity --- trades, transactions, positions ---
+to authorities that keep their own records. It is tempting to build this as a
+parallel pipeline: a second store of trade data, shaped for the report, kept in
+step with the ledger by a process that copies and reconciles. That design
+reintroduces exactly the failure the whole system exists to remove, because now
+there are two records of one activity and a way for them to disagree.
+
+There is no need for it. The economic content of any such report --- what happened,
+in what quantity, to what unit, when --- is already in the move stream, because
+that stream is the record of what happened. A report is therefore one more view:
+a fold that reads the committed log and emits the report's rows in the report's
+shape. It computes; it never mutates state, never writes back, and holds no
+authority the log does not already hold. If two reports of the same activity must
+agree, they agree for the same reason the balance sheet and the profit-and-loss
+statement agree --- they are two folds of one log, and there is only one log for
+them to fold. What a report needs beyond the economic content is reference data:
+the identifiers and classifications an authority requires --- a trade's assigned
+identifier, a party's registered legal identifier, a counterparty's regulatory
+class. Those are not facts the ledger forms; they are supplied at the boundary, by
+the authorities that own them, and joined to the projection as it is built. The
+ledger records the activity and projects it; it does not become the registrar of
+the identifiers the report is filed under.
+
+\subsection{Alignment to a common domain model}
+
+The industry describes a trade, and the events that happen to it over its life, in
+a shared domain model --- a common vocabulary of products and lifecycle events that
+lets independent systems talk about the same trade and mean the same thing. The
+architecture is built to align with that vocabulary rather than to compete with it.
+The alignment is a structural correspondence, and it is concrete: the ledger's unit
+corresponds to the model's product --- and, for a bespoke instrument, to the trade
+itself --- and the map from the model's business events to the ledger's transactions
+is required to be total and deterministic. A trade becoming a position, a coupon
+falling due, a corporate action landing on a holding --- each is an event in the
+model and a transaction at the door, and the map carries one to the other. Because
+the map is a function of the event alone, any conforming map inherits what the
+architecture already guarantees: it composes (a sequence of events maps to the sequence of transactions),
+it conserves (the moves it emits net to zero like any others), it keeps move order,
+and it is idempotent under the same keys the door already deduplicates. A corporate
+action is the one place the map does more than translate: the event supplies both
+halves of the transaction the ledger needs --- the entitlement moves and the
+status write that advances the basis, with its declared conversion --- so that the
+basis change, which a plainer mapping would discard as it had no field for it, is
+carried as the first-class fact it is. This account states the alignment and its
+shape; it does not carry the field-by-field mapping, and does not pretend to.
+
+\subsection{The correctness claims are executable, not asserted}
+
+Throughout, this design has made claims of correctness: that quantity is conserved,
+that a price and a quantity meet in one basis and never two, that every product has
+exactly one declared reaction to every corporate-action class, that a producer's
+economics can be recomputed from the log and compared, that a dated obligation
+reaches a terminal state by its deadline. A claim like that is worth only as much as
+the reader's ability to check it, and the framework's discipline is that each such
+claim is not a sentence in prose but a property a machine re-checks against the
+reference behaviour. Every claim is a universally quantified statement --- for every
+transaction, for every unit, for every boundary --- and each is carried as an
+executable oracle: it is fed cases drawn from the closed enumerations of products and
+events the design admits, and it either holds on every case or names the case it
+fails on. Structural claims hold by construction, so their oracles confirm that the
+types admit no counterexample; economic claims are checked, so their oracles are the
+recomputation the witness performs. This is the concrete content, turned on the
+framework's own claims, of the discipline that a producer's output is trusted for
+nothing and verifiable in everything: a claim in this framework is something a
+machine re-checks, not something a reader is asked to take on trust, and coverage of
+the event vocabulary is a finite checklist rather than a hope that testing found the
+corner.
+
+\subsection{The execution engine and the liveness it underwrites}
+
+A lifecycle contract does not wake itself. Something must hold the dated
+obligations of every open position --- an expiry, a coupon, an exercise window ---
+and fire each when its time comes. That something is an execution engine, and it is
+infrastructure outside the trust boundary, named apart from the door, the log, and
+the views, holding no privileged access of any kind. It is bound by named
+requirements and nothing more: it must fire durably, so a timer survives a restart;
+it must deliver at least once, so a fire is never simply lost; and its firing is
+delivery, not data --- it says \emph{when}, while everything the event means is read
+from the log. Because the trigger is delivery and never data, an engine that stalls,
+fails over, fires early, or fires twice can delay a discharge but cannot corrupt the
+log: a late delivery submits the identical transaction, a duplicate delivery is
+absorbed once at the door, and an early or spurious fire, finding its observation or
+due-state not yet in the log, yields a refusal rather than a commit.
+
+This is what lets the design carry liveness as a guarantee rather than a hope. Every
+contractual obligation is a first-class logged object, registered atomically with
+the position it binds and carrying three things: a deadline, a discharge predicate
+on ledger state, and a compensation action. The guarantee is that by its deadline
+every obligation reaches one of three terminal states --- Discharged, Compensated,
+or Defaulted. The transition is itself an ordinary status write through the single
+writer for obligation state: the discharge predicate met on the discharging
+transaction sets Discharged; and once the deadline passes unmet, the engine wakes the
+obligation's compensation contract, which sets Compensated when the compensation
+action completes and Defaulted when even that cannot. No other component can move an
+obligation to a terminal state, because obligation state, like every other fact, has
+one legal writer. A coupon that should fire and does not is then not silence but a
+visible object past its deadline, which any fold of the log can see; a dated duty
+cannot be quietly forgotten, because forgetting it would be a state, and the state
+is detectable. The honest content of the guarantee is where it is conditional. It
+holds provided the engine is available at the deadline to deliver the trigger, the
+executor that runs the woken contract is available to act, any external cooperation
+the discharge requires is forthcoming, and the lifecycle function computes the right
+discharge from what it reads. Those conditions are named because they are real: the
+ledger cannot make a counterparty pay, and cannot fire a timer while the engine that
+holds it is down. Under an engine outage the obligation is reached \emph{eventually},
+when delivery resumes --- not instantaneously. What the log guarantees unconditionally
+is that it never loses the obligation; it only waits for the fire, and the wait is
+itself a recorded, detectable state.
+
+\subsection{What this framework does not do}
+
+Honesty about depth requires honesty about the edges. The framework has standing
+limits, and they are not gaps to be filled later but boundaries it is built to
+reconcile against rather than to govern. It does not form prices: what a structured
+note is worth is decided by a model on the far side of a wall the ledger never
+crosses, and the ledger records that number as a stamped observation without
+reproducing or validating it. It is not the settlement infrastructure: it projects
+committed activity outward as instructions, and the accounts that move real cash and
+securities are elsewhere. It is not a legal-agreement system: a contract in this
+design is the machine-readable form of a confirmation, not the confirmation's legal
+force. It is not a regulatory-submission channel: it computes the reporting view, and
+the filing of it is an external act. It is not a reference-data authority: the
+identifiers, classifications, and registrations it consumes are owned by others.
+Against each of these it reconciles at its boundary --- the external record is
+independent, and reconciliation against it stays necessary, made detectable and
+narrow rather than eliminated.
+
+Two residual trust assumptions remain, and naming them is part of the honesty. The
+first is at the ingest stamp: when market data enters, the stamp that says which
+basis the datum was disseminated in is trusted to be true of the source, and the
+architecture bounds what that trust buys --- a datum crosses a boundary only by a
+declared operator, and a registered kind carries a mandatory invariance witness that
+pins exactly what the kind's declaration is trusted for, no wider. The second is the
+one the two-layer discipline has already been plain about: a contract's output is
+admitted before its economics are recomputed. A transaction that is well-formed but
+economically wrong --- pays \EUR{98} where \EUR{100} was owed --- is admitted, and
+its error is found afterward by the witness and repaired by a compensating
+transaction that names what it supersedes. Detection is therefore eventual, not
+preventive. What is guaranteed absolutely is that the structural invariants never
+break and that the wrong number is always findable from the log and detected whenever
+the witness runs; what is not claimed is that the wrong number is stopped before it is
+booked. How promptly the witness runs is a scheduling requirement the deployment owns,
+standing alongside the engine's. The design would rather book a detectable, repairable
+error than pretend to a prevention it cannot deliver.

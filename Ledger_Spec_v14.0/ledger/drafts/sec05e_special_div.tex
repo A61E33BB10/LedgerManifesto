@@ -1,0 +1,101 @@
+\section{A Bespoke Special-Dividend Override}\label{sec:tour-special-div}
+
+Real term sheets deviate from the standard treatment, and a system that hard-codes the
+standard treatment has to be reprogrammed each time one does. This stop shows a
+deviation absorbed as data. In September, ACME pays a special dividend, and the book
+holds an option written over ACME whose confirmation adjusts the strike in a way the
+class default would get wrong.
+
+\subsection{Where the default and the term sheet disagree}
+
+The option's strike is \EUR{100}. ACME declares a special dividend of \EUR{2} per
+share, the boundary $(f, c) = (1, 2)$. The class default for a strike --- a
+price-in-basis terms field --- under a special dividend is the full adjustment
+$p \mapsto (p - c)/f$, which here is $K - c = 100 - 2 = \EUR{98}$. This default is
+unconditional: once the event is classified special it applies in full, with no
+threshold and no proportioning. And the classification itself --- ordinary or special
+--- is the confirming authority's determination, recorded in the notice and made
+outside the ledger; there is no ledger-side test that inspects the dividend's size and
+decides the class. The ledger reads the class off the confirmed notice and applies the
+default that class carries.
+
+It is worth seeing why that default is what it is, because the invariance arithmetic
+alone does not settle it. The re-expression $p \mapsto (p - c)/f$ preserves value only
+when the same transaction pays the holder of the shifted field the matching cash leg
+$q \cdot c$. A market quote crossing the ingest seam has that pairing --- the
+shareholder who holds the quoted share is paid the dividend --- but the holder of an
+option over the share is paid nothing. So Theorem~\ref{thm:dim-invariance} by itself
+licenses no strike shift in either dividend class: the cash leg that would balance a
+shift is simply not present for a strike. What decides the default is what the strike
+already contains. An ordinary, anticipated dividend already sits in the forward the
+strike was struck against, so the strike stands: shifting it down would hand the option
+holder per share exactly the cash the boundary has already paid the shareholder --- one
+distribution counted twice in the system's value accounting. A special dividend sits in
+no forward, so a standing strike would impose that same unpriced transfer in the
+opposite direction, this time against the holder; the strike moves to $K - c$ to hold
+the holder's contracted position invariant. One principle yields both cases: a
+price-in-basis terms field shifts by precisely the part of the distribution not already
+embedded in the reference it was struck against --- zero for an ordinary dividend, the
+whole of $c$ for a special. On an ordinary \EUR{2} dividend the strike therefore stands
+at \EUR{100}, even as the read seam carries a \EUR{102} market print across the same
+ex-boundary to \EUR{100}: the quote moves because its holder was paid, the strike does
+not because the option holder was not. On the special \EUR{2} dividend the same
+principle moves the strike the full $c$, to \EUR{98}.
+
+That \EUR{98} is the default. This option's confirmation, though, says something
+narrower: the strike adjusts on a special dividend only to the extent the dividend
+exceeds \EUR{0.50}, and only by the excess. That is not the class default and not a
+market norm --- it is this term sheet's own \emph{declared override}, written as a rule
+in the schedule's closed first-order language that reads the boundary's declared cash
+$c$ and the field's value $K$ and evaluates to
+\[
+  K \;\longmapsto\;
+  \begin{cases}
+    K - (c - 0.50) & \text{if } c > 0.50,\\
+    K & \text{otherwise.}
+  \end{cases}
+\]
+On this \EUR{2} dividend it yields $100 - (2 - 0.50) = \EUR{98.50}$ --- the excess-only
+figure the confirmation requires, and the number the contract must produce. The rule is
+total, and its boundary behaviour is exact: at $c = \EUR{0.50}$ the condition
+$c > 0.50$ is false, so the strike stays \EUR{100}; one cent above, at $c = \EUR{0.51}$,
+it moves by a single cent to $100 - 0.01 = \EUR{99.99}$. There is no gap and no
+ambiguity at the threshold, because the rule evaluates to exactly one value for every
+$c$. The threshold and the excess-only treatment live entirely in this override; the
+class default behind it remains the full \EUR{98}.
+
+\subsection{Three layers, and a gate that will not improvise}
+
+The override is one of three ways a schedule entry can be filled, and the three form a
+strict precedence, most specific winning:
+
+\begin{enumerate}[leftmargin=1.5em]
+\item the \textbf{class default}, fixed once in the specification per corporate-action
+class and dimension --- what a strike does absent any deviation;
+\item a \textbf{declared override}, a total rule in the closed language, reading the
+boundary's parameters and the field's value --- where this term sheet's \EUR{98.50}
+lives;
+\item \textbf{designated discretion}, which names who owes a determination and leaves
+the field with no adjusted value until that party's attested resolved terms arrive
+referencing the boundary; until then the boundary is pending for that field and any
+attempt to consume it is quarantined.
+\end{enumerate}
+
+What makes this safe rather than merely tidy is a totality gate. A unit is registered,
+and every later terms version admitted, only if the schedule yields exactly one
+well-formed entry for every pair of corporate-action class and terms field. The set of
+classes is closed and finite, so the check is finite, and it is strict: an ill-formed
+override is refused at the gate --- \texttt{ScheduleIncomplete} --- never quietly
+defaulted to the class rule. The consequence is strong. Past the moment the option is
+registered, ``the framework does not know how to adjust this field for this event'' is
+not a state the system can reach. Either every class-and-field pair has exactly one
+answer, or the version was never admitted.
+
+So the special dividend runs through the same corporate-action contract as an ordinary
+one. Nothing branches on the fact that this unit is bespoke. The contract reads the
+schedule, finds the override entry, and appends the \EUR{98.50} strike; recomputation
+from the logged notice re-runs the rule on $(K = 100,\ c = 2,\ \text{threshold } 0.50)$
+and confirms \EUR{98.50}, diff zero. \emph{Bespokeness is a higher-precedence layer of
+declared data behind a totality gate that fails closed --- never a special case in
+code; the same contract that adjusts a plain strike adjusts a bespoke one, because the
+deviation was written as data, not as a branch.}

@@ -1,0 +1,222 @@
+\section{The Settlement Layer Interface}
+\label{sec:sec12}
+\label{sec:settlement}
+%==============================================================================
+
+The Ledger records economic events; the settlement layer executes real-world transfers. The boundary between them is a \emph{projection}: a pure, total function that reads one committed transaction and produces an optional settlement instruction. Everything the settlement layer needs is already present in the transaction; everything the settlement layer adds---custodian accounts, CSD connectivity, message formatting---lies outside the Ledger's scope.
+
+\subsection{The Settlement Projection}
+\label{sec:settlement-projection}
+
+\begin{definition}[Settlement Projection]
+\label{def:settle-projection}
+The settlement projection
+\[
+\texttt{settleProjection} : \texttt{SettlementTx} \to \texttt{Maybe}\ \texttt{SettlementInstruction}
+\]
+is pure, deterministic, stateless, and idempotent. It is total: defined on every settlement transaction, returning \texttt{Just} an instruction for the settlable classes (\texttt{SETTLEMENT}, \texttt{COLLATERAL}) and \texttt{Nothing} for the rest.
+\end{definition}
+
+Its input, \texttt{SettlementTx}, is a \emph{boundary type}, not the core transaction of Section~\ref{sec:ledger}. The core \texttt{Transaction} is the one atomic event recorded in the log---an ordered list of moves over ledger units, with the state delta they ride. \texttt{SettlementTx} is the settlement-layer view onto which a committed core transaction \emph{projects}: the transaction id, its settlement class, and its moves with each move's unit already resolved to its settlement identity (\texttt{Asset}---an ISIN or a currency). The projection from core \texttt{Transaction} to \texttt{SettlementTx} is the unit-to-asset resolution the contract performs at move generation; \texttt{settleProjection} then carries \texttt{SettlementTx} to the wire instruction. The two never share a name: there is one \texttt{Transaction} (the log event), and \texttt{SettlementTx} is what the boundary reads of it.
+
+The projection reads only from the transaction:
+\begin{itemize}[nosep]
+\item \textbf{Transaction id} --- the settlement reference (\texttt{EndToEndId} in ISO~20022).
+\item \textbf{Each move's source wallet, destination wallet, settlement asset, and quantity} --- the economic content of the transfer.
+\item \textbf{The CDM event payload} (Section~\ref{sec:cdm}) --- settlement date, counterparty identifiers (LEI, BIC), and execution venue (MIC).
+\end{itemize}
+
+It reads nothing else: not current wallet balances, not other transactions, not any external system. Purity follows: the same settlement transaction always yields the same instruction, the function is safe to re-run after a failure, and the settlement layer need not understand conservation, unit state, or lifecycle logic.
+
+The projection, types first. A settlable move's \texttt{smAsset} is its unit's settlement identity---the security ISIN or the currency the unit denotes, resolved from the unit's registered terms (Section~\ref{sec:sec04}) and carried into the \texttt{SettlementTx} by the contract---so the projection needs no off-transaction lookup. The settlement \emph{type} and the \emph{legs} are one value: each constructor of \texttt{SettlementLegs} carries exactly the legs its type names, so an instruction with no legs cannot be written and the type can never disagree with the legs.
+
+\begin{lstlisting}[language=Haskell]
+-- The settlement classification of a unit: a transferable security, or a
+-- currency. Every settlable move is exactly one or the other. (CashCcy, not
+-- Cash, so the settlement currency case never collides with a scalar.)
+data Asset = Security ISIN | CashCcy Currency
+
+-- A settlement-layer move: it ranges over the settlement identity (Asset),
+-- not the core ledger UnitId. It is what a core Move projects to once the
+-- contract has resolved the unit to its settlement asset.
+data SettleMove = SettleMove { smFrom, smTo :: WalletId, smAsset :: Asset, smQty :: Qty }
+
+-- Settlability is a field set by the contract, never inferred. Total over all
+-- five classes; only SETTLEMENT and COLLATERAL settle. LIFECYCLE/CORRECTION
+-- "sometimes" settle only by DECOMPOSING into separate transactions at the source.
+data TxClass = SETTLEMENT | COLLATERAL | LIFECYCLE | ACCOUNTING | CORRECTION
+settles :: TxClass -> Bool
+settles SETTLEMENT = True
+settles COLLATERAL = True
+settles LIFECYCLE  = False
+settles ACCOUNTING = False
+settles CORRECTION = False
+
+data CdmPayload   = CdmPayload   { cdmTradeDate, cdmSettleDate :: Day
+                                , cdmCounterparty :: LEI, cdmVenue :: MIC }
+
+-- The boundary type. NOT the core Transaction (the log event of Sec.~ledger):
+-- it is the settlement-layer view a committed core Transaction PROJECTS onto,
+-- its moves already resolved to settlement Assets.
+data SettlementTx = SettlementTx { stId :: TxId, stClass :: TxClass
+                                 , stMoves :: [SettleMove], stCdm :: CdmPayload }
+
+data SecuritiesLeg = SecuritiesLeg { slIsin :: ISIN, slQty :: Qty
+                                   , slDeliver, slReceive :: WalletId }
+data CashLeg       = CashLeg       { clCcy :: Currency, clAmount :: Qty
+                                   , clPayer, clReceiver :: WalletId }
+
+-- type and legs are ONE value: "an instruction with no legs" is unrepresentable.
+data SettlementLegs = DvP SecuritiesLeg CashLeg | FoP SecuritiesLeg | CashOnly CashLeg
+
+data SettlementType = DVP | FOP | CASH
+settlementType :: SettlementLegs -> SettlementType   -- a projection, not a stored field
+settlementType (DvP _ _)    = DVP
+settlementType (FoP _)      = FOP
+settlementType (CashOnly _) = CASH
+
+data SettlementInstruction = SettlementInstruction      -- plain data, no behaviour
+  { siRef :: TxId, siTradeDate, siSettleDate :: Day
+  , siLegs :: SettlementLegs, siCounterparty :: LEI, siVenue :: MIC }
+
+-- A security move -> securities leg (source delivers, destination receives);
+-- a cash move -> cash leg (source pays, destination receives). Total over Asset.
+classify :: SettleMove -> Either SecuritiesLeg CashLeg
+classify (SettleMove from to (Security i) q) = Left  (SecuritiesLeg i q from to)
+classify (SettleMove from to (CashCcy c)  q) = Right (CashLeg       c q from to)
+
+-- Nothing when there is no standard leg shape: no moves (a contract error), or a
+-- non-decomposed multi-leg structure. Both give no instruction, never a partial one.
+legsOf :: [SettleMove] -> Maybe SettlementLegs
+legsOf ms = case partitionEithers (map classify ms) of
+  ([s],[c]) -> Just (DvP s c)
+  ([s],[])  -> Just (FoP s)
+  ([],[c])  -> Just (CashOnly c)
+  _         -> Nothing
+
+settleProjection :: SettlementTx -> Maybe SettlementInstruction   -- pure, total
+settleProjection tx
+  | settles (stClass tx) = mk <$> legsOf (stMoves tx)
+  | otherwise            = Nothing
+  where mk legs = SettlementInstruction (stId tx) (cdmTradeDate (stCdm tx))
+          (cdmSettleDate (stCdm tx)) legs (cdmCounterparty (stCdm tx)) (cdmVenue (stCdm tx))
+\end{lstlisting}
+
+\begin{lstlisting}[language=Haskell]
+-- Behaviour, made concrete  (settlementType . siLegs <$> settleProjection tx):
+--   security + cash move  (a DvP equity trade) -> Just DVP
+--   a securities move alone                     -> Just FOP
+--   a cash move alone     (a margin call)       -> Just CASH
+--   an ACCOUNTING transaction                   -> Nothing   -- not settlable
+--   a SETTLEMENT with no moves                  -> Nothing   -- contract error, no instruction
+\end{lstlisting}
+
+\begin{remark}
+The projection is total and deterministic by construction. \texttt{settles} classifies every \texttt{TxClass}; \texttt{legsOf} is exhaustive, its wildcard absorbing both the empty and the non-decomposed multi-leg cases as \texttt{Nothing}; and \texttt{settleProjection} reads only \texttt{tx}---no clock, no balances, no external system---so the same settlement transaction always yields the same instruction and re-running after a failure is safe.
+\end{remark}
+
+\begin{definition}[SettlementInstruction]
+\label{def:settlement-instruction}
+The \texttt{SettlementInstruction} is plain data with no behaviour (the \texttt{data} declaration above): instruction id, trade and settlement dates, the settlement legs, counterparty LEI, and execution venue MIC. The settlement type $\in \{\texttt{DVP}, \texttt{FOP}, \texttt{CASH}\}$ is a \emph{projection} of which legs are present (\texttt{settlementType}), never an independent field that could disagree with them. Both legs present give \texttt{DVP}; securities alone give \texttt{FOP} (Free of Payment); cash alone gives \texttt{CASH}; no legs is unrepresentable, so a settlable transaction with no moves yields \texttt{Nothing}---a contract error, not an instruction.
+\end{definition}
+
+The standard cases---DvP equity trades, FOP transfers, cash-only settlements---carry at most one securities leg and one cash leg. Multi-leg structures decompose at the source, not in the projection: the smart contract emits one \texttt{SETTLEMENT} transaction per independently settleable leg. A repo emits two---an opening leg and a closing leg---each a standard DvP structure.
+
+\subsection{Boundary Separation}
+\label{sec:settlement-boundary}
+
+\begin{principle}[Boundary Separation]
+\label{prin:settlement-boundary}
+The Ledger provides \emph{what} settles: parties, securities, quantities, dates. The settlement layer provides \emph{how}: standing settlement instructions (SSIs), custodian account identifiers, CSD connectivity, ISO~20022 message generation, and exception management. Neither side reads the other's internals.
+\end{principle}
+
+The \texttt{SettlementInstruction} is the sole object shared across the boundary. Wire-message generation is two steps: projection, then enrichment. The projection produces the instruction from the transaction; the settlement layer enriches it with the operational detail the Ledger does not hold---SSIs, CSD participant ids, settlement priority---before generating the ISO~20022 message (e.g.\ \texttt{sese.023}). This is the precise sense of ``message generation is projection, not translation'' (Section~\ref{sec:implementation}): the projection step is the Ledger's; enrichment is the settlement layer's.
+
+\subsection{Transaction Types and Settlability}
+\label{sec:settlement-types}
+
+Settlability is a first-class field on the transaction, assigned by the generating smart contract at the point of move generation, never inferred at runtime---the contract knows the business intent.
+
+\begin{center}
+\begin{tabular}{l l p{7.5cm}}
+\toprule
+\textbf{Type} & \textbf{Settles?} & \textbf{Description} \\
+\midrule
+\texttt{SETTLEMENT} & Yes & Maps to a real-world settlement instruction (e.g.\ equity trade $\to$ \texttt{sese.023}). \\
+\texttt{COLLATERAL} & Yes & Settles through the collateral channel (e.g.\ margin call $\to$ cash transfer). \\
+\texttt{LIFECYCLE} & Sometimes & Decomposes into settlement and accounting sub-transactions. \\
+\texttt{ACCOUNTING} & No & Internal adjustment, no external transfer (e.g.\ PnL crystallisation, revaluation). \\
+\texttt{CORRECTION} & Sometimes & Compensating transaction; settles a reversal only if the original already settled. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The projection returns \texttt{Just} for \texttt{SETTLEMENT} and \texttt{COLLATERAL}, \texttt{Nothing} for the rest. When a \texttt{LIFECYCLE} event requires both settlement and accounting, the smart contract emits both transactions: a \texttt{SETTLEMENT} for the legs that transfer externally, an \texttt{ACCOUNTING} for the internal adjustment. Physical exercise of an option, for instance, emits a \texttt{SETTLEMENT} (deliver shares, receive cash) and a separate \texttt{ACCOUNTING} (close the option position, crystallise PnL). The decomposition is the contract's responsibility, not the projection's.
+
+\subsection{Lifecycle-Originated Settlement}
+\label{sec:settlement-lifecycle}
+
+Some settlements originate from internal contract logic rather than an external instruction: an option exercise, a coupon falling due, a barrier breach. The Ledger is the originator, so there is no external instruction to match. The projection treats these identically---the transaction is tagged \texttt{SETTLEMENT} by the contract, the projection extracts the instruction, the settlement layer enriches and delivers it. The sole difference is provenance: execution-originated instructions match an external trade confirmation; lifecycle-originated instructions are generated unilaterally. The settlement layer receives the instruction with no awareness of its origin.
+
+One lifecycle transaction may yield several instructions where it carries several legs. Physical exercise of an equity option with lot-size constraints (Section~\ref{sec:contracts}) carries a securities delivery (whole lots) and a cash payment (strike value plus any fractional residual); the projection classifies each move by unit type and emits the matching instruction for each.
+
+\subsection{DvP: The Two-Level Guarantee}
+\label{sec:settlement-dvp}
+
+Delivery versus Payment (DvP) is the principle that securities delivery and cash payment occur together or not at all. The framework provides it at two independent, mutually reinforcing levels.
+
+\paragraph{Ledger-level.} A DvP trade is one transaction holding both the securities move and the cash move. The executor commits all moves atomically---both take effect or neither does (Section~\ref{sec:ledger}). This is a structural consequence of the transaction primitive, not a runtime check; the smart-contract specification (Section~\ref{sec:contracts}) supplies the other half by requiring both legs within one transaction.
+
+\paragraph{Settlement-level.} The CSD or CCP provides DvP at the real-world level: securities delivery and cash payment settle simultaneously on its books. This depends on external infrastructure and lies outside the Ledger's control.
+
+\paragraph{The temporal gap.} Between trade date and settlement date the Ledger shows the economic position under trade-date accounting (Section~\ref{sec:intro}); the CSD confirms the real-world transfer at settlement. The gap is not a DvP failure but the normal state under trade-date accounting, where exposure exists from execution.
+
+\paragraph{Settlement failure.} On failure (the counterparty cannot deliver), the Ledger records a settlement-failure event and does \emph{not} reverse the economic position: the exposure existed from trade date regardless of settlement outcome, and persists until the failure resolves through buy-in, cancellation, or partial delivery. The discrepancy between Ledger and custodian positions is detected by virtual-wallet comparison (Section~\ref{sec:implementation}).
+
+\paragraph{External regimes.} Legal title, beneficial ownership, fail treatment, and the regulatory-capital treatment of unsettled transactions are governed by external frameworks, not by the Ledger. The Ledger supplies the position and timing data those treatments require; it does not determine the applicable regime.
+
+\begin{remark}
+The mechanics of the trade-date-to-settlement-date interval---deferred settlement, fail lifecycle, buy-in, partial delivery, and re-instruction---are specified in the standalone deferred-settlement specification. This section fixes only the interface: what the projection produces and how settlement status returns. The satellite is out of scope here.
+\end{remark}
+
+\subsection{Gross-to-Net Reconciliation}
+\label{sec:settlement-netting}
+
+The Ledger records gross transactions, one per trade. The settlement layer may net: for trades in the same security with the same counterparty on the same settlement date, it produces a single net instruction. Netting is a settlement-layer optimisation; the Ledger's gross records are authoritative and are never modified by it.
+
+Gross and net reconcile by an algebraic identity, not a heuristic. For each (security, counterparty, settlement date) group, the algebraic sum of gross instruction quantities---deliveries positive, receipts negative---equals the net instruction quantity. The sum is a \emph{group homomorphism}---a structure-preserving map, here meaning summing the gross legs gives the net leg---written \texttt{foldMap} from the gross legs into the additive group of quantities. A violation localises the fault: either the projection produced an incorrect instruction (a Ledger fault) or the netting computation is wrong (a settlement-layer fault).
+
+\begin{lstlisting}[language=Haskell]
+-- Signed securities quantity from one party's view: delivery positive, receipt negative.
+signedFor :: WalletId -> SecuritiesLeg -> Qty
+signedFor me l | slDeliver l == me = slQty l
+               | slReceive l == me = negQty (slQty l)
+               | otherwise         = mempty
+
+-- The net leg's signed quantity equals the sum of the gross legs'. An identity,
+-- checked, not a reconciliation heuristic.
+reconciles :: WalletId -> [SecuritiesLeg] -> SecuritiesLeg -> Bool
+reconciles me gross net = foldMap (signedFor me) gross == signedFor me net
+\end{lstlisting}
+
+\subsection{The Confirmation Return Path}
+\label{sec:settlement-confirmation}
+
+Settlement confirmations (\texttt{sese.025} for securities, \texttt{camt.054} for cash) flow back into the Ledger as lifecycle events recording the confirmation timestamp and external reference. No moves are generated---positions were already correct from trade date. The settlement status advances:
+
+\begin{center}
+\begin{tabular}{l p{10.5cm}}
+\toprule
+\textbf{Status} & \textbf{Meaning} \\
+\midrule
+\texttt{EXECUTED}   & Committed in the Ledger; the settlement layer has not yet processed it. \\
+\texttt{INSTRUCTED} & The settlement layer has submitted the instruction; the CSD has not confirmed. \\
+\texttt{SETTLED}    & The CSD confirms successful settlement; custody now matches Ledger positions. \\
+\texttt{FAILED}     & The CSD reports a failure. Ledger positions remain correct (economic exposure); the external transfer has not occurred. A failed trade may re-instruct (return to \texttt{INSTRUCTED} after buy-in or extension), partially settle (a lifecycle event), or cancel (a \texttt{CORRECTION} transaction reversing the original moves). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The transitions are \texttt{EXECUTED} $\to$ \texttt{INSTRUCTED} $\to$ \texttt{SETTLED}, with \texttt{INSTRUCTED} $\to$ \texttt{FAILED} as the alternate terminal. Each transition is itself a logged lifecycle event in the move stream. Settlement status is therefore a projection of those events, not a separate mutable store: replaying the events to any point rebuilds the status that held then, and the stored value is overwritten in place only as a read cache. This completes the traceability chain of Section~\ref{sec:implementation}: smart contract $\to$ move $\to$ settlement instruction $\to$ external confirmation $\to$ status.
+
+%==============================================================================

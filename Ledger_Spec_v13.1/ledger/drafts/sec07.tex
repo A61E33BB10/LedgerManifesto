@@ -1,0 +1,187 @@
+\section{Smart Contracts as Move Generators}
+\label{sec:contracts}
+%==============================================================================
+
+A financial instrument is a deterministic program that emits moves, not an opaque record in a database. A bond emits coupons and a redemption; an option, a premium and a conditional payoff; a swap, periodic net payments. The logic varies; the output is always one list of moves.
+
+\begin{mentalmodel}
+Picture a set of automatic valves bolted into a sealed system of water pipes, where each sealed tank is a wallet and the water it holds is units. The contract is the clockwork that drives the valves: set the same dials --- the same inputs, state, and observed conditions --- and it always steps the valves through the same sequence, routing water from one tank to another. Because it sits inside the seal, its only available action is to route water already in the pipes; it has no tap that adds water and no drain that removes it, so even a mis-cut cam can only send water to the wrong tank, never conjure or lose a drop. Unlike a real valve that could jam or burst and spill, this one cannot leak: routing is the whole of its vocabulary.
+\end{mentalmodel}
+
+\subsection{Contract Definition}
+
+\begin{definition}[Smart Contract]
+A smart contract is a deterministic function from inputs, state, and observed conditions to a sequence of atomic moves:
+\[
+\textit{Contract} : (\textit{Input}, \textit{State}, \textit{Conditions}) \to [\textit{Move}].
+\]
+\end{definition}
+
+\noindent A contract's sole output is moves. A move transfers a quantity from one wallet to another without creating or destroying it (Section~\ref{sec:ledger}). Conservation therefore holds by construction: a contract can move units, never create or destroy them.
+
+\noindent Equal inputs, state, and conditions yield equal moves. There is no randomness, no hidden state, no dependency beyond the passed parameters. The contract is not stored apart from the ledger; its effects \emph{are} ledger entries. Product complexity is isolated in the contract, and the ledger sees only moves. A new product type is a new contract; the move stream, balance computation, and reporting are untouched, and at the ledger level its moves are indistinguishable from any other product's.
+
+A smart contract is the machine-readable, executable form of the legal confirmation. An ISDA derivatives confirmation already states the product, economics, lifecycle events, and settlement obligations in structured terms. The CDM is the formal vocabulary of that structure. Writing the contract from the confirmation is transcription, not engineering: CDM enums map directly onto product types, lifecycle events, and settlement obligations. The contract adds executability; it adds nothing to the information content.
+
+The output type is a \texttt{Move} carrying a quantity \texttt{Qty}. A quantity is an exact integer in the unit's smallest denomination (minor units: cents, satoshis, basis-point-notional); never a decimal, never a float. Integer minor units make addition associative and every balance computation exact. Identical inputs therefore produce bit-identical outputs across hardware and compilers. This is the precondition for reproducible time travel and cross-system verification. Rounding (round-half-to-even, IEEE~754) applies once, at instruction projection, where an exact internal amount becomes a settlement or payment message. It never applies within balance or payment arithmetic.
+
+The types make this exactness structural. A \texttt{Qty} is an integer count of minor units, and the contract is a total function emitting a list of moves. The contract is fully determined by the moves it lists, with no hidden step.
+
+\begin{lstlisting}[language=Haskell]
+-- A quantity is an EXACT integer in the unit's smallest denomination
+-- (minor units: cents, satoshis, basis-point-notional). Never a decimal float.
+newtype Qty = Qty Integer deriving (Eq, Ord, Show)
+
+-- Qty is the additive abelian group of Section 2 (the position algebra).
+instance Semigroup Qty where Qty a <> Qty b = Qty (a + b)  -- associative, exact
+instance Monoid    Qty where mempty = Qty 0                 -- identity (zero)
+qneg :: Qty -> Qty                                          -- inverse
+qneg (Qty n) = Qty (negate n)
+
+newtype WalletId = WalletId String deriving (Eq, Ord, Show)
+newtype UnitId   = UnitId   String deriving (Eq, Ord, Show)
+
+-- A move: a positive Qty of one unit, one wallet to another (Section 2),
+-- tagged with the emitting contract and metadata. Direction carries the sign,
+-- so mQty is always > 0. Illustrative form, local to this section: the reference
+-- Move carries the magnitude as PosQty and elides the free-text mMeta field.
+data Move = Move
+  { mFrom   :: WalletId, mTo     :: WalletId
+  , mUnit   :: UnitId,   mQty    :: Qty       -- exact minor units, > 0
+  , mTime   :: Integer,  mSource :: String    -- timestamp; emitting contract id
+  , mMeta   :: String                         -- event description / external refs
+  } deriving (Eq, Show)
+
+-- A smart contract is a DETERMINISTIC, TOTAL function emitting a move schedule.
+-- The ledger sees only [Move]; product complexity stays inside the contract.
+type Contract i s c = (i, s, c) -> [Move]
+\end{lstlisting}
+
+\noindent Instruction projection converts an exact internal amount to a settlement message, and a rate or an FX cross can make that conversion produce a fraction. Round-half-to-even applies there and nowhere else.
+
+\begin{lstlisting}[language=Haskell]
+-- The SOLE rounding site. Prelude `round` IS round-half-to-even (IEEE 754).
+projectAmount :: Rational -> Qty
+projectAmount r = Qty (round r)
+
+-- ghci> Qty 250 <> Qty 12500            -- exact integer addition
+-- Qty 12750
+-- ghci> qneg (Qty 12500) <> Qty 12500   -- conservation: no rounding error
+-- Qty 0
+-- ghci> projectAmount (5 % 2)           -- 2.5 -> nearest even -> 2
+-- Qty 2
+-- ghci> projectAmount (7 % 2)           -- 3.5 -> nearest even -> 4
+-- Qty 4
+-- ghci> Move (WalletId "wB") (WalletId "wS") (UnitId "USD")
+--            (Qty 250000) 0 "put_ref" "PUT_PREMIUM"   -- Move 1 below, typed
+\end{lstlisting}
+
+The listed code carries its own guarantees: every function is total and deterministic, and rounding cannot reach balance arithmetic. The remark makes this precise.
+
+\begin{remark}[Totality and determinism]
+The \texttt{Qty} group (\texttt{(<>)}, \texttt{mempty}, \texttt{qneg}) is reused verbatim from the reference \texttt{reference/Ledger.hs}. The \texttt{Move} record, \texttt{Contract} synonym, and \texttt{projectAmount} are total (\texttt{round} is total on \texttt{Rational}; \texttt{Move} is a plain product; \texttt{Contract} is a type synonym) and deterministic, with rounding confined to the single \texttt{projectAmount} boundary so no balance arithmetic can round.
+\end{remark}
+
+\subsection{Composition: Modular over Composite}
+
+An instrument is a bundle of obligations, and each obligation has its own inputs and its own logic. The principle keeps them separate.
+
+\begin{principle}[Modular contracts]
+One smart contract per payout or obligation type, not one composite contract per instrument.
+\end{principle}
+
+\noindent An option payoff depends on strike, spot, and exercise terms. A CSA margin depends on aggregate mark-to-market, threshold, minimum transfer amount, and eligible-collateral currency. These are independent calculations on independent inputs. Separation keeps each a pure function testable in isolation. Combining them makes the input space the product of the two, most of which is irrelevant. A margin contract written once attaches to any collateral wallet, whatever the instrument behind it (option, swap, or structured note), eliminating duplication.
+
+Modularity requires clear interfaces. The executor, the single component permitted to mutate the ledger (Section~\ref{sec:lifecycle}), orchestrates the contract invocations for a given lifecycle event. This orchestration is simpler than maintaining a composite script for every product--CSA combination.
+
+\subsection{Equity, Dividend, and Corporate-Action Contracts}
+
+A stock contract emits moves for trade execution, dividend payment, and corporate actions through one primitive: a set of moves in a transaction. No separate machinery is involved.
+
+\noindent\textbf{Trade execution.} A purchase of $n$ shares at price $p$ is a transaction of two atomic moves: $n \cdot p$ cash from buyer to seller, and $n$ of the stock from seller to buyer.
+
+\noindent\textbf{Dividend.} On the ex-dividend date the contract emits cash from an issuer virtual wallet to each holder wallet, proportional to shares held. The unit state --- materialised \emph{UnitStatus}, a projection of the event log (\S\ref{sec:states-unitstatus}), governed in Section~\ref{sec:lifecycle} --- records the event (date, amount per share) for idempotency.
+
+\noindent\textbf{Bond accrued interest.} Accrued interest is not a separate unit. The bond price function $P_t(u)$ returns the \emph{dirty} price (including accrual). A between-coupon trade settles as cash-for-bond at the dirty price. At the next coupon date the contract pays the full coupon and transitions the bond ex-coupon. Clean versus dirty is a reporting convention derived from unit state (last coupon date, accrual convention), not a separate position: the clean price is reported by subtracting the accrued interest computed from that state.
+
+\noindent\textbf{Corporate actions.} A corporate action is a sequence of state transitions and moves anchored to its dates --- announcement, record, ex/effective, payment. At the record date the unit state records the entitlement snapshot; at the ex/effective date the contract emits position-adjustment moves from a corporate-action virtual wallet, and the same multi-date mechanism handles splits, mergers, spin-offs, and rights issues. Each step is a transaction with full metadata (dates, ratios, entitlement rules), so time travel reconstructs both pre- and post-action views; the frame change the action causes, and every pricing rule across it, are governed by the State-Basis Discipline (\S\ref{sec:state-basis}).
+
+\subsection{European Put---Full Move Schedule}
+
+A put is two transfers: an unconditional premium at inception and a conditional payoff at expiry. The full schedule follows.
+
+\noindent Parameters: strike $K$, expiry $T$, underlying $S$, notional $N$, premium $P$, buyer $w_B$, seller $w_S$.
+
+\noindent\textit{Move 1 (inception, $t=0$)} --- unconditional, on contract creation:
+
+\begin{lstlisting}
+Move(from: w_B, to: w_S, unit: USD, quantity: P * N,
+     timestamp: t_0, source: "put_ref", metadata: "PUT_PREMIUM")
+\end{lstlisting}
+
+\noindent\textbf{Cash settlement.} \textit{Move 2 (expiry $t=T$)} executes only if $S_T < K$ (in-the-money). The seller pays the buyer the intrinsic value $(K-S_T)\cdot N$. If $S_T \ge K$, no move.
+
+\begin{lstlisting}
+Move(from: w_S, to: w_B, unit: USD, quantity: (K - S_T) * N,
+     timestamp: T, source: "put_ref", metadata: "PUT_SETTLEMENT_CASH")
+\end{lstlisting}
+
+\noindent\textbf{Physical delivery.} If $S_T < K$, the buyer delivers $N$ of the underlying and receives $K\cdot N$ cash. The two moves are one atomic transaction; delivery requires the buyer to hold the underlying at expiry. If $S_T \ge K$, no moves.
+
+\begin{lstlisting}
+Move(from: w_B, to: w_S, unit: S,   quantity: N,     ...   metadata: "PUT_DELIVERY_ASSET")
+Move(from: w_S, to: w_B, unit: USD, quantity: K * N, ...   metadata: "PUT_DELIVERY_CASH")
+\end{lstlisting}
+
+\noindent\textbf{Lot-size constraint.} Equity delivery requires whole multiples of the board lot $L$ (reference data in the Unit Store). For lot $L$,
+\[
+N_{\text{deliver}} = \left\lfloor \tfrac{N}{L} \right\rfloor \cdot L, \qquad N_{\text{residual}} = N - N_{\text{deliver}}.
+\]
+Whole lots settle as a DvP pair at strike; the residual settles in cash at intrinsic value. All moves are one atomic transaction:
+
+\begin{lstlisting}
+Transaction (settlement: txIntroduce = Nothing, carrying the three moves below):
+    Move(from: w_B, to: w_S, unit: S,   quantity: N_deliver)            -- whole lots
+    Move(from: w_S, to: w_B, unit: USD, quantity: K * N_deliver)        -- strike cash
+    Move(from: w_S, to: w_B, unit: USD, quantity: (K - S_T) * N_residual) -- cash residual
+\end{lstlisting}
+
+Splitting the notional changes the form of settlement, not its value.
+
+\begin{proposition}[Lot-split conservation]
+The underlying nets to zero ($-N_{\text{deliver}} + N_{\text{deliver}} = 0$); cash nets to zero, the seller's outflow $K\cdot N_{\text{deliver}} + (K-S_T)\cdot N_{\text{residual}}$ equalling the buyer's inflow. The economic value transferred is the put payoff $(K-S_T)\cdot N$, independent of the lot split.
+\end{proposition}
+
+\noindent The lot-adjustment is a pure function of $(K, N, S_T, L)$, tested by the property suite (Appendix~\ref{app:properties}). The settlement projection (Section~\ref{sec:settlement}) yields two instructions: a securities delivery (\texttt{sese.023}) for $N_{\text{deliver}}$ shares and a cash payment for $K\cdot N_{\text{deliver}} + (K-S_T)\cdot N_{\text{residual}}$. The pattern generalises to any physically settled instrument with lot constraints: convertible conversion, warrant exercise, equity-forward delivery. Only the payoff formula differs.
+
+The contract is fully defined by its move schedule: a finite list of conditional transfers parameterised by market observables. Pricing complexity (Black--Scholes, Monte Carlo, finite differences) is irrelevant to the ledger, which sees only the emitted moves.
+
+\subsection{Interest Rate Swap---Full Move Schedule}
+
+Each reset pays the difference between the floating and fixed rates on the notional for the period. The swap is that payment repeated over the schedule.
+
+\noindent Parameters: notional $N$, fixed rate $r_{\text{fixed}}$, floating reference $r_{\text{float},k}$ (e.g.\ SOFR) at reset $k$, reset dates $\{t_1,\ldots,t_n\}$, day-count fraction $\delta_k$, fixed-payer $w_F$, floating-payer $w_L$. CDM date types and conventions fix the dates and $\delta_k$ (Section~\ref{sec:cdm-dates}). For each reset $t_k$:
+\[
+\text{Payment}_k = N \cdot (r_{\text{float},k} - r_{\text{fixed}}) \cdot \delta_k .
+\]
+
+\begin{lstlisting}
+Move(from: w_F, to: w_L, unit: USD, quantity: Payment_k,
+     timestamp: t_k, source: "irs_ref", metadata: "IRS_NET_PAYMENT")
+\end{lstlisting}
+
+\noindent Move quantities are positive (Section~\ref{sec:ledger}). The contract emits $|\text{Payment}_k|$: $w_F \to w_L$ when $\text{Payment}_k > 0$, $w_L \to w_F$ when $\text{Payment}_k < 0$. Direction encodes the sign; quantity is the magnitude. Each reset needs only the current floating rate and the fixed parameters; no historical path is required. The complete contract is the sequence $\{m_1,\ldots,m_n\}$, one move per reset, plus the unit state recording settled resets for idempotency.
+
+\medskip
+\noindent\textbf{Worked example (CDM lifecycle).} A 5-year USD IRS, notional \$10M, fixed 3\%, quarterly resets.
+
+\begin{itemize}[nosep]
+\item \emph{Inception} (CDM \texttt{ExecutionEvent}, intent \texttt{OPEN}). Unit state initialised: fixed rate, floating index, schedule, reset counter $=0$. No cash move (par swap, no upfront premium).
+\item \emph{Reset at $t_1$} (CDM \texttt{ResetEvent}). SOFR observed at 3.5\%; unit state records \texttt{float\_rate\_$t_1$} $=3.5\%$, counter incremented.
+\item \emph{Coupon at $t_1$} (CDM \texttt{TransferEvent}). $10\text{M}\times(3.5\%-3\%)\times0.25 = 12{,}500$. \texttt{Move(from: w\_F, to: w\_L, unit: USD, quantity: 12{,}500)}; period $t_1$ marked settled.
+\item \emph{Maturity at $t_n$} (CDM \texttt{TerminationEvent}, intent \texttt{TERMINATE}). Final coupon as above; unit state transitions to TERMINATED. No further resets or payments.
+\end{itemize}
+
+\clearpage
+%==============================================================================
+

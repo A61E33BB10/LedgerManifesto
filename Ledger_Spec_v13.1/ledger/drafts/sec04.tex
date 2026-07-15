@@ -1,0 +1,232 @@
+\section{The Unit Store}
+\label{sec:unit-store}
+%==============================================================================
+\newtheorem*{condition}{Condition}
+
+Section~\ref{sec:ledger} fixed the unit universe $\mathcal{U}$ and the balance function $w_t : \mathcal{U} \to \mathbb{R}$ but left $\mathcal{U}$ abstract. The \textbf{Unit Store} makes $\mathcal{U}$ concrete. It decides which units exist, records their identity and static terms, binds each unit to a smart contract, and validates every unit at registration. The executor, the settlement projection, and the valuation function all read $\mathcal{U}$ from here.
+
+\subsection{Units}
+
+A unit is any financial instrument that can appear as a wallet balance: cash currencies, listed equities and bonds (by ISIN), listed derivatives (by exchange contract specification), OTC derivatives (each bilateral trade), and structured products (each issuance). A unit has \emph{identity} (how it is distinguished from every other unit), \emph{type}, static \emph{terms}, and a bound \emph{smart contract}. A unit's evolving state is not stored on the unit entry. Its lifecycle stage and product-specific state live in the three-home state model (Section~\ref{sec:states}).
+
+\subsection{Unit Identity: OTC versus Listed}
+\label{sec:unit-identity}
+
+Two positions are in the same unit exactly when they are fungible.
+
+\begin{principle}[Unit Identity]
+\label{prin:unit-identity}
+Two positions are in the same unit if and only if they are fungible: a holder is economically indifferent between them. Fungible positions share one unit entry and net against each other; non-fungible positions are distinct units with distinct entries.
+\end{principle}
+
+Fungibility fixes a different identity key for each instrument class.
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Instrument class} & \textbf{Identity key} & \textbf{Fungibility} \\
+\midrule
+Cash & Currency code & All balances of a currency net \\
+Listed equity & ISIN & All shares of an ISIN net \\
+Listed derivative & Contract spec & All positions in a series net \\
+ & (exchange, underlier, type, strike, expiry) & (via CCP novation) \\
+OTC derivative & Full CDM \texttt{Trade} & Non-fungible: counterparty and \\
+ & (includes counterparty, \texttt{Collateral}) & CSA make each trade unique \\
+Bond & ISIN & All holdings of an ISIN net \\
+Structured note & ISIN + product terms & Same issuance is fungible \\
+Tokenised equity & Contract address + chain ID & All tokens on a contract net \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For OTC instruments the identity is the CDM \texttt{Trade} object \emph{including} its \texttt{Collateral} field. Two trades with identical payoffs under different CSAs (USD versus EUR) are therefore different units. They carry different discount curves, margin flows, and settlement currencies. For listed instruments the CCP novates itself in as sole counterparty, so all positions in one contract specification are fungible regardless of original counterparty. A tokenised security is a unit distinct from its underlying: NVDA and tokenised-NVDA carry the same exposure under different settlement mechanisms. The double-counting this raises is resolved in Appendix~\ref{app:cdm-walkthrough}: the custodian nets to zero economic exposure.
+
+\subsection{Three-Tier Architecture}
+
+The store has three tiers, each answering one question.
+
+\paragraph{Tier 1 --- Reference Data. \emph{What instruments exist in the market?}}
+Instrument master data: ISIN, exchange, contract specification, issuer, coupon schedule. It is read from exchanges, vendors, and CSD records. The Ledger consumes reference data; it does not author it. CDM: \texttt{TransferableProduct} for securities, \texttt{NonTransferableProduct} for derivatives and structured products.
+
+\paragraph{Tier 2 --- Product Registry. \emph{What lifecycle logic governs this kind of instrument?}}
+One smart-contract template per product \emph{type}, not per contract. ``European equity index option'' maps to one \texttt{OptionPayout} template, and that template covers every such option regardless of underlier, strike, or expiry. CDM \texttt{ProductQualification} classifies \texttt{EconomicTerms} into a product type; each type maps to a template (Section~\ref{sec:contracts}). An entry is created automatically the first time a Tier-3 registration encounters a new product type. Thereafter the entry is immutable.
+
+\paragraph{Tier 3 --- Unit Registry. \emph{Which specific units can appear as balances?}}
+The elements of $\mathcal{U}$. For listed instruments the unit is the contract specification; for OTC instruments it is the full CDM \texttt{Trade}, \texttt{Collateral} included. Each entry carries identity, type, the static terms drawn from \texttt{EconomicTerms}, the bindings to its Tier-2 template and smart contract, and provenance:
+
+\begin{lstlisting}
+UnitEntry:
+    unit_id        : UniqueId        -- deterministic, from the CDM object
+    unit_type      : UnitType        -- CASH | EQUITY | LISTED_DERIV
+                                     --   | OTC_DERIV | BOND | STRUCTURED
+    -- Identity (varies by type)
+    isin           : Option<ISIN>          -- securities, bonds, notes
+    contract_spec  : Option<ContractSpec>  -- listed derivatives
+    cdm_trade_ref  : Option<TradeRef>      -- OTC (includes Collateral)
+    -- Bindings
+    product_ref    : ProductRegistryRef    -- Tier 2 template
+    smart_contract : SmartContractRef      -- lifecycle logic instance
+    -- Static terms (from CDM EconomicTerms)
+    currency       : CurrencyCode
+    multiplier     : Option<Decimal>
+    expiry         : Option<Date>
+    -- Provenance
+    created_by     : TransactionId         -- registering transaction
+    created_at     : Timestamp
+\end{lstlisting}
+
+The \texttt{unit\_id} is derived deterministically and injectively from the CDM object: a hash of the contract-specification fields for listed instruments, the UTI or metadata key for OTC. Distinct CDM objects always yield distinct unit IDs.
+
+\paragraph{Where evolving state lives.}
+The unit entry holds identity and static terms only. The lifecycle stage and the product-specific state (which coupons a bond has paid, the accumulated cost of a futures position) are not entry fields. A unit carries immutable, versioned terms in \emph{ProductTerms}$[u]$ and a shared lifecycle status in \emph{UnitStatus}$[u]$. Per-position state lives in \emph{PositionState}$[w,u]$. These are the three-home state model (Section~\ref{sec:states}). The lifecycle stage is read from \emph{UnitStatus}.
+
+\emph{UnitStatus} is a projection, not a mutable store. It is one shared value per unit: a read cache of the immutable event log, rebuilt exactly by replay (established in \S\ref{sec:states-unitstatus}).
+
+\subsection{Registration}
+\label{sec:unit-registration}
+
+Units enter the registry through three channels.
+
+\begin{enumerate}
+\item \textbf{Cash (pre-registered).} Currency units are permanent entries created at system initialisation: no expiry, no lifecycle events, stage \texttt{ACTIVE} permanently, smart contract the identity function.
+\item \textbf{Listed instruments (reference-data feed).} On a new listing or initialisation against an existing market, the feed supplies the contract specification; the store creates the Tier-1, Tier-2 (if the product type is new), and Tier-3 entries. This is administrative, not a trade: the unit enters $\mathcal{U}$ upon listing, before any position is taken.
+\item \textbf{OTC instruments (trade execution).} The executed CDM \texttt{Trade} \emph{is} the unit definition; the store creates the Tier-3 entry from it. The unit ID derives from the Trade's metadata key (counterparty and \texttt{Collateral} included), so identical payoffs under different CSAs receive different IDs. The unit enters $\mathcal{U}$ at execution.
+\end{enumerate}
+
+Registration is atomic: a unit is fully validated and added, or rejected with no partial state. Units are never deleted. A unit at end of life reaches a terminal stage in \emph{UnitStatus} (matured, terminated, settled), and its entry remains for audit and time travel. The executor rejects new moves against a non-\texttt{ACTIVE} unit, except to settle existing obligations.
+
+Two disciplines bind registration: it writes the first value of every per-unit map, and it happens once.
+
+\begin{condition}[C7: ProductTerms registration-total]
+\label{cond:C7}
+\sloppy
+\emph{ProductTerms} is registration-total: its first version is written at registration, so \texttt{product\_terms(u)} is defined for every registered $u$. (\emph{UnitStatus} is registration-total by the same write, C5, established in Section~\ref{sec:states}.)
+\end{condition}
+
+\begin{condition}[C10: no re-registration]
+\label{cond:C10}
+Re-registering an existing unit id is a hard error, never a silent reset of its state.
+\end{condition}
+
+Registration writes \emph{ProductTerms} and \emph{UnitStatus} together, so ``registered in ProductTerms $\iff$ registered in UnitStatus'' holds by construction. C10 makes the write once-only, so a re-registration cannot overwrite live state behind the log.
+
+The registering function writes the \emph{singleton} first version of \emph{ProductTerms} and the default \emph{UnitStatus} together, in one operation. It returns the updated ledger, or rejects an already-registered id with a \texttt{Left} (C10).
+
+\emph{ProductTerms} is a \texttt{NonEmpty} list of versions, so a registered-but-versionless unit is unrepresentable, and the in-force-version accessor is total: it needs no \texttt{Maybe} for emptiness (C7).
+
+\texttt{register} is exported; \emph{ProductTerms} and \texttt{Ledger} are exported abstract, with no field setter. That single write is therefore the only origin of a unit's terms, and no caller can falsify the \emph{ProductTerms}--\emph{UnitStatus} coupling. In code, registration is a move-less transaction applied through the same function as trades, settlements, and amendments:
+
+\begin{lstlisting}[language=Haskell]
+-- ProductTerms abstract: NonEmpty makes "registered but versionless"
+-- unrepresentable; currentTerms is then total (no Maybe).      -- C7
+newtype ProductTerms = ProductTerms (NonEmpty TermsVersion)
+
+data LedgerError = ReRegistration UnitId | UnknownUnit UnitId    -- C10; the two registration errors: the full LedgerError is in Sec. 4
+
+-- Registration is ONE move-less Transaction whose txIntroduce carries
+-- the unit's first terms version and its default status.
+registerTx :: UnitId -> TermsVersion -> UnitStatus -> Transaction
+registerTx u tv us = Transaction
+  { txUnit = u, txMoves = [], txRows = Map.empty, txStatus = []
+  , txIntroduce = Just (tv, us), txAppend = Nothing, txBoundary = Nothing }
+
+-- register is not a separate door: it is applyTx of that transaction, so
+-- registration, trade, settlement, and amendment share one apply. The
+-- introduce branch of applyTx writes the singleton first ProductTerms
+-- version (C7) and the default UnitStatus (C5) together, and rejects an
+-- already-registered id with Left (ReRegistration u) (C10). [Section 4]
+register :: UnitId -> TermsVersion -> UnitStatus
+         -> Ledger -> Either LedgerError Ledger
+register u tv us = applyTx (registerTx u tv us)
+\end{lstlisting}
+
+A first registration succeeds. The same id a second time is rejected, and the prior ledger and its live state are left untouched. The rejection is a hard error, never a silent reset:
+
+\begin{lstlisting}[language=Haskell]
+register uES tvES  (defaultStatus uES) emptyLedger  ==  Right l0
+register uES tvDup (defaultStatus uES) l0           ==  Left (ReRegistration uES)
+\end{lstlisting}
+
+Conservation does not arise at registration. A registration is a move-less transaction, so its edge-sum is \texttt{mempty}, which is vacuously conserved, and the transaction touches no \emph{PositionState} row. A non-vacuous balance, and the conservation that constrains it, appears only when the first position is taken (Section~\ref{sec:states}).
+
+\subsection{Two-Stage Validation}
+\label{sec:unit-validation}
+
+Validity is enforced at registration and at transaction time.
+
+\noindent\textbf{At registration}, a unit must satisfy:
+\begin{enumerate}[nosep]
+\item \textbf{Uniqueness}: no existing unit shares its \texttt{unit\_id} (C10).
+\item \textbf{Smart-contract binding}: a contract reference exists for its product type.
+\item \textbf{CDM qualification}: for CDM-native units, \texttt{ProductQualification} returns a valid classification for the stated \texttt{EconomicTerms}; an unclassifiable product is rejected.
+\item \textbf{Term consistency}: static terms cohere. Expiry is in the future at creation, the multiplier is positive, the currency code is valid.
+\end{enumerate}
+
+\noindent\textbf{At transaction time}, the executor checks that every unit a move references (i) exists in the store, (ii) is in a stage compatible with the operation (read from \emph{UnitStatus}), and (iii) has a smart contract invokable for the requested event.
+
+Invalid units cannot enter $\mathcal{U}$, and moves cannot reference non-existent or retired units. With the conservation law (Section~\ref{sec:ledger}) and the executor's purity (Section~\ref{sec:lifecycle}), two-stage validation completes the correctness chain. The ledger operates only on validated, contract-governed units.
+
+\subsection{Guarantees}
+
+The Unit Store provides four guarantees to every downstream consumer.
+
+\begin{enumerate}
+\item \textbf{Existence}: every unit a move references exists and is in a valid lifecycle stage.
+\item \textbf{Immutability of identity and terms}: a \texttt{unit\_id} always denotes the same instrument with the same static terms. Lifecycle stage and product-specific state evolve (Section~\ref{sec:states}); identity and terms do not.
+\item \textbf{Smart-contract availability}: every registered unit has a bound contract the executor can invoke for lifecycle events.
+\item \textbf{CDM alignment}: every CDM-native unit maps to a CDM object (\texttt{Trade}, \texttt{Non\allowbreak{}Transferable\allowbreak{}Product}, or \texttt{Transferable\allowbreak{}Product}) with a successful qualification.
+\end{enumerate}
+
+These guarantees make referential integrity (P3, Section~\ref{sec:invariants}) hold by construction: $m.\text{unit} \in \mathcal{U}$ because the executor consults the store before accepting any move.
+
+\subsection{CDM Alignment}
+
+Each tier maps to a CDM concept.
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Tier} & \textbf{Content} & \textbf{CDM equivalent} \\
+\midrule
+1 Reference Data & Instrument master data & \texttt{TransferableProduct} (securities), \\
+ & & \texttt{NonTransferableProduct} (derivatives) \\
+2 Product Registry & Smart-contract templates & \texttt{ProductQualification} + \texttt{EconomicTerms} \\
+3 Unit Registry & Position-bearing units ($\mathcal{U}$) & \texttt{Trade} (OTC), contract spec (listed) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+CDM has no native catalogue concept. It models individual trades, not registries. It serves both listed and OTC derivatives through one \texttt{NonTransferableProduct} type, with no dedicated listed-contract-specification type and no model for exchange reference-data feeds (listings, expiry calendars, lot sizes). These are documentation gaps, not design incompatibilities. The store uses CDM objects as its internal representation; catalogue management sits alongside CDM as a Ledger-specific concern.
+
+\subsection*{Key Invariants and Consequences}
+
+The foundations rest on one primitive: the atomic move of a quantity between two
+wallets. From that primitive the following hold by construction. Each is catalogued, with
+its executable oracle, in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{Conservation (P1).} $Q(u)=\sum_w w_t(u)=0$ for every unit $u$ and time $t$.
+Each move debits and credits equal magnitude, so the signed per-unit sum of any
+transaction is the group identity. A conservation failure is an implementation bug, never
+a financial event. (\S\ref{sec:ledger}, Theorem~\ref{inv:P1}.)
+\item \textbf{Atomic commitment (P2).} A transaction applies completely or not at all. No
+partial state is observable, so a lifecycle event commits as one indivisible unit.
+(\S\ref{sec:ledger}.)
+\item \textbf{Log monotonicity (P4).} The event stream is append-only and hash-chained; no
+entry is retroactively rewritten. (\S\ref{sec:unit-store}.)
+\item \textbf{Idempotency (P5, P6).} Re-applying a transaction by \texttt{tx\_id}, or a
+lifecycle event to the same unit state, has no incremental effect.
+(\S\ref{sec:unit-store}.)
+\item \textbf{Determinism and time travel (P8, P9).} Replay of the immutable stream is a
+pure, total fold, and lifecycle functions are pure. \texttt{clone\_at}$(t)$ reconstructs
+balances and unit state identical to the ledger at time $t$. The ledger is a deterministic
+function of its event history. (\S\ref{sec:unit-store}.)
+\item \textbf{Consequence---unreachable internal breaks.} Trading-system/general-ledger
+divergence, PnL/balance-sheet mismatch, and inter-entity breaks are disagreements between
+projections of one record. For activity inside the boundary they are not representable.
+(\S\ref{sec:intro}.)
+\end{itemize}
+
+

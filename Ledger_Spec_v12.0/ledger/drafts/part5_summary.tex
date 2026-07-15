@@ -1,0 +1,31 @@
+\subsection*{Key Invariants and Consequences}
+
+Obligations and the six-coordinate position vector generalise the scalar core without
+relaxing any of P1--P10: every transaction satisfying P11--P23 also satisfies P1--P10. Each
+guarantee carries its canonical number in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{Conservation generalises (P1).} Each move writes exactly one coordinate of
+one unit across the two entities it connects (Single-Coordinate Move Principle); the signed
+sum over all coordinate slots is preserved, so the scalar law extends unchanged to the
+six-coordinate vector. (\S\ref{sec:gpm}, Proposition~\ref{prop:gpm-conservation}.)
+\item \textbf{Available-inventory identity (P20).}
+$\mathrm{avail}(e,u)=\vec w_e(u)[\mathrm{own}]-\vec w_e(u)[\mathrm{onloan}]+\vec
+w_e(u)[\mathrm{borr}]$, computed on read from three stored coordinates and never stored,
+hence not violable. (\S\ref{sec:sbl-invariants}, Invariant~\ref{inv:P20}.)
+\item \textbf{SBL narrows without relaxing (P11--P19).} Paired legs (P11), on-loan
+consistency (P12), collateral sufficiency (P13), locate before short (P14), partial-return
+monotonicity (P15), and lender ownership invariance under title transfer (P18, by
+construction---lending writes \emph{onloan}, never the lender's \emph{own}) narrow the
+valid states. (\S\ref{sec:sbl-invariants}.)
+\item \textbf{Obligation liveness (P21).} For every obligation $o$ with deadline $t_d$:
+$\forall t>t_d,\ o.\mathit{state}\in\{\textsc{Discharged},\textsc{Compensated},\textsc{Defaulted}\}$;
+none persists in \textsc{Pending} or \textsc{Attempted} past its deadline.
+(\S\ref{sec:obligation-invariants}, Invariant~\ref{inv:P21}.)
+\item \textbf{Obligation conservation (P22).} Every discharging and every compensating move
+set satisfies $Q(u)=0$; the mechanism does not bypass the executor. Follows from P1.
+(\S\ref{sec:obligation-invariants}, Invariant~\ref{inv:P22}.)
+\item \textbf{Obligation idempotency (P23).} Discharging the same obligation twice by
+$o.\mathit{id}$ has no incremental effect; it composes with P5 and P6.
+(\S\ref{sec:obligation-invariants}, Invariant~\ref{inv:P23}.)
+\end{itemize}

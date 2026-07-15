@@ -1,0 +1,26 @@
+\subsection*{Key Invariants and Consequences}
+
+Valuation and lifecycle processing are projections of state; the following hold once
+conservation is granted. Each is catalogued in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{State-sufficiency.} Portfolio value depends only on current state---wallet
+balances, unit state (including embedded lifecycle state), and the current price
+vector---not on transaction history. Valuation is the linear functional
+$V_t=\sum_u w_t(u)\,P_t(u)$. (\S\ref{sec:valuation}.)
+\item \textbf{PnL path-independence (P10).} $\mathrm{PnL}=V_{t_1}-V_{t_0}$, independent of
+the intermediate transactions. Dual valuation applies two price vectors to one state.
+(\S\ref{sec:valuation}, Theorem~\ref{inv:P10}.)
+\item \textbf{Lifecycle value invariance.} Across deterministic lifecycle
+events---coupons, dividends, resets, redemptions---total value under a given price vector
+is invariant: the instrument's price jump is offset by the explicit cash move. Under
+optionality the invariance holds for intrinsic value only. (\S\ref{sec:intro}; \S7.)
+\item \textbf{Contracts as move generators.} A smart contract is a deterministic program
+emitting sequences of moves; because every lifecycle effect is a move, conservation P1 is
+preserved with no separate validation. (\S6.)
+\item \textbf{Lifecycle idempotency (P6).} Applying the same lifecycle event to the same
+unit state produces no additional moves. (\S8, Invariant~\ref{inv:P6}.)
+\item \textbf{Lifecycle purity (P9).} For fixed inputs, lifecycle functions produce
+identical outputs and no effect beyond the return, so valuation and time travel are
+deterministic. (\S8.)
+\end{itemize}

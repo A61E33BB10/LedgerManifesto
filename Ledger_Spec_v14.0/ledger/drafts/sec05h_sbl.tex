@@ -1,0 +1,182 @@
+\section{Securities Lending in Brief}\label{sec:tour-sbl}
+
+Every stop so far kept one thing fixed: a position is a signed number per unit, and
+ownership \emph{is} that number. Securities lending is the one business that breaks the
+assumption, because it separates ownership from possession --- a lender still owns
+shares that are physically in someone else's hands. This last stop shows the ledger
+absorbing that not by adding a new architecture, but by widening one coordinate.
+
+This stop works the same firm's September special dividend --- the \EUR{2} distribution
+the option stop already met --- through a book that holds 1{,}000 ACME shares with 400
+of them out on loan. A loan is opened before the dividend and recalled after. A scalar
+balance can no longer describe the book: it must show that it still owns 1{,}000 shares
+for the purpose of profit and loss, while only 600 are available to sell. So the balance
+generalises from a scalar to a vector of coordinates, per holder and unit --- one
+coordinate for each distinct custody state a share can be in. There are five:
+
+\[
+  \vec{w} = (\ \text{own},\ \text{on-loan},\ \text{borrowed},\ \text{collateral-posted},\
+  \text{collateral-received}\ ).
+\]
+
+Each coordinate passes a physical-action test --- a distinct action moves it and only it
+--- and only \emph{own} carries economic value and drives profit and loss. The list is
+open at the same seam it is closed: a deployment that permits re-pledging received
+collateral adds a \emph{rehypothecated} coordinate the same way, one physical action
+moving one coordinate, and this stop does not, so five suffice. Available inventory is
+not a stored number at all; it is a projection, computed on read as
+$\text{avail} = \text{own} - \text{on-loan} + \text{borrowed}$, so it cannot drift out
+of step with the coordinates it is derived from. When ownership and possession
+coincide, on-loan and borrowed are zero, avail equals own, and the vector degenerates
+back to the scalar of every earlier stop.
+
+Two other events sit at the edges of the loan. A \emph{locate}, the confirmation a
+borrower obtains before selling short, enters as a pre-trade check: a stamped
+confirmation admitted before the sale, not a balance change. And each loan is its own
+unit, carrying its own fee, collateral, and reporting --- so a loan is a first-class
+thing in the log, not an annotation on a share balance. The fee is not a figure kept on
+the side: it \emph{accrues} over the loan's life, a daily fee on the on-loan
+notional booked as periodic cash moves on the loan unit, so the lender's fee income is
+itself a fold of recorded moves and reconciles by construction.
+
+\subsection{A loan, opened and recalled}
+
+Opening the loan is one atomic transaction, and the rule that keeps the vector
+consistent is the single-coordinate move principle: one atomic move writes exactly one
+coordinate of one unit, the \emph{same} coordinate at both of its endpoints --- it
+subtracts a quantity from that coordinate at the source wallet and adds the identical
+quantity to that coordinate at the destination ($\text{src}[c] \mathrel{-}= q$,
+$\text{dst}[c] \mathrel{+}= q$). An operation that must change several coordinates is not
+one move but a \emph{transaction}: a list of single-coordinate moves, admitted
+all-or-nothing. The open is such a transaction, of three moves.
+
+Two carry the share leg, and each writes its own coordinate against a contra in the
+loan's per-relationship virtual wallet. The first marks the book's \emph{on-loan} up by
+400 --- $\text{Book.onloan} \mathrel{+}= 400$ against $\text{Virtual.onloan} \mathrel{-}=
+400$ --- recording that 400 of the book's shares are now owned-but-lent. The second
+records the borrower's possession --- $\text{Borrower.borrowed} \mathrel{+}= 400$ against
+$\text{Virtual.borrowed} \mathrel{-}= 400$. The virtual wallet thus carries a contra on
+\emph{every} coordinate the transaction writes, which is exactly why the per-unit sum
+closes; a lone contra discharging only one of the two coordinates would leave the ledger
+400 shares short of balancing. Through both moves the book's \emph{own} is never written
+and stays at 1{,}000, and the standing custodian leg that holds the book's shares at
+$-1{,}000$ is likewise untouched. The third move is the collateral. Here the collateral
+is cash, and cash is value on the \emph{own} coordinate: the move is
+$\text{Borrower.own} \mathrel{-}= \EUR{21{,}000}$, $\text{Book.own} \mathrel{+}=
+\EUR{21{,}000}$ on the cash unit --- 400 shares marked at the post-split \EUR{50} is
+\EUR{20{,}000} of exposure, and a 105\% margin posts \EUR{21{,}000}. It is a single move
+on one coordinate, like any cash transfer. The \emph{collateral-posted},
+\emph{collateral-received}, and, where a deployment re-pledges, \emph{rehypothecated}
+coordinates are named for the non-cash bilateral case, where the collateral is itself
+securities to be tracked in custody without being owned; cash collateral needs none of
+them, and the return obligation it creates is carried in the loan unit's own state.
+After the open:
+\[
+  \vec{w}_{\text{book}}(\text{ACME}) = (1{,}000,\ 400,\ 0,\ \dots), \qquad
+  \vec{w}_{\text{borrower}}(\text{ACME}) = (0,\ 0,\ 400,\ \dots).
+\]
+The book's available inventory is $1{,}000 - 400 + 0 = 600$; the borrower's is
+$0 - 0 + 400 = 400$. Crucially, \emph{no move wrote the book's own in ACME} --- it
+stands at 1{,}000 through the whole loan, so the book has not derecognised the shares
+and its profit and loss still reads on 1{,}000. That the lender's own is constant across
+lending is not a rule enforced after the fact; it holds by construction, because loan
+initiation writes on-loan and never own.
+
+Conservation holds here in exactly the sense it held for a plain share, and it is worth
+separating the three statements it comprises, because a lent position needs all three.
+
+\emph{Law A --- per-unit balance.} For each unit, the signed sum over \emph{all} slots
+that carry it --- the real wallets, the per-relationship virtual wallet, and the
+custodian contra --- is zero; equivalently, every transaction nets to zero per unit.
+This holds only because the virtual wallet carries a contra on every coordinate a move
+writes. Summing the ACME slots the loan touches:
+\[
+  \underbrace{1{,}000}_{\text{book own}} \; \underbrace{-\,1{,}000}_{\text{custodian}}
+  \; + \underbrace{400}_{\text{book on-loan}} \; \underbrace{-\,400}_{\text{virtual on-loan}}
+  \; + \underbrace{400}_{\text{borrower borrowed}} \; \underbrace{-\,400}_{\text{virtual borrowed}}
+  = 0.
+\]
+The two virtual contras, one per share coordinate, are what close the sum; drop either
+and the line fails to balance by 400.
+
+\emph{Law B --- physical conservation.} The shares physically possessed sum, across all
+parties, to the shares in issue --- a constant $N$, here 1{,}000, not zero. Possession is
+$\text{own} - \text{on-loan} + \text{borrowed} + \text{collateral-received}$, so a lent
+share is counted once, at the borrower who holds it, through the lender's minus: the
+book possesses $1{,}000 - 400 = 600$, the borrower $400$, and $600 + 400 = 1{,}000$. (The
+collateral-received term is zero here, where the collateral is cash; it carries the
+non-cash case, where securities held as collateral are possessed without being owned.)
+
+\emph{Law C --- own is constant.} The lender's \emph{own} is invariant across the loan by
+construction, because loan initiation writes \emph{on-loan} and never \emph{own}. This is
+the property just seen from the move list, stated as a law: it is why the book's profit
+and loss keeps reading on 1{,}000 shares for the whole life of the loan.
+\subsection{The special dividend, split by payer}
+
+The loan is open across ACME's September special dividend --- the same \EUR{2} per share
+distribution that, in the option stop, moved a written strike. A plain holding takes one
+dividend; a lent holding takes two, and the coordinate is what tells them apart. The
+book owns 1{,}000 shares, but only 600 are in its possession; the other 400 sit on loan,
+held by the borrower on the record date.
+
+The special dividend is a cash event --- no share moves, only cash on the \emph{own}
+coordinate --- and it resolves into three cash moves. On the 600 it possesses, the book
+receives the \emph{real} dividend, paid by ACME's paying agent:
+$600 \times 2 = \EUR{1{,}200}$, carrying a real dividend's tax character --- withholding
+and franking as the jurisdiction attaches them to a distribution from the company. On the
+400 on loan, ACME pays that same real dividend to whoever holds the shares on the record
+date --- the borrower, not the book: $400 \times 2 = \EUR{800}$ from the paying agent to
+the borrower. The book is not left short, because the loan obliges the borrower to pass
+it a \emph{manufactured} dividend of $400 \times 2 = \EUR{800}$, borrower to lender.
+
+This third leg is a different cash flow in every respect that matters. Its payer is the
+borrower, not the issuer; its tax character is a substitute payment rather than a
+distribution --- typically carrying no dividend withholding credit, and in many
+jurisdictions taxed as ordinary income rather than a qualified dividend in the lender's
+hands --- and it is booked on the \emph{on-loan} line, as its own unit and move, precisely
+because the on-loan coordinate is what records that these 400 shares are owned-but-lent
+and so owe a manufactured, not a real, dividend. Cash conserves across the three moves:
+the paying agent is out \EUR{2{,}000}, the book is up \EUR{2{,}000}, and the borrower
+nets zero --- it received \EUR{800} from the issuer and passed \EUR{800} on.
+
+The two legs sum to what ownership entitles the book to: $\EUR{1{,}200}$ real plus
+$\EUR{800}$ manufactured is $\EUR{2{,}000}$, exactly $\EUR{2} \times 1{,}000$, because
+\emph{own} stayed at 1{,}000 through the loan and \emph{own} is what drives profit and
+loss. What the loan changed is not how much the book earns but who pays it and in what
+character --- and that distinction rides on the coordinate, never smuggled into one
+dividend number. A scalar balance could not have told the real \EUR{1{,}200} from the
+manufactured \EUR{800}; the vector does, because the on-loan coordinate was there to
+carry the difference.
+
+\subsection{Recall, with a deadline}
+
+The recall is not an instantaneous mirror image but a dated obligation, and it generates
+no moves at all: it is a notification that flips the loan from \emph{active} to
+\emph{recalled} and registers the obligation object the framework already carries. A
+recall sets a return deadline; the borrower returning the shares before that deadline is
+the discharge, and if the deadline passes with the shares not back, the lender's
+\emph{buy-in} --- purchasing them in the market and charging the borrower the cost --- is
+the compensation path. A deadline, a discharge predicate, a compensation action, and one
+of its terminal states reached by the deadline: this is the obligation object of the
+framework, applied to a loan rather than a coupon. The coordinate mirror fires on the
+return that settles the recall, not on the recall notice itself.
+
+When the return does complete, it is the mirror of the open, move for move:
+$\text{Borrower.borrowed} \mathrel{-}= 400$ against $\text{Virtual.borrowed} \mathrel{+}=
+400$; $\text{Book.onloan} \mathrel{-}= 400$ against $\text{Virtual.onloan} \mathrel{+}=
+400$; and the \EUR{21{,}000} of cash collateral returns on the \emph{own} coordinate,
+$\text{Book.own} \mathrel{-}= \EUR{21{,}000}$, $\text{Borrower.own} \mathrel{+}=
+\EUR{21{,}000}$. Afterwards the book's ACME vector is $(1{,}000, 0, 0, \dots)$ and its
+available inventory is back to 1{,}000; the borrower's line returns to the zero vector;
+the cash collateral is released in full. The available projection moved
+$1{,}000 \to 600 \to 1{,}000$ with no stored value that could fall out of step, because
+it was a fold of the moves the whole time.
+
+Nothing else changed. The door is the same door, the checks are the same checks, and
+the lender's and borrower's differing views of the loan are two folds of the one log,
+not two records to reconcile. \emph{Securities lending is accommodated by generalising
+the coordinate, not the architecture --- the same door, the same conservation, and views
+as folds of the same log carry the position and entitlement mechanics of a loan:
+ownership held while possession moves, a dividend split by payer across the lent line,
+and a recall discharged or bought in against a deadline --- and they collapse back to the
+scalar the moment ownership and possession coincide again.}

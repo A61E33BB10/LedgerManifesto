@@ -1,0 +1,36 @@
+\begin{figure}[tb]
+\centering
+\begin{tikzpicture}[
+    >={Stealth[length=2.4mm]},
+    pan/.style={draw, rounded corners, align=center, font=\small,
+                minimum width=30mm, minimum height=14mm},
+  ]
+  % --- the one move, stated above the beam ---
+  \node[font=\small, align=center] at (0,2.6)
+    {one move $m$: transfer quantity $q$ of unit $u$ from $A$ to $B$};
+  \draw[->] (-2.3,2.0) -- node[above, font=\scriptsize]{$q$} (2.3,2.0);
+
+  % --- balance beam, level: the two entries are equal and opposite ---
+  \fill[gray!25] (-0.45,0) -- (0.45,0) -- (0,0.95) -- cycle;
+  \draw          (-0.45,0) -- (0.45,0) -- (0,0.95) -- cycle;
+  \draw[very thick] (-4,0.95) -- (4,0.95);
+  \draw (-3.3,0.95) -- (-3.3,0.35);
+  \draw ( 3.3,0.95) -- ( 3.3,0.35);
+
+  % --- the two equal and opposite entries ---
+  \node[pan] (a) at (-3.3,-0.45)
+    {wallet $A$ (debit)\\[2pt]$w_A(u)\mathrel{-}=q$\\[2pt]entry $-q$};
+  \node[pan] (b) at ( 3.3,-0.45)
+    {wallet $B$ (credit)\\[2pt]$w_B(u)\mathrel{+}=q$\\[2pt]entry $+q$};
+
+  % --- the sum ---
+  \node[font=\small, align=center] at (0,-1.9)
+    {$(-q) + (+q) = 0$\quad(quantities of unit $u$)};
+\end{tikzpicture}
+\caption{Conservation of quantity, per unit $u$. A move records two equal and opposite
+entries---a debit of $q$ in wallet $A$ and a credit of $q$ in wallet $B$---which sum to
+zero, so $\sum_{w} w(u) = 0$ holds for every unit. What is conserved is \emph{quantity},
+not market value: prices move and so does value, and across optionality value is not
+conserved (\S\ref{sec:intro}). The beam weighs units, not money.}
+\label{fig:conservation}
+\end{figure}

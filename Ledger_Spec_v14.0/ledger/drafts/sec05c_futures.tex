@@ -1,0 +1,104 @@
+\section{Listed Futures Daily Settlement}\label{sec:tour-futures}
+
+A listed future behaves unlike the others: it settles every day, it posts
+variation margin, and desks run whole engines to manage that margin. This stop shows
+that daily settlement needs no engine of its own. It is a scheduled trigger producing
+ordinary conserving moves, and the margin that looks like special machinery is just
+those moves summing to zero.
+
+The contract is a real one, and it is dollar-denominated, so the tour states it as
+such rather than forcing it into euros: ES-FUT, a cash-settled equity-index future,
+contract multiplier 50, quoted in USD. Three traders, A, B, and C, and a
+clearinghouse hub CH stand behind them. Two rules run the whole life:
+
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{A trade of $\Delta$ contracts at price $p$} adds $-\Delta \cdot p \cdot
+50$ to the accumulated cost $ac$ of each side.
+\item \textbf{A settle at price $S$} pays each holder variation margin $VM(w) =
+\mathit{netq}(w) \cdot S \cdot 50 + ac(w)$, then resets $ac(w) \leftarrow
+-\mathit{netq}(w) \cdot S \cdot 50$.
+\end{itemize}
+
+The daily settle mark $S$ is not a number the ledger forms. It enters as an externally
+sourced observation carrying its basis, and it is consumed under single-basis
+consumption: the mark and the positions it is multiplied against must stand in one
+frame, exactly as the split stop required.
+
+\subsection{The life of the contract}
+
+Table~\ref{tab:futures-life} is the whole life, in position ($\mathit{netq}$),
+accumulated cost ($ac$), and the variation-margin cash each settle pays, for
+$(A, B, C)$.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Step & Event & $\mathit{netq}$ & $ac$ (USD) & VM cash (USD) \\
+\midrule
+T1        & A buys 10 from B @100 & $(10,-10,0)$ & $(-50{,}000,\ +50{,}000,\ 0)$ & --- \\
+Settle d1 & $S_1 = 102$           & $(10,-10,0)$ & $(-51{,}000,\ +51{,}000,\ 0)$ & $(+1{,}000,\ -1{,}000,\ 0)$ \\
+T2        & C buys 4 from A @103  & $(6,-10,4)$  & $(-30{,}400,\ +51{,}000,\ -20{,}600)$ & --- \\
+Settle d2 & $S_2 = 101$           & $(6,-10,4)$  & $(-30{,}300,\ +50{,}500,\ -20{,}200)$ & $(-100,\ +500,\ -400)$ \\
+T3        & B buys 4 from C @101  & $(6,-6,0)$   & $(-30{,}300,\ +30{,}300,\ 0)$ & --- \\
+Expiry    & final $S = 105$       & $(6,-6,0)$   & $(-31{,}500,\ +31{,}500,\ 0)$ & $(+1{,}200,\ -1{,}200,\ 0)$ \\
+\bottomrule
+\end{tabular}
+\caption{ES-FUT over its life. Each settle is a scheduled trigger; variation margin is
+the cash the settle contract moves.}
+\label{tab:futures-life}
+\end{table}
+
+Two of the numbers repay a moment. Day 1 is the easy case: A is long 10 into a mark
+that rose from 100 to 102, and collects $10 \times 102 \times 50 - 50{,}000 =
+\text{USD}~1{,}000$, which B pays. Day 2 looks harder, because A traded intraday. A
+sold 4 contracts to C at 103 before the mark fell to 101, and A's day-2 margin is
+$6 \times 101 \times 50 - 30{,}400 = -\text{USD}~100$ --- not the naive
+$6 \times (101 - 102) \times 50 = -300$ a per-position mark-to-mark would give. The
+difference is the \text{USD}~200 A realised selling 4 contracts at 103 into a prior
+mark of 102, and the accumulated cost carried it correctly, because $ac$ is a stored,
+conserved field and not a re-derivation each day.
+
+\subsection{Margin is just conservation}
+
+The point of the table is the last column. At every settle the variation margin sums
+to zero across the holders: $+1{,}000 - 1{,}000 = 0$; $-100 + 500 - 400 = 0$;
+$+1{,}200 - 1{,}200 = 0$. This is not a reconciliation the ledger performs after the
+fact. It is the same fact as accumulated-cost conservation, $\sum_w \Delta ac = 0$,
+which holds because every settle is built from moves and a move is a transfer:
+whatever leaves one wallet enters another. The clearinghouse leg is the residual that
+balances the holders' legs, and here, with every holder inside the ledger, that
+residual is zero each day. Position conservation, $\sum \mathit{netq} = 0$, holds at
+every step for the same reason.
+
+Because each settle is keyed by (unit, settlement date), a settle that fires twice ---
+a processor retried after a crash, a timer that fired late --- commits once. And the
+zero-sum closes over the whole life, not just each day. Cumulative margin is
+$A = +2{,}100$, $B = -1{,}700$, $C = -400$, and $2{,}100 - 1{,}700 - 400 = 0$: the
+contract's entire economic history is a single conserved stream, checkable end to end.
+A's \text{USD}~2{,}100 is exactly $[\,4 \times (103 - 100) + 6 \times (105 - 100)\,]
+\times 50$ --- what A made on the 4 contracts sold at 103 and the 6 carried to expiry
+at 105 --- so the running margin and the closed-form profit agree to the cent.
+
+One margin lives outside this picture, and the stop should say so plainly. Initial
+margin --- the portfolio or SPAN amount a clearinghouse holds against future moves ---
+is gross, not zero-sum: every member posts it to the clearinghouse and no member's
+posting offsets another's, so it is not a conserved transfer among the holders and does
+not belong to the variation-margin stream this table records. It is a collateral
+position posted to the clearinghouse, booked like any other collateral through the same
+door, and its sizing is a risk model's output the ledger records but never forms. The
+zero-sum here is a statement about \emph{variation} margin --- the daily cash the mark
+moves between holders --- and about nothing else.
+
+The arithmetic never divides. A settle multiplies $\mathit{netq} \cdot S \cdot m$ and
+nothing else --- prices are never added to prices, only multiplied by an integer
+position and an integer multiplier --- so there is no place for a rounding error to
+enter and accumulate. The ES mark ticks in quarter-points, and a quarter-point on a
+multiplier of 50 is an exact $\text{USD}~12.50$, so even the finest price increment
+lands on a whole number of cents and the zero-sum holds to the cent at any scale.
+\emph{Variation margin is ordinary conserved transactions keyed per settlement day ---
+there is no privileged \emph{variation-margin} engine inside the ledger; the same door
+and the same log that carry a share purchase carry a cleared future's entire
+variation-margin life, while initial margin sits outside as a posted collateral
+position.}

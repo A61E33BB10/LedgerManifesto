@@ -1,0 +1,137 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- encoding + clean PDF text extraction (ligature fix, proven) ---
+\usepackage{cmap}                 % must precede fontenc
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}              % must follow fontenc
+\input{glyphtounicode}\pdfgentounicode=1
+% small-caps has no italic shape in Computer Modern; substitute upright small-caps
+% silently (renders identically) so \textsc inside italic theorem/formula contexts
+% raises no font-substitution warning. Deferred so the lmodern family is declared first.
+\AtBeginDocument{%
+  \DeclareFontShape{T1}{lmr}{m}{scit}{<->ssub*lmr/m/sc}{}%
+  \DeclareFontShape{T1}{lmr}{bx}{scit}{<->ssub*lmr/bx/sc}{}%
+}
+
+% --- math, tables, code, graphics ---
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{textcomp}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
+\usepackage[hidelinks]{hyperref}
+
+\geometry{margin=1in}
+\setcounter{tocdepth}{2}
+% last-resort stretch so tough paragraphs (long typewriter identifier runs) break
+% without running into the margin, instead of an overfull box.
+\setlength{\emergencystretch}{3em}
+\newcommand{\EUR}[1]{\texteuro#1}
+
+% --- theorem-like environments ---
+\newtheorem{definition}{Definition}[section]
+\newtheorem{principle}[definition]{Principle}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{invariant}[definition]{Invariant}
+\newtheorem{remark}[definition]{Remark}
+
+% --- Haskell listings ---
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=2em,
+  aboveskip=0.5em,
+  belowskip=0.5em,
+  language=Haskell,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\title{The Ledger: A Closed-System Framework for Financial Settlement\\[6pt]
+\large Unified Design Specification: Architecture, Lifecycle, and CDM Integration}
+\author{R.\ Delloye}
+\date{June 2026 --- v11.0}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Within its scope, the post-trade activity addressed by this framework reduces to one operation: the
+atomic move of a quantity between wallets. From this single primitive the Ledger builds a unified system
+in which financial instruments---equities, bonds, derivatives, swaps, managed accounts, Quantitative
+Investment Strategies, listed futures---are deterministic contracts that emit sequences of moves. One law
+governs the system: conservation, which holds by construction. From it follow path-independent profit and
+loss, complete time travel over an immutable event log, and idempotent lifecycle processing through pure
+functions, and several classes of internal reconciliation failure become structurally unreachable. Unit
+state lives in three homes---immutable \texttt{ProductTerms}, the shared \texttt{UnitStatus}, and
+per-position \texttt{PositionState}; \texttt{UnitStatus} is a materialised projection of the event log,
+not an authoritative mutable store. The scalar balance suffices for buy/sell/exercise workflows; for
+securities lending it extends to a six-coordinate position vector. Throughout, the design is illustrated
+in Haskell, with types chosen so that illegal states are unrepresentable. This design
+specification presents the three-home state model, the \texttt{UnitStatus} characterisation,
+the futures lifecycle, and the managed-account workflow as one self-contained whole.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+%==============================================================================
+% BODY
+%==============================================================================
+\input{drafts/sec01}
+\input{drafts/sec02}
+\input{drafts/sec03}
+\input{drafts/sec04}
+\input{drafts/sec05}
+\input{drafts/sec06}
+\input{drafts/sec07}
+\input{drafts/sec08}
+\input{drafts/sec09}
+\input{drafts/sec10}
+\input{drafts/sec11}
+\input{drafts/sec12}
+\input{drafts/sec13}
+\input{drafts/sec14}
+\input{drafts/sec15}
+\input{drafts/sec16}
+\input{drafts/sec17}
+\input{drafts/sec18}
+\input{drafts/sec19}
+\input{drafts/sec20}
+
+%==============================================================================
+% APPENDICES
+%==============================================================================
+\appendix
+\input{drafts/appA}
+\input{drafts/appB}
+\input{drafts/appC}
+\input{drafts/appD}
+\input{drafts/appE}
+\input{drafts/appF}
+\input{drafts/appG}
+\input{drafts/appH}
+\input{drafts/appI}
+
+%==============================================================================
+% REFERENCES (only the externally-cited regulatory sources; other external
+% mentions are pinned inline as footnotes in house style)
+%==============================================================================
+\begin{thebibliography}{9}
+\bibitem{isla-ibp} International Securities Lending Association, ``ISLA Best Practice Handbook,'' various editions.
+\bibitem{sec15c33} U.S.\ Securities and Exchange Commission, ``Rule 15c3-3: Customer Protection---Reserves and Custody of Securities,'' 17~CFR \S240.15c3-3.
+\bibitem{regsho} U.S.\ Securities and Exchange Commission, ``Regulation SHO, Rule 203(b)(1): Locate Requirement,'' 17~CFR \S242.203(b)(1).
+\bibitem{sec10c1a} U.S.\ Securities and Exchange Commission, ``Rule 10c-1a: Reporting of Securities Loans,'' 17~CFR \S240.10c-1a, adopted January 2024.
+\bibitem{finra6500} Financial Industry Regulatory Authority, ``FINRA Rule 6500 Series: Securities Lending and Transparency Engine (SLATE),'' 2024.
+\end{thebibliography}
+
+\end{document}

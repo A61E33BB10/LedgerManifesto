@@ -1,0 +1,76 @@
+\section{A Dividend Forecast as a Two-Component Datum}\label{sec:tour-forecast}
+
+The split stop showed a single number --- a price --- crossing a boundary. This stop
+shows why the ledger insists that an observation declare a dimension for each of its
+parts, rather than arriving as one number under one name. A dividend forecast on ACME
+is the example, because its two parts react differently to the very same split.
+
+\subsection{One datum, two components}
+
+That same June, a data authority stamps a dividend forecast on ACME. It is not one
+number. It has two components, and the datum-kind registry required both to be
+declared, with a dimension each, before any forecast of this kind could enter the
+log:
+
+\begin{itemize}[leftmargin=1.5em]
+\item a \textbf{cash-per-share} component of \EUR{3.00}, declared with dimension
+\emph{price} --- it is quoted in the share's own price basis;
+\item a \textbf{proportional} component of $1\%$ of price, declared
+\emph{dimensionless} --- it is a ratio, carrying no basis of its own.
+\end{itemize}
+
+A forecast settles nothing --- it is an estimate, and cash pays only off the declared
+dividend terms at the ex and pay dates. What a forecast feeds is a \emph{valuation}: a
+dividend-swap or forward mark reads a theoretical figure off it. Against a holding of
+1{,}000 shares at \EUR{100}, the two components contribute
+$1{,}000 \times 3 = \EUR{3{,}000}$ from the cash part and
+$1\% \times 100 \times 1{,}000 = \EUR{1{,}000}$ from the proportional part to that
+mark. So far nothing forces the components apart. The split does.
+
+The two-for-one split declares \texttt{Scale 2}, and the read seam applies it to the
+forecast when the forecast is next read in the post-split frame. But it applies to
+each component by that component's own declared dimension, not to the datum as a
+lump. The cash-per-share component is a price, so it maps $p \mapsto (p - c)/f$ with
+$c = 0$: \EUR{3.00} halves to \EUR{1.50}. The proportional component is
+dimensionless, so it stands: $1\%$ stays $1\%$. And both contributions are exactly
+invariant, which is the whole point of splitting the datum in two:
+\[
+  1{,}000 \times 3 = 2{,}000 \times 1.50 = \EUR{3{,}000}, \qquad
+  1\% \times 100 \times 1{,}000 = 1\% \times 50 \times 2{,}000 = \EUR{1{,}000}.
+\]
+The dividend value the forecast carries did not change when ACME split; only its
+per-share expression did, and it changed correctly because each component reacted by
+the dimension it was declared under.
+
+\subsection{One wrong word, half the money}
+
+Now suppose the proportional component had been declared wrong --- registered as a
+\emph{price} instead of dimensionless. Under \texttt{Scale 2} a price halves, so the
+$1\%$ would be taken to $0.5\%$, and the component would contribute
+$0.5\% \times 50 \times 2{,}000 = \EUR{500}$ to the mark where the correct figure is
+\EUR{1{,}000}. Nothing settles off this --- a forecast pays no cash --- so the damage is
+not a wrong payment but a corrupted \emph{valuation}: the position would be marked
+\EUR{500} light on that leg against the correct \EUR{1{,}000}, half the datum's
+contribution lost to a single wrong word in a declaration. And nothing downstream would
+look wrong, because a mark is a well-formed number that no conservation check disputes.
+This is why every registry entry must carry an invariance witness: a check that replays
+a scale boundary against the declared dimensions and refuses the entry if a component's
+declared dimension does not survive it. The dividend-forecast kind carries exactly such
+a witness, and it fails the mis-declared variant at registration, before any forecast
+of that kind can be stamped --- before the mis-typed component can enter any view. The
+declaration is a trust assumption, and the witness checks exactly what it can:
+dimensional consistency --- that each component's declared dimension satisfies the
+invariance identity under a replayed scale --- not whether the forecast's numbers are
+true. Whether \EUR{3.00} is the right estimate is not the witness's question, and it is
+never claimed to be.
+
+A forecast is a model's output --- some team's estimate of a future payment. What
+matters for the ledger is that the estimate does not cross the door as an authoritative
+number to be interpreted. It crosses as a stamped observation of a \emph{registered
+kind}, whose components carry declared dimensions the ledger already knows how to
+transport. A kind that was never registered is simply unconsumable: the door refuses
+it, returns the payload with the refusal, and admits nothing. \emph{A forecast enters as a stamped
+observation of a registered kind with a dimension per component, never as a model
+number the ledger must trust; an unregistered kind cannot be consumed at all, and a
+mis-declared one is caught by the kind's own witness before it can mark the position
+half light.}

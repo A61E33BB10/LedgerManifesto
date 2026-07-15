@@ -1,0 +1,459 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\ac}{\texttt{ac}}
+\newcommand{\netq}{\mathrm{net\_qty}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\unit}{u_{F}}
+\newcommand{\mult}{m}
+
+\title{The Lifecycle of a Listed Future}
+\author{The Ledger --- companion to \code{FutureLifeCycle.hs}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent A listed future is recorded, traded, settled daily for variation margin, expired, and flattened to
+zero within the three-map state model of the StatesHome addendum (\S4.1) over the move and
+conservation primitives of v10.3. Each step is one atomic \code{StateDelta}; conservation is shown
+at each, not asserted. The variation-margin settlement is the centrepiece: one event that writes the
+shared settlement price once and fans out over the current holders, resetting each accumulated cost
+and moving cash. One worked example --- one cash-settled future, multiplier $50$, wallets A, B, C
+--- runs the whole life through the terminal Close, which flattens every position to $(0,0,0)$. The
+reference implementation is \code{FutureLifeCycle.hs}, whose \code{main} computes these figures
+through Close; this document reproduces them exactly in prose and writes no Haskell.
+\end{abstract}
+
+%==============================================================================
+\section{Scope and primitives recalled}
+%==============================================================================
+
+The framework primitives are those of v10.3 and are used here in silence: a \emph{wallet} $w$ holds
+signed quantities $h(w,u)$ of \emph{units} $u$; a \emph{move} transfers a positive quantity of one
+unit from a source wallet to a destination wallet, with semantics $w_s(u)\mathrel{-}=q$,
+$w_d(u)\mathrel{+}=q$; a \emph{transaction} is a finite set of simultaneous moves;
+\emph{conservation} is the invariant $\sum_{w}h(w,u)=0$ for every $u$, an algebraic consequence of
+the move pattern, not a runtime check. Write $\netq(w,u):=h(w,u)$ for the signed quantity of unit
+$u$ held by wallet $w$; the formulas below use $\netq$.
+
+State attaches to three objects, each with its own map and mutation discipline
+(addendum \S\ref{sec:answer-recalled}):
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Map & Key & Discipline \\
+\midrule
+\emph{ProductTerms}  & $u$            & immutable, append-only, versioned; registration-total \\
+\emph{UnitStatus}    & $u$            & mutable, shared across holders; registration-total \\
+\emph{PositionState} & $(w,u)$        & monotone carrier; \code{Option} accessor \\
+\bottomrule
+\end{tabular}
+\end{center}
+\label{sec:answer-recalled}
+
+\noindent For the future, the fields divide by who reads them and how often they change:
+
+\begin{center}\small
+\begin{tabular}{@{}p{6.6cm}p{3.0cm}p{5.4cm}@{}}
+\toprule
+Field & Home & Reason \\
+\midrule
+\code{multiplier}, \code{currency}, \code{expiry}, \code{clearinghouse}, \code{exchange},
+\code{product\_id} & \emph{ProductTerms}$[\unit]$ & immutable; the CME and ICE contracts are
+distinct units. \\
+\addlinespace
+\code{lifecycle\_stage}, \code{last\_settlement\_price}, \code{last\_settlement\_date} &
+\emph{UnitStatus}$[\unit]$ & one settlement price per contract, read identically by every holder. \\
+\addlinespace
+\code{accumulated\_cost} (\ac) & \emph{PositionState}$[w,\unit]$ & two wallets holding the same
+contract carry different \ac. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The accumulated cost \ac{} is a \emph{conserved} field: $\sum_w \ac(w,u)=0$ for every $u$,
+enforced one level up at the event handler (addendum C2), since a refinement type on a sum of exact
+integers is free in no production language.
+
+\paragraph{The atomic delta.} One event proposes one \code{StateDelta} for one unit across the three
+maps: at most one shared \code{Stage} write, a map of per-holder position deltas
+$(\Delta\netq,\Delta\ac)$, and a map of per-holder cash legs. It applies in full or not at all
+(C3); a partially applied delta is not representable. A delta reaches application only through
+\code{validate}, which discharges conservation --- $\sum_w\Delta f(w,u)=0$ for each conserved field
+--- and returns the abstract witness \code{ValidDelta}. An unconserved delta cannot be applied.
+
+\paragraph{The single dimension bridge.} Contracts, money, and price are distinct types
+(\code{Qty}, \code{Cash}, \code{Price}). The only multiplication in the lifecycle,
+\[
+\mathrm{markValue}(\netq, S, \mult) \;=\; \netq \cdot S \cdot \mult \;:\; \code{Cash},
+\]
+converts contracts at a price into money. \code{Price} carries no addition: two prices are never
+summed, nor moved between wallets. This makes the load-bearing identity
+$\mathrm{VM}=\netq\cdot S\cdot\mult+\ac$ typecheck only because both summands are \code{Cash}.
+\code{Price} and \code{Cash} share one fixed minor-unit scale, chosen so that $\netq\cdot S\cdot\mult$
+lands in \code{Cash}'s unit. The worked example carries \code{Price} in whole index points and
+\code{Cash} in whole dollars for readability; a production scale carries \code{Price} in scaled minor
+units --- a quarter-point for ES, a cent for a bond quoted in 32nds --- so sub-point ticks are exact.
+The arithmetic is integer throughout and never divides, so the scale is free to fix and no rounding can
+break conservation at any scale.
+
+%==============================================================================
+\section{The instrument and the worked example}
+%==============================================================================
+
+One cash-settled listed future $\unit=\code{ES-FUT}$, with
+\[
+\mult=50,\quad \code{currency}=\text{USD},\quad \code{expiry}=\text{Day }3,\quad
+\code{clearinghouse}=\text{CME-CH},\quad \code{exchange}=\text{CME}.
+\]
+Wallets A, B, C are traders; CH is the clearinghouse virtual wallet --- the variation-margin settlement
+hub, whose cash leg is the residual that balances the holders' legs. CH stands in for the clearinghouse
+as a settlement hub, not as a \emph{novating} central counterparty: faithful novation would interpose CH
+on the \emph{contract} leg of every trade ($A\,{+}q\,/\,\text{CH}\,{-}q$ and $\text{CH}\,{+}q\,/\,B\,{-}q$),
+so the two cleared sides never face each other. The clearing infrastructure itself is out of scope; here
+CH carries only the variation-margin cash residual. Two rules govern every figure below:
+
+\begin{itemize}
+\item \textbf{Trade.} For a signed-quantity change $\Delta$ at price $p$, each leg sets
+$\ac \mathrel{+}= -\,\Delta\cdot p\cdot \mult$.
+\item \textbf{Settlement.} At price $S$, the per-holder variation margin is
+$\mathrm{VM}(w)=\netq(w)\cdot S\cdot \mult + \ac(w)$ (cash, routed through CH); then
+$\ac(w)\leftarrow -\,\netq(w)\cdot S\cdot \mult$.
+\end{itemize}
+
+\noindent The whole life, with $\netq$, \ac, and the per-step variation-margin cash for $(A,B,C)$:
+
+\begin{center}\small
+\begin{longtable}{@{}llrrr@{}}
+\toprule
+Step & Event & $\netq$ (A,B,C) & \ac{} (A,B,C) & VM cash (A,B,C) \\
+\midrule
+\endhead
+Listing    & $\unit$ registered; stage \code{REGISTERED}, no mark; no rows & $(0,0,0)$ & $(-,-,-)$ & $-$ \\
+T1         & A buys 10 from B @100                       & $(10,-10,0)$ & $(-50000,+50000,0)$ & $-$ \\
+Settle d1  & $S_1=102$; shared price $\leftarrow 102$    & $(10,-10,0)$ & $(-51000,+51000,0)$ & $(+1000,-1000,0)$ \\
+T2         & C buys 4 from A @103                        & $(6,-10,4)$  & $(-30400,+51000,-20600)$ & $-$ \\
+Settle d2  & $S_2=101$; shared price $\leftarrow 101$    & $(6,-10,4)$  & $(-30300,+50500,-20200)$ & $(-100,+500,-400)$ \\
+T3         & B buys 4 from C @101 (C $\to$ flat)         & $(6,-6,0)$   & $(-30300,+30300,0)$ & $-$ \\
+Expiry     & stage $\to$ \code{EXPIRED}; final $S=105$   & $(6,-6,0)$   & $(-31500,+31500,0)$ & $(+1200,-1200,0)$ \\
+Close      & units returned to CH; positions $\to 0$     & $(0,0,0)$    & $(0,0,0)$ & $-$ \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\noindent The sections below walk this table in the order the events occur. Each event is one
+\code{StateDelta}; each shows the three conservation sums $\sum\Delta\netq$, $\sum\Delta\ac$,
+$\sum\mathrm{VM}$. The example is the argument; the prose names the mechanism.
+
+%==============================================================================
+\section{Listing}
+%==============================================================================
+
+Registration writes \emph{ProductTerms}$[\unit]$ (the six immutable terms above) and
+\emph{UnitStatus}$[\unit]$ together, establishing ``$u\in$ terms $\iff u\in$ status'' by
+construction (\code{register}). The status is initialised to stage \code{REGISTERED} with no
+settlement mark. No \emph{PositionState} row exists: $\code{position}(w,\unit)=\mathrm{None}$ for
+every $w$.
+
+\code{REGISTERED} denotes a unit recorded in and known to the ledger before any settlement, not
+admission to an exchange; an OTC option or an internal strategy reaches it identically. The two
+unreachable status states --- a never-traded unit carrying a price, an expired unit lacking a final
+mark --- are made unspellable by fusing the mark onto the stage:
+\[
+\code{Stage}=\code{Registered}\;\mid\;\code{Active}(\code{Maybe Settlement})\;\mid\;
+\code{Expired}\;\code{Settlement}.
+\]
+\code{Registered} carries no mark; \code{Expired} always carries one. The addendum's
+\code{last\_settlement\_price} and \code{last\_settlement\_date} are projections of the
+\code{Settlement} carried by the stage, not independent fields. Conservation holds vacuously:
+no holders, so every sum is the empty sum, zero (C9). Re-registering an existing unit id is a hard
+error, never a silent reset (C10).
+
+%==============================================================================
+\section{First trade}
+%==============================================================================
+
+A buys 10 contracts from B at 100. The trade emits one \code{StateDelta}:
+
+\begin{itemize}
+\item \textbf{Shared.} \code{REGISTERED} $\to$ \code{ACTIVE} with no mark
+(\code{Active Nothing}); the first trade activates the unit. Any existing settlement mark would be
+preserved --- a trade never wipes the shared price.
+\item \textbf{Per-position.} The contract quantity moves from seller to buyer:
+$\Delta\netq(A)=+10$, $\Delta\netq(B)=-10$. Each leg sets $\ac\mathrel{+}=-\Delta\cdot p\cdot\mult$:
+\[
+\Delta\ac(A) = -(+10)\cdot 100\cdot 50 = -50000,\qquad
+\Delta\ac(B) = -(-10)\cdot 100\cdot 50 = +50000.
+\]
+\item \textbf{Cash.} None: entering a futures position pays no notional.
+\end{itemize}
+
+\noindent Conservation:
+$\sum\Delta\netq = +10-10 = 0$, $\sum\Delta\ac = -50000+50000 = 0$, $\sum\mathrm{VM}=0$. State after
+T1: $\netq=(10,-10,0)$, $\ac=(-50000,+50000,0)$. A and B cross from $\mathrm{None}$ to
+$\mathrm{Some}$ on first touch; C is still $\mathrm{None}$.
+
+\paragraph{Positive quantity.} A trade leg carries a strictly positive quantity $q>0$, parsed at
+the boundary (\code{mkPosQty}); $q\le 0$ is rejected (\code{NonPositiveQty}) and never recorded.
+$q=0$ would promote \code{REGISTERED}$\to$\code{ACTIVE} and create $\mathrm{Some}$-flat rows for two
+never-held wallets, collapsing the never-held/held-flat distinction (\S\ref{sec:close}); $q<0$ would
+swap the buyer and seller roles, violating the move primitive's positivity. The sign of the position
+change is supplied by the leg --- buyer $+q$, seller $-q$ --- not by $q$.
+
+%==============================================================================
+\section{Daily variation-margin settlement: the mechanism and the clean case (day 1)}
+\label{sec:settle-mech}
+%==============================================================================
+
+Settlement at price $S$, multiplier $\mult$, over the current holders. For each holder the reset
+target is $\mathrm{target}=-\netq\cdot S\cdot\mult$, the row delta is
+$\Delta\ac=\mathrm{target}-\ac$, and the cash leg is
+\[
+\boxed{\;\mathrm{VM}(w) \;=\; -\,\Delta\ac(w) \;=\; \netq(w)\cdot S\cdot \mult + \ac(w)\;}
+\]
+This is the centrepiece identity. The cash leg is the mirror of the change in accumulated cost.
+Therefore $\sum_w\mathrm{VM} = -\sum_w\Delta\ac$, and variation-margin zero-sum is the \emph{same}
+fact as \ac{} conservation, not a separate reconciliation.
+
+Settlement is therefore one atomic \code{StateDelta} touching both layers:
+\begin{itemize}
+\item \textbf{Shared}, one write: \emph{UnitStatus}$[\unit]$ acquires the mark $(S,d)$. The
+\emph{coarse stage rank} --- $\code{REGISTERED}<\code{ACTIVE}<\code{EXPIRED}$ --- is unchanged by a
+settle: it stays \code{ACTIVE}. What updates every settle is the \emph{embedded mark}, the stage
+value becoming \code{Active (Just (Settlement $S$ $d$))}.
+\item \textbf{Per-position}, a fan-out over the current holders: each row's \ac{} is reset to
+$\mathrm{target}$, and each holder gets the cash leg $\mathrm{VM}(w)$.
+\end{itemize}
+
+\noindent The cash legs are emitted over the holders. The clearinghouse leg is the residual that
+balances them; since the holder legs already sum to zero, CH's leg is zero throughout this example
+and no CH cash row materialises. This is the special case of a \emph{closed} holder set $\{A,B,C\}$, in
+which $\sum_w\netq(w)=0$ at every step. In the Ledger's intended use --- an internal firm system of
+record facing an external clearinghouse --- the firm is generally \emph{not} flat: when
+$\sum_w\netq(w)\ne 0$ over the firm's holders, the CH leg is the firm's nonzero net variation margin,
+and that residual is exactly the boundary figure reconciled against the clearing broker's daily
+statement.
+
+\paragraph{Day 1: $S_1=102$.} The holders are A and B; C has no row and is untouched --- the contract
+settles vacuously over C, the shared price still updating (C9). With pre-settle
+$\ac=(-50000,+50000)$ on $(A,B)$ and $\netq=(10,-10)$:
+\[
+\mathrm{VM}(A) = 10\cdot 102\cdot 50 + (-50000) = 51000-50000 = +1000,
+\]
+\[
+\mathrm{VM}(B) = -10\cdot 102\cdot 50 + 50000 = -51000+50000 = -1000.
+\]
+The \ac{} reset: $\ac(A)\leftarrow -10\cdot 102\cdot 50 = -51000$,
+$\ac(B)\leftarrow +51000$. Conservation: $\sum\Delta\netq=0$ (no quantity moved),
+$\sum\Delta\ac = (-51000+50000)+(51000-50000)=0$, $\sum\mathrm{VM}=+1000-1000=0$. State:
+$\netq=(10,-10,0)$, $\ac=(-51000,+51000,0)$.
+
+%==============================================================================
+\section{A subsequent, intraday trade (day 2)}
+%==============================================================================
+
+C buys 4 contracts from A at 103, after the day-1 settle and before the day-2 settle --- A trades
+intraday. One \code{StateDelta}, stage already \code{Active} (mark preserved):
+\[
+\Delta\netq(C)=+4,\quad \Delta\netq(A)=-4;\qquad
+\Delta\ac(C) = -(+4)\cdot 103\cdot 50 = -20600,\quad
+\Delta\ac(A) = +20600.
+\]
+Conservation: $\sum\Delta\netq=+4-4=0$, $\sum\Delta\ac=-20600+20600=0$, $\sum\mathrm{VM}=0$
+(a trade moves no variation-margin cash). State after T2:
+$\netq=(6,-10,4)$, $\ac=(-51000+20600,\,+51000,\,-20600)=(-30400,+51000,-20600)$. C crosses from
+$\mathrm{None}$ to $\mathrm{Some}$ on first touch.
+
+%==============================================================================
+\section{Settlement under intraday trading (day 2): the anchor}
+\label{sec:anchor}
+%==============================================================================
+
+The day-2 settle at $S_2=101$ runs the same fan-out of \S\ref{sec:settle-mech} over holders A, B, C:
+\[
+\mathrm{VM}(A) = 6\cdot 101\cdot 50 + (-30400) = 30300-30400 = -100,
+\]
+\[
+\mathrm{VM}(B) = -10\cdot 101\cdot 50 + 51000 = -50500+51000 = +500,\qquad
+\mathrm{VM}(C) = 4\cdot 101\cdot 50 + (-20600) = 20200-20600 = -400.
+\]
+Conservation: $\sum\Delta\netq=0$ (no quantity moved), $\sum\mathrm{VM} = -100+500-400 = 0$. The \ac{} reset:
+$\ac\leftarrow(-30300,+50500,-20200)$ from $\ac\leftarrow -\netq\cdot 101\cdot 50$, and
+$\sum\Delta\ac=0$. State: $\netq=(6,-10,4)$, $\ac=(-30300,+50500,-20200)$.
+
+\paragraph{The load-bearing subtlety.} A's day-2 variation margin is $-100$, not the naive
+$\netq\cdot(S_2-S_1)\cdot\mult = 6\cdot(101-102)\cdot 50 = -300$. A sold 4 contracts at 103
+intraday, one point above the prior mark 102, gaining $4\cdot(+1)\cdot 50=+200$, which offsets the
+$-300$ mark loss on the held position. Only the stored per-wallet \ac, which absorbed the intraday
+trade, yields the correct $-100$. A price-derived model gives the wrong cash. This is why \ac{} is
+per-position stored state (C11), not a consequence read off the shared price.
+
+\paragraph{The three answers, stated plainly.}
+\begin{enumerate}
+\item \emph{Settlement is a state update; its parts split by layer.} The shared part ---
+\code{last\_settlement\_price}, \code{last\_settlement\_date} --- is one write on
+\emph{UnitStatus}$[\unit]$, one value per contract. The per-position part --- the \ac{} reset and
+the cash leg --- is a fan-out over the current holders on \emph{PositionState}$[w,\unit]$. The event
+touches both layers in one atomic \code{StateDelta}.
+\item \emph{It is one atomic event that fans out, not a derived consequence of the price.} The cash
+leg is real daily money moving between longs and shorts through CH; every cash move is a recorded,
+conservation-bearing event, so a per-holder pass is unavoidable. The \ac{} reset rides in the same
+atomic delta under the single-writer discipline. The fan-out is forced by the cash, not chosen for
+the bookkeeping.
+\item \emph{Price only in shared state, consequence only in per-wallet state.}
+\code{last\_settlement\_price} lives only in \emph{UnitStatus}$[\unit]$; its consequence --- the
+\ac{} reset and the variation-margin cash --- lives only in \emph{PositionState}$[w,\unit]$ and the
+move stream. The price is shared; its consequence is per-wallet.
+\end{enumerate}
+
+%==============================================================================
+\section{Closing a position to flat}
+\label{sec:close}
+%==============================================================================
+
+B buys 4 contracts from C at 101; C goes flat. One \code{StateDelta}:
+\[
+\Delta\netq(B)=+4,\ \Delta\netq(C)=-4;\qquad
+\Delta\ac(B)=-(+4)\cdot 101\cdot 50=-20200,\ \Delta\ac(C)=+20200.
+\]
+Conservation: $\sum\Delta\netq=0$, $\sum\Delta\ac=0$, $\sum\mathrm{VM}=0$ (no cash leg). State:
+$\netq=(6,-6,0)$, $\ac=(-30300,+30300,0)$. C is now flat. Its row is \emph{retained}, $\mathrm{Some}$ at
+$(\netq\,0,\ \ac\,0)$ --- not deleted, not $\mathrm{None}$. The two readings are distinct and both
+load-bearing: $\mathrm{None}$ means never held; $\mathrm{Some}$-flat means held and now flat, read
+after close-out for tax reporting, wash-sale lookback, and trade reconstruction (C1(a)). The carrier
+is monotone: once a row is created it is never removed (C1(b)); no row deleter exists, because the
+ledger is abstract.
+
+%==============================================================================
+\section{Expiry and final settlement}
+%==============================================================================
+
+Expiry is the settlement fan-out of \S\ref{sec:settle-mech} composed with a stage write to
+\code{EXPIRED}; like a settle, it acts only on an \code{ACTIVE} unit, never a never-traded one
+(\S\ref{sec:invariants}). The final mark $S=105$ fans out over the remaining holders A and B (C is flat, its
+row touched to no effect):
+\[
+\mathrm{VM}(A) = 6\cdot 105\cdot 50 + (-30300) = 31500-30300 = +1200,\qquad
+\mathrm{VM}(B) = -6\cdot 105\cdot 50 + 30300 = -1200.
+\]
+Conservation: $\sum\Delta\netq=0$ (no quantity moved), $\sum\mathrm{VM}=+1200-1200=0$;
+$\ac\leftarrow(-31500,+31500,0)$ with $\sum\Delta\ac=0$. The coarse rank advances to \code{EXPIRED},
+the stage value becoming \code{Expired (Settlement 105 (Day 3))}; the final mark is always present.
+
+\paragraph{Cash settlement and the Close.} No unit is delivered; the economic result is the
+cumulative variation margin already moved at the final settle. The \emph{Close} step extinguishes
+every holder's position against the clearinghouse, flattening both $\netq$ and \ac{} by an additive
+negation of each row, with no further cash. A held $+6$ and B held $-6$; closing them returns the
+contracts to CH:
+\[
+\Delta\netq(A)=-6,\quad \Delta\netq(B)=+6,\quad \Delta\netq(\text{CH})=0;\qquad
+\Delta\ac(A)=+31500,\quad \Delta\ac(B)=-31500,\quad \Delta\ac(\text{CH})=0.
+\]
+The clearinghouse legs are the residual of the holder legs --- zero, since the holder legs already
+balance --- so no CH row materialises. Conservation, on all three sums:
+$\sum\Delta\netq=-6+6+0=0$, $\sum\Delta\ac=+31500-31500+0=0$, $\sum\mathrm{VM}=0$ (Close moves no
+cash). State after Close: $\netq=(0,0,0)$, $\ac=(0,0,0)$; rows are retained at zero (monotone
+carrier). Close carries no stage write, so it is the one event still admissible on an \code{EXPIRED}
+unit.
+
+\paragraph{Physical settlement.} The variant differs only at the Close. Instead of flattening
+against CH for cash, the contract converts to delivery: the deliverable unit and the cash payment
+move together as one atomic transaction (delivery versus payment), the future's $\netq$ goes to
+zero, and the holder's wallet gains the deliverable. The cash leg is struck at the \emph{final
+settlement price} $S$, not the trade price: expiry has already marked every position to $S$ through
+variation margin, so delivery exchanges the deliverable for $\netq\cdot S\cdot\mult$ and moves no
+further mark-to-market --- pricing the delivery at any other figure would double-count the variation
+margin already settled. Per-unit conservation holds on each unit separately --- the future, the
+deliverable, the cash --- and the cross-unit delivery is one transaction applied all-or-nothing. The
+worked example is cash-settled; the figures above are unchanged by this variant.
+
+\paragraph{Closing identity.} Cumulative variation margin per wallet:
+$A = +1000-100+1200 = +2100$; $B = -1000+500-1200 = -1700$; $C = -400$; $\text{CH}=0$; sum $0$. Each
+equals the wallet's economic profit and loss:
+$A = 4\cdot(103-100)\cdot 50 + 6\cdot(105-100)\cdot 50 = +2100$;
+$B = 4\cdot(100-101)\cdot 50 + 6\cdot(100-105)\cdot 50 = -1700$;
+$C = 4\cdot(101-103)\cdot 50 = -400$. Cash ties to economic profit and loss by construction.
+
+%==============================================================================
+\section{After expiry: state versus derivation}
+%==============================================================================
+
+After the Close, every row is retained at zero: \emph{PositionState}$[w,\unit]=\mathrm{Some}$ flat
+for A, B, C (monotone carrier). \emph{UnitStatus}$[\unit]$ holds stage \code{EXPIRED} and final mark
+$105$. \emph{ProductTerms}$[\unit]$ is unchanged --- immutable.
+
+\code{first\_touch\_date} is \emph{not} stored: it is derived from the event log on demand. Caching
+it in \emph{PositionState} would make a replay disagree with itself under a back-dated correction,
+the cached value reflecting the pre-correction order while the fold reflects the corrected one. The
+rule is general: what the fold over the log determines is derived, not stored; only what the fold
+cannot reconstruct from prior events is state.
+
+%==============================================================================
+\section{Invariants threaded through the life}
+\label{sec:invariants}
+%==============================================================================
+
+\begin{itemize}
+\item \textbf{Conservation per event (C2).} Every \code{StateDelta} satisfies
+$\sum_w\Delta\netq=0$, $\sum_w\Delta\ac=0$, $\sum_w\mathrm{VM}=0$, discharged by \code{validate}
+before application. Induction over the stream lifts the per-event identity to the global invariant.
+The vacuous case --- a unit with no holders --- is the empty sum, zero (C9); conservation sums
+deltas and never divides by a holder count.
+\item \textbf{Deterministic replay as a fold (C1(b)).} \code{replay} is a Kleisli fold of the event
+stream over the ledger; $\code{replay}(xs\mathbin{+\!\!+}ys)=\code{replay}\,xs \mathbin{>\!=\!>}
+\code{replay}\,ys$. Checkpoint independence is a consequence of this law, not a test; the monotone
+carrier keeps the key set stable across cuts. The stream is assumed \emph{unique} --- de-duplicated at
+the ingestion boundary by an event key --- because the two event kinds differ in idempotency: a
+duplicated \code{SettleVM} at a fixed mark is inert ($\Delta\ac=0$, $\mathrm{VM}=0$, by the no-op
+above), whereas a duplicated \code{Trade} accumulates a second position delta. Duplicate suppression is
+therefore a boundary obligation, not a ledger function.
+\item \textbf{\ac{} per-position (C11).} Accumulated cost is keyed by $(w,u)$ with a single canonical
+writer (settle/trade). This is what makes the intraday trader's variation margin correct
+(\S\ref{sec:anchor}).
+\item \textbf{Settlement price shared.} \code{last\_settlement\_price} is one value per contract on
+\emph{UnitStatus}$[\unit]$, read identically by every holder.
+\item \textbf{Monotone, absorbing transitions.} The coarse stage rank
+$\code{REGISTERED}<\code{ACTIVE}<\code{EXPIRED}$ never regresses; a proposed stage of strictly lower
+rank is rejected (\code{StageRegression}). Settle and expire act only on an \code{ACTIVE} unit; both
+reject a \code{REGISTERED} (never-traded) unit (\code{NotActive}), which has no holders and no mark
+slot to update --- so a never-traded unit is never silently promoted, and \code{EXPIRED} is reachable
+only from \code{ACTIVE}: the chain is \code{REGISTERED}$\to$\code{ACTIVE}$\to$\code{EXPIRED} with no
+skips. \code{EXPIRED} is additionally \emph{absorbing}: no
+trade, settle, or re-expiry acts on an expired unit. The rank guard alone is too weak here --- a
+second expiry has equal rank, and $2<2$ is false --- so an explicit absorbing test rejects every
+stage-writing delta on an expired unit; \code{Close}, which carries no stage write, is the one event
+still admissible. Re-settling at the same price before expiry is a no-op: with
+$\ac=-\netq\cdot S\cdot\mult$ already, $\Delta\ac=0$ and $\mathrm{VM}=0$ --- the transition is
+idempotent at a fixed mark.
+\end{itemize}
+
+%==============================================================================
+\section{Escalations}
+%==============================================================================
+
+\paragraph{E1 --- Fan-out cost at scale.} A settlement writes one \emph{PositionState} row and emits
+one cash leg per open holder, every day. Across $\sim\!10^{6}$ contracts each with up to thousands of
+holders, daily settlement is $O(\text{open positions})$ writes and cash legs --- a large daily
+fan-out and write amplification, the same key-space pressure as addendum risk F3. This is intrinsic
+to per-wallet variation margin. Mitigations (batching the fan-out, snapshotting) trade against the
+conservation-per-event and single-writer disciplines and must be shown to preserve C2 and C11. The
+cost stands. \emph{Owner: the performance/risk agent.}
+
+\paragraph{E2 --- The derived-consequence alternative, declined.} Storing only the shared
+\code{last\_settlement\_price} and computing each wallet's mark lazily saves nothing on the dominant
+cost --- the cash leg is per-wallet and unavoidable (E1) --- cannot produce the correct variation
+margin for an intraday trader without reconstructing \ac{} anyway, and would split the single-writer
+discipline for \ac{} (C11). The fan-out is forced by the cash, not chosen for the bookkeeping.
+
+\end{document}

@@ -1,0 +1,566 @@
+\documentclass[11pt,a4paper]{article}
+
+% Fix fi/fl ligature extraction from the PDF (correct ToUnicode CMaps)
+\input{glyphtounicode}
+\pdfgentounicode=1
+\usepackage{cmap}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+\setcounter{tocdepth}{2}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{principle}[definition]{Principle}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{invariant}[definition]{Invariant}
+\newtheorem{remark}[definition]{Remark}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=2em,
+  aboveskip=0.5em,
+  belowskip=0.5em,
+  breaklines=true,
+  showstringspaces=false
+}
+
+\title{The Ledger: The Managed-Account Workflow\\[6pt]
+\large A derivation of \S 6 (Managed Accounts, Virtual Portfolios, and TRS)\\
+from the primitives, with Addendum~A1 (StatesHome)\\
+\normalsize Convergence of a nine-lens adversarial review}
+\author{R.\ Delloye}
+\date{June 2026 --- Workflow note to v10.3}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A managed account is not a primitive. It is the composition of four that already exist: a
+wallet partition that holds positions and produces PnL; a mandate unit $u_{\mathrm{MA}}$
+issued by the manager and held by the client, conserved by the issuance law; a
+deterministic reset contract that observes performance, crystallises one net cash flow, and
+resets its baseline; and the three-map state model of Addendum~A1, which homes the mandate's
+terms, the shared observables, and the per-client economic state. This note derives the exact
+managed-account workflow from those primitives and carries one numerical example
+through subscription, a trade, a period's NAV, a performance-fee crystallisation against a
+high-water mark, and redemption, verifying $\sum_w w(u)=0$ at every step. Nine specialist lenses
+attacked the workflow with $140$ challenge questions; $105$ were answered and cleared, and $35$
+escalated to three framework-level weaknesses that \S 6 cannot resolve without changing the
+framework. The escalations are stated plainly in \S\ref{sec:escalations}; they are the most
+valuable output of the review, not its defects.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+%==============================================================================
+\section{Primitives}
+\label{sec:primitives}
+%==============================================================================
+
+\noindent\textbf{Wallet, unit, move, conservation.} A wallet $w\in\mathcal{W}$ has state
+$w_t:\mathcal{U}\to\mathbb{R}$; $w_t(u)$ is the signed quantity of unit $u$, negative for a
+short or obligation. A move $m=(w_s,w_d,u,q,t,\text{source},\text{meta})$ with $q>0$ acts by
+$w_s(u)\mathbin{-}\!=q;\ w_d(u)\mathbin{+}\!=q$. A transaction is a finite set of moves applied
+atomically. Conservation is algebraic, not a check:
+\[
+Q(u)=\sum_{w\in\mathcal{W}}w_t(u)=0\qquad\forall u,\ \forall t. \tag{P1}
+\]
+External counterparties are virtual wallets inside the closed system; the ledger has no
+``outside'' within scope. A contract unit issued by party $A$ to party $B$ obeys the
+\emph{issuance law} $w_A(u)=-1,\ w_B(u)=+1$, so $\sum_w w(u)=0$ by the same conservation.
+
+\noindent\textbf{Valuation.} $V_t=\sum_{u}w_t(u)\,P_t(u)$ with $P_t$ an external price input
+($P_t(\text{USD})=1$). Conservation guarantees \emph{quantity} integrity only; value moves with
+$P_t$. PnL is path-independent: $\mathrm{PnL}=V_{t_1}-V_{t_0}$, and decomposes as
+$\mathrm{PnL}=\mathrm{PnL}_{\text{price}}+\mathrm{PnL}_{\text{flow}}$. Arithmetic is
+fixed-precision decimal with bankers' rounding only at instruction generation, so outputs are
+bit-identical and replayable.
+
+\noindent\textbf{The three-map state model (Addendum~A1).} State attaches to three maps:
+immutable versioned \textit{ProductTerms}$[u]$; mutable shared \textit{UnitStatus}$[u]$; and
+per-position \textit{PositionState}$[w,u]$, with an \texttt{Option} accessor (\texttt{None}
+``never held'' $\neq$ \texttt{Some(zero)} ``held, now flat'') and a monotone carrier (closed-out
+rows are retained at zero). There is no wallet-keyed economic-state sector: every per-wallet
+economic fact is $(w,u_{\mathrm{MA}})$-keyed. Condition~C2 requires each event handler to emit a
+\texttt{StateDelta} that is structurally zero-sum per event class; C3 makes it atomic across all
+three maps; C4 scopes reads by capability; C11 names the unique handler permitted to mutate each
+\textit{PositionState} field.
+
+%==============================================================================
+\section{Account Establishment}
+\label{sec:establishment}
+%==============================================================================
+
+\noindent\textbf{The mandate is a unit.} A managed account is opened by issuing the mandate unit
+$u_{\mathrm{MA}}$ from the manager $w_M$ to the client $w_C$:
+\begin{lstlisting}
+Move(from: w_M, to: w_C, unit: u_MA, quantity: 1,
+     source: "mandate_issue", metadata: "MANDATE_ISSUANCE")
+\end{lstlisting}
+giving $w_M(u_{\mathrm{MA}})=-1,\ w_C(u_{\mathrm{MA}})=+1,\ \sum_w w(u_{\mathrm{MA}})=0$. This is
+a real two-named-wallet issuance with a real issuer and holder, not the rejected self-reflexive
+sentinel; conservation holds by the issuance law (P1).
+
+\begin{invariant}[Mandate is a singleton bilateral contract]
+\label{inv:singleton}
+$\operatorname{support}\big(w\mapsto w(u_{\mathrm{MA}})\big)=\{(w_M,-1),(w_C,+1)\}$ while the
+mandate is live.
+\end{invariant}
+
+\noindent Conservation alone does \emph{not} establish Invariant~\ref{inv:singleton}: $P1$ admits
+$(-5,+5)$ or a three-way split. Identity is pinned by four existing primitives together:
+Invariant~\ref{inv:singleton} for the active phase; the \texttt{Option} accessor distinguishing
+\texttt{None} (pre-issuance) from \texttt{Some(zero)} (terminated, retained); a
+\textit{UnitStatus} lifecycle guard admitting issuance only from an unissued status (so a
+terminated $u_{\mathrm{MA}}$ cannot be resurrected); and C8 routing a re-mandate to a fresh
+$u'_{\mathrm{MA}}$ with \texttt{SupersededBy}.
+
+\noindent\textbf{What is recorded where.}
+
+\begin{longtable}{p{8.4cm}p{6.4cm}}
+\toprule
+\textbf{Datum} & \textbf{Home} \\
+\midrule
+Mandate text, fee schedule, benchmark identity, position limits, HWM/hurdle methodology,
+crystallisation frequency & \textit{ProductTerms}$[u_{\mathrm{MA}}]$ (immutable, versioned) \\
+Lifecycle stage, \texttt{superseded\_by} & \textit{UnitStatus}$[u_{\mathrm{MA}}]$ (shared) \\
+HWM value, entry NAV, accrued fees, mandate-breach flags, subscription/redemption cursor,
+benchmark NAV at this wallet's inception & \textit{PositionState}$[w_C,u_{\mathrm{MA}}]$ \\
+Current benchmark level & \textit{UnitStatus}$[u_{\mathrm{bench}}]$ \\
+\bottomrule
+\end{longtable}
+
+\noindent The placement of the per-client \emph{economic} scalars is the subject of
+escalation~E1 (\S\ref{sec:escalations}): A1 stores them, yet each is a fold of the event log.
+
+\begin{principle}[Mandate is non-valued]
+\label{prin:nonvalued}
+$u_{\mathrm{MA}}$ is excluded from the domain of valuation: $P_t(u_{\mathrm{MA}})$ is undefined,
+not zero. A price on $u_{\mathrm{MA}}$ would add $+1\cdot P_t(u_{\mathrm{MA}})$ to the client's
+per-wallet NAV and double-count the underlying exposure; the term cancels only in the global sum.
+\end{principle}
+
+%==============================================================================
+\section{Subscription}
+\label{sec:subscription}
+%==============================================================================
+
+Capital enters the managed wallet as a cash move from the client's external funding wallet
+$w_{\text{ext}}$ (a virtual wallet at the ledger boundary):
+\begin{lstlisting}
+Move(from: w_ext, to: w_C, unit: USD, quantity: K,
+     source: "subscribe", metadata: "SUBSCRIPTION")
+\end{lstlisting}
+The move is \textbf{tagged} \texttt{SUBSCRIPTION} and indexed by the subscription/redemption
+cursor in \textit{PositionState}$[w_C,u_{\mathrm{MA}}]$. The tag is load-bearing: it lets the net
+external flow over any interval be reconstructed as a projection over the stream
+(\S\ref{sec:fees}). At subscription the entry NAV and the initial high-water mark are set to the
+subscribed capital base; the high-water mark before subscription is \texttt{None}
+(unrepresentable), never $0$ --- a $0$ mark would charge a performance fee on the entire
+contributed capital at the first crystallisation. The benchmark NAV at inception is recorded from
+\textit{UnitStatus}$[u_{\mathrm{bench}}]$ for performance \emph{reporting}.
+
+%==============================================================================
+\section{Trading under Mandate}
+\label{sec:trading}
+%==============================================================================
+
+A trade is an ordinary two-legged transaction against a virtual market wallet $w_{\text{mkt}}$,
+admitted only if it satisfies the mandate guards.
+
+\begin{definition}[Mandate guard]
+A quantitative mandate constraint is a precondition $g$ on the move-generation function. The
+contract evaluates $g$ against the current state and the recorded price snapshot; if $g$ fails,
+\emph{no} moves are emitted and the state is unchanged.
+\end{definition}
+
+\noindent Guard determinism is \textbf{price-relative}. The claim ``same wallet state $+$ same
+trade $\Rightarrow$ same decision'' is false for value-based limits (leverage,
+concentration-by-value, currency caps): holding positions fixed and doubling a price flips the
+same trade from admit to reject. Determinism is recovered only when the guard is a pure function
+of $(\textit{ProductTerms},\,\text{state},\,\text{trade},\,P_t)$ with $P_t$ an \emph{explicit,
+snapshot-pinned} input. Two totality obligations follow: a missing price
+($P_t(u)=\texttt{None}$) must make the guard \emph{fail closed} (a typed reject), never a silent
+admit; and a \emph{passive} breach --- a limit crossed by price appreciation with no admitted
+trade --- lies outside the domain of a move-time guard and is detected only by a periodic
+valuation sweep, not by the guard. The pinned-snapshot requirement is escalation~E2.
+
+%==============================================================================
+\section{Valuation and NAV}
+\label{sec:nav}
+%==============================================================================
+
+The account NAV is the wallet valuation with the mandate excluded
+(Principle~\ref{prin:nonvalued}):
+\[
+\mathrm{NAV}_t \;=\; \sum_{u\neq u_{\mathrm{MA}}} w_{C,t}(u)\,P_t(u).
+\]
+By state-sufficiency, $\mathrm{NAV}_t$ depends only on current balances, current unit state, and
+current prices --- not on history. Performance against the benchmark is computable from the
+inception benchmark NAV and the current level in \textit{UnitStatus}$[u_{\mathrm{bench}}]$; it
+feeds \emph{reporting}, and feeds the \emph{fee} only when the mandate's methodology names a
+benchmark hurdle.
+
+%==============================================================================
+\section{Fee Logic}
+\label{sec:fees}
+%==============================================================================
+
+\noindent\textbf{Performance is net of capital flows.} Over a reset interval
+$[t_{k-1},t_k]$ the performance is the gross NAV change less the net external flow:
+\[
+\mathrm{Perf}_k \;=\; \big(\mathrm{NAV}_{t_k}-\mathrm{NAV}_{t_{k-1}}\big)\;-\;
+\mathrm{NetFlow}_{[t_{k-1},t_k]},\qquad
+\mathrm{NetFlow}=\!\!\sum_{\substack{m\ \text{tagged sub/redemption}\\ t_{k-1}<m.t\le t_k}}\!\!\pm\,m.q.
+\]
+The gross change $\mathrm{NAV}_{t_k}-\mathrm{NAV}_{t_{k-1}}$ conflates performance with capital
+flows: by the PnL decomposition a mid-period subscription is a \emph{flow}, and crystallising it
+as performance would charge a fee on the client's own contributed capital. $\mathrm{NetFlow}$ is a
+projection over the already-tagged cursor moves (\S\ref{sec:subscription}); the correction adds no
+new coordinate.
+
+\noindent\textbf{Fee is not PnL settlement.} A single whole-$\mathrm{Perf}\to$beneficiary move is
+the \emph{internal desk} case, where a book is swept to Treasury. A client managed account pays
+the manager only a fee fraction; the gain \emph{stays in the client book}. The fee handler is
+total over $\operatorname{sign}(\mathrm{NAV}-\mathrm{HWM})$:
+\begin{align*}
+\text{management fee } f^{m}_k &= r_{\text{m}}\cdot\Delta t_k\cdot \mathrm{NAV}^{\text{base}}_k
+&&\text{(accrues on AUM regardless of sign),}\\
+\text{performance fee } f^{p}_k &= r_{\text{p}}\cdot\max\!\big(0,\ \mathrm{NAV}^{\text{net}}_k-\mathrm{HWM}_{k-1}\big)
+&&\text{(floored at zero; no clawback),}\\
+\mathrm{HWM}_k &= \max\!\big(\mathrm{HWM}_{k-1},\ \mathrm{NAV}^{\text{net}}_k-f^{p}_k\big)
+&&\text{(monotone ratchet; C11 writer \texttt{fee\_crystallise}),}
+\end{align*}
+where $\mathrm{NAV}^{\text{net}}_k=\mathrm{NAV}_{t_k}-f^{m}_k$. On a loss period the performance
+fee is $0$ and the high-water mark is unchanged, while the management fee still accrues.
+
+\noindent\textbf{Crystallisation is double-entry.} A fee is realised as a real cash move
+$w_C\to w_M$, so it is conserved and carries its own contra-entry; a non-conserved stored scalar
+would be single-entry and sit outside P1. The handler emits, atomically (C3):
+\begin{lstlisting}
+Move(from: w_C, to: w_M, unit: USD, quantity: f_m_k, metadata: "MGMT_FEE")
+Move(from: w_C, to: w_M, unit: USD, quantity: f_p_k, metadata: "PERF_FEE")
+\end{lstlisting}
+\begin{theorem}[Fee zero-sum per crystallisation]
+$\sum_w \Delta_{\text{fee}}(\text{USD})=0$ at each crystallisation: the client pays exactly what
+the manager receives, creating and destroying no value.
+\end{theorem}
+\noindent\textit{Proof.} Each leg is $w_C\mathbin{-}\!=q;\ w_M\mathbin{+}\!=q$; summing over
+wallets gives $-q+q=0$ per leg, hence $0$ over the transaction. \qed
+
+\noindent\textbf{Quantity, baseline, residual.} The crystallise leg, like every settlement leg in
+this note, emits $q=|x|$ with direction fixed by $\operatorname{sign}(x)$ and \emph{no} move at
+$x=0$; a fixed-direction listing with a signed quantity is non-representable on a loss and illegal
+at $q=0$. The reset baseline is the \emph{post-settlement} capital base
+$B_k=\mathrm{NAV}_{t_k}-(f^{m}_k+f^{p}_k)+\mathrm{NetFlow}$; reading the pre-settlement NAV would
+claw the distributed performance back next period. The rounding residual
+$\mathrm{Perf}_k-\operatorname{round}(\mathrm{Perf}_k)$ is \emph{retained} in $w_C$ as a conserved
+un-crystallised remainder, never dropped; it is the reconciling item between economic performance
+and moved cash. Whether $B_k$, $\mathrm{HWM}_k$, and the
+accrued fee are stored or re-derived is escalation~E1.
+
+%==============================================================================
+\section{Segregation}
+\label{sec:segregation}
+%==============================================================================
+
+\begin{theorem}[Segregation]
+\label{thm:seg}
+No conservative move can perturb a wallet it does not name. Client partitions are mutually
+isolated \emph{iff} conservation is combined with capability scoping.
+\end{theorem}
+
+\noindent\textbf{Conservation alone is not segregation.} A move
+$m=(w_{A},w_{B},\text{USD},q)$ between two \emph{different} clients' partitions is perfectly
+conservative ($\sum_w\Delta=0$), so $P1$ does not forbid it. The \S 6 phrasing ``conservation
+enforces segregation by algebra'' conflates two independent facts: conservation (CONS,
+$\sum_w\Delta=0$) and locality (LOC, $\operatorname{supp}(\Delta)\subseteq\{w_s,w_d\}$). Locality
+gives ``no effect beyond the named wallets''; isolation of \emph{distinct} clients additionally
+requires an authorisation predicate --- C4 capability scoping, forbidding a handler from naming or
+reading across a $(w,u_{\mathrm{MA}})$ boundary it has no capability for. Segregation is therefore
+a theorem under CONS $\wedge$ LOC $\wedge$ C4, which supplies the logical-segregation component of
+CASS~6 / MiFID~II~16(8). Legal segregation (distinct custodial accounts, trust/nominee) is outside
+scope: the ledger evidences it, it does not establish it. That C4 is asserted in prose rather than
+typed on the accessor signature is escalation~E4 (\S\ref{sec:escalations}).
+
+%==============================================================================
+\section{CSA Margin and Collateral}
+\label{sec:csa}
+%==============================================================================
+
+The CSA margin contract is a wallet-level smart contract attached to a per-counterparty collateral
+wallet. It reads the aggregate mark-to-market of the trades the CSA governs \emph{in the real
+ledger}, computes the required collateral (threshold, minimum transfer amount, eligible-collateral
+and haircut rules), and emits margin-call moves to or from the collateral wallet. Margin
+eligibility and haircut are contractual data in \textit{ProductTerms}; the exposure is the
+observed valuation.
+
+\noindent For a \emph{synthetic} managed account the netting set is the single real unit
+$u_{\mathrm{TRS}}$, never the simulated constituents in the virtual ledger: reading those would
+breach the isolation invariant (\S\ref{sec:trs}) and over-margin unmargined positions. The realm
+tag and C4 realm-scoped reads enforce this. The margin exposure $N_k\cdot\mathrm{TR}_k$ is itself
+an \emph{observation} of the virtual book lifted across the realm boundary as a number; that this
+observation is unattested and unversioned is escalation~E2.
+
+%==============================================================================
+\section{TRS as Synthetic Managed Account}
+\label{sec:trs}
+%==============================================================================
+
+A total return swap connects a virtual ledger $\mathcal{L}_v$ to real counterparty wallets in the
+real ledger $\mathcal{L}_r$ through periodic cash settlement.
+
+\begin{invariant}[Ledger isolation]
+\label{inv:p7}
+No move has one endpoint in $\mathcal{L}_v$ and the other in $\mathcal{L}_r$. (Invariant~P7.)
+\end{invariant}
+
+\noindent At reset $t_k$ the TRS contract in $\mathcal{L}_r$ \emph{observes} the virtual book's
+performance and emits one real move of $\big|\mathrm{Payment}_k\big|$,
+$\mathrm{Payment}_k=N_k\cdot\mathrm{TR}_k-N_k\cdot r_k\cdot\Delta t_k$, direction by sign:
+\begin{lstlisting}
+Move(from: w_payer, to: w_receiver, unit: USD,
+     quantity: |Payment_k|, metadata: "TRS_NET_SETTLEMENT")
+\end{lstlisting}
+A minimal virtual ledger is not a second engine but a $\mathrm{realm}\in\{\text{real,virtual}\}$
+tag enforcing Invariant~\ref{inv:p7}. The total return $\mathrm{TR}_k=(V^v_{t_k}-V^v_{t_{k-1}})/
+V^v_{t_{k-1}}$ is partial: it requires $V^v_{t_{k-1}}>0$, an unstated precondition that must be a
+typed failure, not a division by zero.
+
+\begin{theorem}[Equivalence to the funded managed account]
+The TRS settlement and the funded managed-account fee/PnL settlement are the \emph{same} ledger
+operation: one net conservative cash move whose magnitude is a deterministic function of an
+observed performance and a recorded baseline. The funded book plays the role of $\mathcal{L}_v$;
+the periodic settlement is the TRS payment.
+\end{theorem}
+\noindent\textit{Proof sketch.} Both reduce to $\mathrm{Crystallise}(\text{magnitude},\text{from},
+\text{to})$ with magnitude $=$ observed performance over the interval and direction by sign; both
+reset a baseline to the post-settlement value; neither moves a position across a boundary.
+The settlement \emph{primitive} is one; the \emph{products} differ, and that difference is a CDM
+(reporting) distinction, not a ledger one: a CDM \texttt{TotalReturnSwap} is two-legged
+($N\,\mathrm{TR}$ and $N\,r\,\Delta t$), so the report derives from the retained CDM
+\texttt{BusinessEvent}, never from the netted move (\S\ref{sec:conformance}). \qed
+
+\noindent\textbf{Price consistency.} $\mathcal{L}_v$ valuation and $\mathcal{L}_r$ settlement must
+use one price vector $P_t$. Because Invariant~\ref{inv:p7} forbids a cross-ledger move, a price
+divergence produces unexplained PnL with \emph{no} internal reconciliation path --- the one place
+the ``no internal break'' guarantee can be silently voided. The framework asserts consistency in
+prose but does not bind it; the structural fix (a shared, content-addressed snapshot) is
+escalation~E2.
+
+%==============================================================================
+\section{Redemption and Wind-down}
+\label{sec:redemption}
+%==============================================================================
+
+Wind-down strikes a final NAV, settles the final fee, returns capital, and retires the mandate.
+Positions are liquidated against the market wallet; the cash is paid to the client's external
+wallet; the mandate unit is returned to the manager. All closed-out rows are retained at zero
+under the monotone carrier, preserving the audit trail, the final high-water mark, and the
+quantities needed for tax reconstruction.
+\begin{lstlisting}
+Move(from: w_C, to: w_mkt, unit: <asset>, quantity: <held>)   -- liquidate
+Move(from: w_mkt, to: w_C, unit: USD, quantity: <proceeds>)
+Move(from: w_C, to: w_ext, unit: USD, quantity: <final NAV>)  -- capital-out
+Move(from: w_C, to: w_M, unit: u_MA, quantity: 1)             -- retire mandate
+\end{lstlisting}
+
+%==============================================================================
+\section{Balance-Sheet Substantiation at Account Level}
+\label{sec:substantiation}
+%==============================================================================
+
+Each account's balance at any date is a deterministic projection of the move stream filtered to
+its wallets; client statements, desk PnL, and regulatory position reports differ only in the
+filter. Within the ledger there is no separate account-level \emph{quantity} record to reconcile
+against. The move stream substantiates \emph{quantities and
+provenance}; \emph{valuations} depend on the external price vector, and disclosures and legal
+status require external evidence (consistent with the dual-valuation section of the main
+specification). Net settlement is \emph{operational} netting: presenting a balance sheet net
+requires, in addition, a legally enforceable right of set-off and the intent to settle net
+(IAS~32.42 / ASC~210-20) --- a determination outside the ledger. The accounts'
+assets~$=$~liabilities~$+$~equity reconciliation holds at the quantity level by P1 (the trial
+balance balances by construction); the valued and classified presentation does not follow from P1
+alone.
+
+%==============================================================================
+\section{Worked Example}
+\label{sec:example}
+%==============================================================================
+
+One managed account $w_C$ under mandate $u_{\mathrm{MA}}$ issued by manager $w_M$; virtual market
+wallet $w_{\text{mkt}}$; client external wallet $w_{\text{ext}}$. USD reference. Terms: management
+fee $2\%/\text{yr}$, performance fee $20\%$ over a high-water mark (no hurdle), quarterly
+($\Delta t=0.25$). Conventions: management fee on end-of-period NAV; performance fee on NAV net of
+the management fee, above the mark; the mandate is non-valued. Every figure below was verified by
+a decimal conservation check: $\sum_w w(u)=0$ holds for \emph{every} unit after \emph{every} move.
+
+\begin{longtable}{p{4.6cm}p{7.2cm}r}
+\toprule
+\textbf{Step} & \textbf{Moves} ($\text{src}\to\text{dst}:\text{qty unit}$) & \textbf{NAV} \\
+\midrule
+A. Mandate issuance & $w_M\to w_C:1\ u_{\mathrm{MA}}$ & --- \\
+B. Subscription & $w_{\text{ext}}\to w_C:1{,}000{,}000\ \text{USD}$ & $1{,}000{,}000$ \\
+C. Trade (buy $5{,}000$ AAPL @100) & $w_C\to w_{\text{mkt}}:500{,}000\ \text{USD}$;\ \ $w_{\text{mkt}}\to w_C:5{,}000\ \text{AAPL}$ & $1{,}000{,}000$ \\
+D. Q1 NAV (AAPL $\to 130$) & (price move; no ledger move) & $\mathbf{1{,}150{,}000}$ \\
+E. Fee crystallisation & $w_C\to w_M:5{,}750\ \text{USD}$ (mgmt);\ \ $w_C\to w_M:28{,}850\ \text{USD}$ (perf) & $\mathbf{1{,}115{,}400}$ \\
+F. Wind-down & $w_C\to w_{\text{mkt}}:5{,}000\ \text{AAPL}$;\ \ $w_{\text{mkt}}\to w_C:650{,}000\ \text{USD}$;\ \ $w_C\to w_{\text{ext}}:1{,}115{,}400\ \text{USD}$;\ \ $w_C\to w_M:1\ u_{\mathrm{MA}}$ & $0$ \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{Fee arithmetic (Step~E).} No capital flow occurred inside the period, so
+$\mathrm{Perf}=(1{,}150{,}000-1{,}000{,}000)-0=150{,}000$. Management fee
+$=1{,}150{,}000\times0.02\times0.25=5{,}750$. NAV net of management
+$=1{,}144{,}250$. Performance fee $=0.20\times(1{,}144{,}250-1{,}000{,}000)=28{,}850$. NAV after
+both fees $=1{,}115{,}400$. New high-water mark $=\max(1{,}000{,}000,\,1{,}115{,}400)=1{,}115{,}400$;
+reset baseline $B_1=1{,}115{,}400$. Fee zero-sum:
+$\sum_w\Delta_{\text{fee}}(\text{USD})=-34{,}600\,(w_C)+34{,}600\,(w_M)=0$.
+
+\noindent\textbf{Closing identity (all wallets).} Final non-zero balances:
+$w_M=+34{,}600$ (fee revenue), $w_{\text{mkt}}=-150{,}000$ (the gross gain paid out by the
+market), $w_{\text{ext}}=+115{,}400$ (client net). Their sum is
+$34{,}600-150{,}000+115{,}400=0$. The client received principal $1{,}000{,}000$ plus net gain
+$115{,}400$; the gross gain $150{,}000$ equals net $115{,}400$ plus fees $34{,}600$. Per-unit
+conservation holds across the whole chain: $u_{\mathrm{MA}}$ is issued $(+1,-1)$ then returned
+$(0,0)$; USD nets to $0$ at $w_C$ and globally after every move; AAPL is acquired and liquidated
+with $w_{\text{mkt}}$ as the mirror. Every position row is retained at zero under the monotone
+carrier.
+
+%==============================================================================
+\section{Conformance and Flags}
+\label{sec:conformance}
+%==============================================================================
+
+No conformance is asserted; each item is either demonstrated against a cited source or flagged for
+the responsible owner. The CDM strata named below (\texttt{LegalAgreement}, \texttt{Trade},
+\texttt{TotalReturnSwap}, \texttt{TradeState}, \texttt{BusinessEvent}) are identified at the type
+level only; pinning them to a named CDM release is owed to the responsible CDM owner and is
+\emph{flagged}, not asserted here.
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{CDM mandate representation.} $u_{\mathrm{MA}}$ maps to the CDM
+\texttt{LegalAgreement} stratum (the ISDA Create-digitised investment-management agreement:
+parties, fee schedule, benchmark identity, methodology, limits), not the \texttt{Trade}/product
+stratum. A discretionary mandate is a legal agreement, not a tradable contract.
+\item \textbf{CDM TRS representation.} A CDM \texttt{TotalReturnSwap} is two-legged; the report is
+the retained \texttt{BusinessEvent} (performance leg and financing leg
+$N\,r\,\Delta t$), never the netted settlement move. The ledger ``same mechanism'' identity is a
+settlement-primitive identity, \emph{flagged} as not a CDM/reporting identity.
+\item \textbf{SFTR/EMIR reporting surface.} $u_{\mathrm{MA}}$ issuance is \emph{not} reportable: a
+discretionary mandate is the MiFID~II Annex~I~\S A(4) portfolio-management service, not a Section~C
+instrument, not an SFT, not a derivative. This discharges the open risk F5 of Addendum~A1. The
+reportable artefact is never $u_{\mathrm{MA}}$ but the underlying book trade or $u_{\mathrm{TRS}}$,
+each carrying its own UTI/UPI/LEI. Reportability is a per-relationship, regime-cited attribute on
+the \emph{wrapped} unit's \textit{ProductTerms}; it is not inferable from the coarse unit-type key
+(escalation~GOV, \S\ref{sec:escalations}).
+\item \textbf{IFRS classification.} Economic NAV and economic PnL are derived here; accounting
+classification of fair-value changes (FVTPL/FVOCI/amortised cost) and net presentation
+(IAS~32.42) are outside scope and require external evidence. Accrued fees, modelled as conserved
+moves rather than stored scalars, carry their own contra-entry and are auditable as double-entry.
+\item \textbf{CDM \texttt{TradeState} alignment.} That the CDM \texttt{TradeState}-per-\texttt{Trade}
+view and \textit{PositionState}$[w,u]$ stay replay-consistent (both projections of one minted
+event) is asserted, not yet verified; it is the outstanding F6 deliverable (a Rosetta mapping
+rerun against the three-map schema).
+\end{itemize}
+
+%==============================================================================
+\section{Escalated Weaknesses}
+\label{sec:escalations}
+%==============================================================================
+
+Of $140$ challenge questions, $105$ were answered and cleared by every touched lens; $35$ escalated
+to framework-level weaknesses that \S 6 cannot resolve without changing the framework. They are
+stated plainly; none was resolved by reshaping a question, narrowing its scope, or assuming away
+its premise.
+
+\begin{description}[leftmargin=0pt,style=nextline]
+\item[\textbf{E1 --- Store-vs-derive economic scalars (an Addendum~A1 internal inconsistency).}]
+A1 homes the high-water mark, entry NAV, accrued fee, and reset baseline as mutable
+\textit{PositionState} scalars. Yet each is a \emph{fold} of the event log: the high-water mark is
+a monotone max over recorded post-crystallisation NAVs, the accrued fee a fold over the rate
+schedule and the NAV path, the baseline a fold over settlements. A1's own \texttt{first\_touch\_date}
+ruling demotes exactly such a value to ``not state'' because caching it ``would create a
+fold-inconsistency under back-dated corrections.'' Storing these scalars therefore re-creates the
+internal-reconciliation surface the framework claims to abolish: under a back-dated price
+correction the stored value desyncs from the recomputed fold. \emph{Direction of a fix:} hold these
+as derived projections, not stored fields; their re-derivation requires recorded prices (E2). A
+breaking mandate amendment makes this concrete --- carrying the high-water mark to the successor
+unit must be re-derivation from the (corrected) stream, never a copy, on pain of a silent mark
+reset.
+
+\item[\textbf{E2 --- The observation surface is unversioned and unattested (the linchpin).}]
+The price vector $P_t$, the benchmark level, the TRS financing fix $r_k$, and intraday path
+observations (barrier touch, realised vol) all strike real, irreversible cash, yet they enter
+through \textit{UnitStatus}, which A1 defines as mutable, shared, overwritten in place, and
+\emph{not} versioned. Consequences: the exact price that struck a fee is overwritten and not
+replayable, so path-independence (P10) is not achievable across replay and a valued balance sheet
+is only as reproducible as a mutable cell; $\mathcal{L}_v$ valuation and $\mathcal{L}_r$
+settlement cannot be \emph{proved} to share one price, so divergence (hence unexplained PnL) is
+representable; a base and an overlay mandate resetting at the same instant can read different
+prices for the same wallet; and the benchmark and $r_k$ get \emph{weaker} discipline than $P_t$,
+with no staleness, fallback, or cross-source check, though the benchmark hurdle is client money.
+\emph{Direction of a fix:} prices, benchmark levels, and rates must enter as attested,
+content-addressed, append-only \emph{snapshot events}, with consistency secured by sharing the
+snapshot hash rather than by after-the-fact reconciliation. This single change also discharges E1,
+because recorded prices are what make the economic scalars folds. It carries two governance
+sub-items: the oracle-key lifecycle (generation, rotation, revocation --- on which replay
+semantics depend) is unspecified; and every trust assumption at the cash boundary is currently
+ownerless, which is forbidden for a value-bearing input.
+
+\item[\textbf{E3 --- The closed system is blind to counterparty legal identity.}]
+P1 models an external counterparty as a virtual wallet, correct for \emph{quantity} closure but
+erasing the counterparty's legal identity. Dual-sided EMIR/CFTC/SFTR reporting requires two
+validated ISO-17442 LEIs, a reporting-counterparty determination, FC/NFC$(\pm)$ or SD/MSP
+classification, and a paired UTI from the CPMI-IOSCO / EU Art~7 generation waterfall on the real
+$u_{\mathrm{TRS}}$ --- none of which is a quantity fact, so none lives in the move stream. The only
+candidate home, \textit{WalletRegistry}, is declared non-economic and non-versioned; a mutable LEI
+would let an M\&A transfer or lapse retroactively rewrite every historical report on replay, so the
+binding must be a time-indexed append-only sequence. Moreover a trade-repository \emph{pairing}
+break is an \emph{external} fact: a closed ledger can produce our side of a report but cannot pair
+it. \emph{Direction of a fix:} either promote counterparty LEI and classification to first-class,
+time-versioned, replayable state bound to each externally-facing real wallet, or formally scope LEI
+as an external reference-data dependency that the minting step joins against and records in the
+event payload for deterministic replay.
+
+\item[\textbf{E4 --- C4 capability scoping is asserted, not typed.}]
+Segregation (\S\ref{sec:segregation}) and the no-cross-$(w,u_{\mathrm{MA}})$-read guarantee depend
+on C4, but A1's reference accessor $\texttt{position}(w,u)$ takes no capability argument, so a
+handler firing on one mandate can read another's state. This is answerable by adding a capability
+parameter to the accessor (a section-level refinement); it is recorded here because it is the typed
+expression on which Theorem~\ref{thm:seg} rests, and the reference signature does not yet carry it.
+
+\item[\textbf{E5 --- No in-ledger solvency liveness.}]
+Crystallising unrealised mark-to-market can drive the cash wallet negative; since negative is a
+legal obligation, conservation alone cannot distinguish a \emph{funded} obligation from an
+\emph{insolvent} overdraft. The ledger faithfully represents the obligation; funding is
+settlement-layer state, and a client-money wallet carries a non-negativity precondition. The
+residual --- a liveness invariant tying crystallisation to settlement finality --- is a boundary
+property the closed ledger represents but does not guarantee.
+\end{description}
+
+\noindent\textbf{Reading of the escalations.} They are not failures of the workflow above, which is
+sound as quantity algebra: every step is expressible as atomic $q>0$ moves with $\sum_w w(u)=0$
+verified, and the worked example closes to the penny. They are the points at which the
+\emph{performance and reporting} layer outruns the framework's current treatment of recorded
+observations and external identity. E2 is the linchpin: an attested, versioned snapshot discipline
+for the observation surface discharges E1 directly and underwrites the determinism the fee, guard,
+margin, and TRS settlements all silently assume. These three weaknesses are the agenda for the next
+framework version.
+
+\end{document}

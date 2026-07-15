@@ -1,0 +1,340 @@
+\section{Orchestration and Obligation Liveness}
+\label{sec:temporal}
+
+The framework fixes \emph{what} must hold: conservation, atomicity, idempotency, purity. It leaves open \emph{how} lifecycle events are scheduled, retried, and sequenced. Safety alone does not move the system forward: a coupon due on a date causes no error if it never fires. This section states the requirements an execution engine must meet to close that gap.
+
+\begin{mentalmodel}
+Picture an alarm set for a future date whose winding is written into a ledger rather than held in the clock's spring: cut the power, swap the clock, or move it to another building, and at the appointed moment it still rings, because whoever rebuilds it reads the same date and re-arms it. The ring is a duty falling due, and arming the alarm the instant the duty is created is what keeps a dated duty from being silently forgotten. Unlike a household alarm, whose ring is satisfied by the ring itself, this one demands the duty actually be met: when it rings the duty is either already discharged, or a prescribed fallback runs, or---if no fallback can be computed---the duty is recorded as defaulted.
+\end{mentalmodel}
+
+%----------------------------------------------------------------------
+\subsection{Execution-engine requirements}
+\label{sec:exec-requirements}
+%----------------------------------------------------------------------
+
+Four requirements follow from the framework's own primitives. They bind any execution engine. The engine itself is an implementation choice that satisfies them, not a result derived here.
+
+\begin{enumerate}[nosep]
+\item \textbf{At-least-once delivery.} Idempotency (P5, transaction level; P6, lifecycle level) makes duplicate execution harmless. It does not make an event fire. The engine must dispatch every scheduled event and re-dispatch on worker failure. At-least-once delivery composed with idempotent activities yields exactly-once semantics.
+
+\item \textbf{Durable timers surviving restarts.} A coupon scheduled for a fixed future date fires on that date irrespective of process restarts, deployments, or infrastructure failures in the interval. Timer state is persisted by the engine, not held in process memory.
+
+\item \textbf{Deterministic replay.} Time travel (Property~\ref{prop:time-travel}) requires ledger state at any past instant to be reconstructable by replaying the move stream. The engine carries the complementary property for orchestration: workflow state at any point is reconstructable by replaying an append-only workflow history. Both derive correctness from one principle, deterministic replay of an immutable log.
+
+\item \textbf{Single-threaded execution per instance.} Each workflow instance processes signals, timer fires, and activity completions one at a time, in deterministic order. This is the single-writer model. It eliminates concurrency races without a command queue or consensus protocol.
+\end{enumerate}
+
+\noindent The reference architecture adopts Temporal.io, whose durable-execution model satisfies all four. ``The engine'' hereafter denotes the adopted instance. Its guarantees enter the liveness proof as named lemmas (\S\ref{sec:liveness-proof}).
+
+%----------------------------------------------------------------------
+\subsection{Processor requirements}
+\label{sec:processor-contract}
+%----------------------------------------------------------------------
+
+The ledger admits transactions; it does not manufacture them. The machinery that computes a settlement or a corporate-action adjustment and submits it is a \emph{processor}: external to the ledger, untrusted by it, and verifiable against it. The engine of \S\ref{sec:exec-requirements} delivers events; the four conditions here bind whatever receives them.
+
+Two kinds of processor exist, and they are one architecture. A \emph{lifecycle processor} catches a due event from the scheduler (\S\ref{sec:temporal-scheduler}) --- an expiry, a coupon, an exercise. It reads the unit's declared terms and pulls the stamped observations the payoff names. It computes the settlement and submits the transaction. A \emph{corporate-action processor} catches a confirmed notice. It reads the declared operator, the declared dimensions, and the adjustment schedule. It submits the transaction the boundary requires, and that transaction has three parts. The first is the new terms version, appended under \hyperref[cond:C6]{C6} and carrying the adjusted strikes and references. The second is the entitlement moves. The third is the status writes: \texttt{SetBasis}, together with the matching unit-status updates on any related units the boundary touches. The two kinds differ in what they read, not in how they run: catch, read declared data, compute, submit. An option expiry and a stock split are processed by the same shape of machine.
+
+The pure function \texttt{handle} (\S\ref{sec:lifecycle}) is one conforming implementation --- the reference one. Running in-process, it satisfies the four conditions by construction. The conditions exist so that every other implementation --- a separate service, a vendor system, a rewrite --- is held to exactly what \texttt{handle} already satisfies.
+
+\begin{enumerate}[nosep]
+\item \textbf{Closed inputs.} A processor reads the committed log and the stamped observations the log records; nothing else. No ambient clock, no direct feed read, no configuration outside the log. The timer fire is delivery, not data: it says \emph{when}; everything the event means --- terms, schedule, observations --- is log data. An expiry processor woken an hour late reads the same terms and the same stamped close it would have read on time, and submits the same transaction.
+
+\item \textbf{Prefix-determinism.} Given a log prefix, the submission is determined: same prefix, same transaction. Two runs, or two independent implementations, over one prefix produce equal transactions. \texttt{canonicalTx} fixes a deterministic move order, so equality is decided move for move, not judged.
+
+\item \textbf{Idempotence keys.} Every submission carries a key derived deterministically from its cause. For a lifecycle settlement the key is the obligation id (Definition~\ref{def:obligation}). For a corporate-action follow-on the key is the causing boundary id --- the value recorded as \texttt{txCause} --- paired with the target unit. A retried submission is bit-identical (item~2), so it carries the same transaction id and the door commits it once (P5). Crash-and-retry cannot double-book.
+
+\item \textbf{Proposed, never authoritative.} A submission is a proposal. It becomes ledger fact only through \texttt{applyTx} (Principle~\ref{prin:executor}), under the same admission checks as every other transaction. A processor holds no write privilege, and no submission channel bypasses the door.
+\end{enumerate}
+
+\noindent What the door guarantees about these producers, and what it leaves to be checked, divide along one line.
+
+\begin{principle}[Admission and recomputation]
+\label{prin:admission-recomputation}
+Admission guarantees that no transaction can break the ledger; recomputability from declared data guarantees that a wrong transaction can always be detected. Structural correctness is enforced at the door. Economic correctness is not enforced at the door: it is made checkable by recomputing the transaction from the log, and a failed check marks a producer defect, repaired downstream.
+\end{principle}
+
+The first layer is \emph{structural correctness}. Conservation rides on the Transaction type: an unconserved move set is unrepresentable, so no processor can submit one. Every submission passes \texttt{applyTx}, so no processor can break an invariant, leave a partial state, or delete a row. Structural correctness holds against a defective processor and a malicious one alike, because it never depended on the processor at all.
+
+The second layer is \emph{economic correctness}, and the door does not check it --- by design, not by omission. Whether a transaction is economically right is not a predicate on the transaction alone; it is agreement between the transaction and the declared data that determine it, and agreement is checked by computing, not by inspecting. The declared terms of an option settlement state that \EUR{100} is owed; a defective processor submits a settlement paying \EUR{98}. The transaction is balanced, conserving, and basis-consistent. Admission has no ground to refuse it, and it books \EUR{2} of wrong economics.
+
+The error is caught in exactly one way: recompute the transaction from the log prefix and compare. The terms, the adjustment schedule, the dimensions, the datum-kind registry, and the operator are all declared, logged data, so a second computation of the same settlement is always possible from the log alone. The recorded and the recomputed transactions are compared in canonical form: \texttt{canonicalTx} fixes the form, and equality on Transaction decides the comparison. P27 (Producer agreement) is the executable witness. Its oracle, \texttt{recomputeOK}, recomputes over the prefix and asserts a zero diff.
+
+A nonzero diff is a producer defect, never a ledger defect. It is repaired through the compensating-transaction path (\S\ref{sec:implementation-corrections}): the producer is corrected and the transaction resubmitted.
+
+The corporate-action half runs the same check on the same numbers as the lifecycle half. A 2-for-1 split's declared \texttt{Scale}~2 and the unit's adjustment schedule take a \EUR{100} strike to \EUR{50}; a defective corporate-action processor submits a terms append carrying \EUR{49} --- the 49-versus-50 error of the June-1 timeline (\S\ref{sec:basis-operators}). The append is structurally admissible, and the error is caught the same way: \texttt{recomputeOK} re-runs the schedule against the logged notice, obtains \EUR{50}, and reports a nonzero diff, repaired through the same compensating path. One architecture, one verification mechanism, on both halves.
+
+\emph{Untrusted} therefore has exact content. A processor is trusted to produce transactions, not trusted to be right about them. The door re-checks the structure of every submission, and every output the processor produces can be recomputed from declared data by an independent implementation. The single-door consequence of \S\ref{sec:lifecycle} (Principle~\ref{prin:executor}) is exactly the first layer of this division; the second layer is what recomputation adds on top of it.
+
+Replay re-reads recorded transactions; it never re-executes a processor, and it fetches nothing from outside the log. History is therefore closed against processor change: a processor can be upgraded, replaced, or discarded, and every past state still reconstructs exactly. The settlements these processors originate are the lifecycle-originated settlements of \S\ref{sec:settlement-lifecycle}: the Ledger is the originator, so the settlement projection carries them outward as instructions, and there is no inbound instruction the ledger must wait for or reconcile against.
+
+%----------------------------------------------------------------------
+\subsection{The executor as an activity}
+\label{sec:executor-activity}
+%----------------------------------------------------------------------
+
+The executor is the single component permitted to mutate the ledger. It validates conservation, checks idempotency by transaction ID (P5), and commits atomically. It runs as a retriable engine \emph{activity}: a unit of work the engine re-invokes on transient failure.
+
+The mapping is exact on two points. \textbf{Retry.} The engine retries on transient failures: network partition, process crash, transient database error. The executor's transaction-ID idempotency check makes a retried commit a no-op. At-least-once dispatch is thereby upgraded to exactly-once effect. Conservation violations, referential-integrity errors, and idempotency rejections are non-retryable. They signal logic errors, never transient ones, and a retry never succeeds. \textbf{Idempotency contract.} The activity's idempotency key is the transaction ID. If that ID is already committed, the executor returns the prior result without re-applying moves. This satisfies the engine's requirement that an activity called repeatedly with the same input produce one observable effect.
+
+%----------------------------------------------------------------------
+\subsection{The due-event scheduler}
+\label{sec:temporal-scheduler}
+%----------------------------------------------------------------------
+
+Every contractual obligation with a deterministic future date is mapped, at unit registration, to a durable timer. This covers bond coupons, futures daily settlement, option expiry, IRS resets, CSA margin calls, and managed-account resets (Table~\ref{tab:obligation-types}, deterministic-date rows). The timer is persisted by the engine. It survives server restarts, worker deployments, version upgrades, and data-centre failovers. This resolves the liveness gap for dated obligations. The timer fires regardless of infrastructure failures, and idempotency guarantees it fires at most once.
+
+A due event does not proceed on stale or unavailable market data. Each lifecycle workflow runs a data-quality check before invoking the lifecycle function. On failure it defers the event and retries after a fixed interval. The deferral itself is durable across worker crashes. Market-data staleness thresholds and cross-source validation are specified in the market-data satellite specification. This section consumes that gate; it does not define it.
+
+%----------------------------------------------------------------------
+\subsection{Concurrency: single-writer by construction}
+\label{sec:temporal-concurrency}
+%----------------------------------------------------------------------
+
+One lifecycle workflow is assigned per unit, or per wallet for per-wallet state such as futures accumulated cost. Each instance processes events single-threaded in deterministic order, so concurrent lifecycle events on the same unit serialise. Two margin calls on one CSA cannot interleave. Two coupons on one bond cannot race. A daily settlement and an intraday trade on one futures contract process in strict causal order. The executor therefore never receives concurrent mutations for a unit from the orchestration layer. Its idempotency check (P5) is a second line of defence against a duplicate reaching it through an activity retry.
+
+Operations spanning units, such as corporate actions, close-out netting, and CSA-level margin, are coordinated by a parent workflow. The parent's deterministic execution fixes causal order across its children. No shared mutable state exists between them. Serialisation is per unit, not global. Distinct units execute in parallel, so throughput scales with the number of active units and the worker pool, not with any single unit's lifecycle complexity.
+
+%----------------------------------------------------------------------
+\subsection{Obligation liveness}
+\label{sec:obligation-liveness}
+%----------------------------------------------------------------------
+
+The scheduler closes the gap only for obligations whose deadline is known at registration. A second class, \emph{event-triggered} obligations, arises during the lifecycle with no timer at registration. An SBL recall creates a return-by deadline absent at loan inception. A collateral-eligibility change creates a substitution demand with a cut-off. A margin call creates a delivery obligation at T+1 from the call. A counterparty default triggers close-out netting on master-agreement deadlines. Obligations handled only inside workflow code are invisible to the framework. The framework then cannot distinguish ``tracked'' from ``forgotten by the workflow author.'' The obligation as a first-class object closes this gap.
+
+\subsubsection{The obligation type}
+\label{sec:obligation-type}
+
+An obligation packages three things: a deadline, a test on ledger state that says whether the duty has been met, and a prescribed consequence if the deadline passes with the test unmet. The definition makes each part a field.
+
+\begin{definition}[Obligation]
+\label{def:obligation}
+An \emph{obligation} is a tuple $o = (\mathit{id},\, \mathit{type},\, \mathit{source},\, t_d,\, D,\, \kappa)$:
+\begin{itemize}[nosep]
+\item $\mathit{id}$: a unique identifier, derived deterministically from the source event and obligation type.
+\item $\mathit{type}$: a member of the obligation-type enumeration (Table~\ref{tab:obligation-types}).
+\item $\mathit{source}$: the unit, agreement, or regulatory event that created it.
+\item $t_d$: the \emph{deadline} by which the obligation must be discharged.
+\item $D$: the \emph{discharge predicate} on ledger state. The obligation is discharged when a move set $M$ journaled before $t_d$ gives $D(\mathrm{state\_after}(M)) = \mathit{true}$.
+\item $\kappa$: the \emph{compensation action}, a deterministic function computing compensating moves when the deadline passes undischarged.
+\end{itemize}
+\end{definition}
+
+\noindent The obligation record and its discharge predicate are expressed directly in the type system. The discharge predicate $D$ and the compensation $\kappa$ are \emph{total} functions of ledger state: same state, same verdict. A discharge decision is therefore deterministic and replayable. $\kappa$ returns \texttt{Just}~moves when it can compute valid compensating moves and \texttt{Nothing} when it cannot; the latter forces \textsc{Defaulted}. The record below transcribes the definition field for field.
+
+\begin{lstlisting}[language=Haskell]
+-- D and kappa are total functions of ledger state (deterministic verdicts).
+data Obligation = Obligation
+  { obId         :: ObId                        -- derived from source event + type
+  , obType       :: ObType                      -- taxonomy (obligation-types table)
+  , obSource     :: Source                      -- unit / agreement / regulatory event
+  , obDeadline   :: Time                        -- t_d
+  , obDischarge  :: LedgerState -> Bool         -- D : the discharge predicate
+  , obCompensate :: LedgerState -> Maybe [Move] -- kappa : Just on success, Nothing fails
+  }
+\end{lstlisting}
+
+\noindent The lifecycle state is a one-way street: once an obligation settles, no code path can reopen it. The state type is split so that the type, not a convention, forbids leaving a terminal state. \textsc{Pending} and \textsc{Attempted} are the only \emph{live} states, and the handler consumes only live states. \textsc{Discharged}, \textsc{Compensated}, and \textsc{Defaulted} are terminal and have no exit edge. ``An obligation leaves a terminal state'' is unrepresentable, not merely unreached.
+
+\begin{lstlisting}[language=Haskell]
+data Live     = Pending | Attempted                  -- non-terminal
+data Terminal = Discharged | Compensated | Defaulted  -- terminal: no exit edge
+data ObState  = Active Live | Settled Terminal        -- stored per obligation
+
+data Trigger  = DischargeSignal | DeadlineFired       -- the two things that move o
+
+-- Total over (Live x Trigger). `step` takes only Live, so a Terminal can never
+-- be transitioned. On DeadlineFired every arm returns Right (a terminal state):
+-- that absence of a Left IS lemma L5 (handler totality), the handler half of P21.
+step :: Obligation -> LedgerState -> Live -> Trigger -> Either Live Terminal
+step o s _ DischargeSignal
+  | obDischarge o s = Right Discharged
+  | otherwise       = Left  Attempted
+step o s _ DeadlineFired
+  | obDischarge o s = Right Discharged
+  | otherwise       = case obCompensate o s of
+      Just _ms      -> Right Compensated    -- kappa succeeded
+      Nothing       -> Right Defaulted      -- kappa failed
+\end{lstlisting}
+
+\noindent The whole mechanism is a record, a sum type split into live and terminal, and one total function. Anything further would remove neither a bug nor a line of code. The state-table transitions of \S\ref{sec:obligation-type} are exactly the cases of \texttt{step}. The CSA call below (\S\ref{sec:obligation-example-csa}) makes the behaviour concrete: \texttt{step csaVM} on a post-delivery state with \texttt{DischargeSignal} returns \texttt{Right Discharged}; on a no-delivery state with \texttt{DeadlineFired} it returns \texttt{Right Compensated}.
+
+\begin{center}
+\small
+\begin{tabular}{l l l}
+\toprule
+\textbf{From} & \textbf{To} & \textbf{Condition} \\
+\midrule
+\textsc{Pending}   & \textsc{Attempted}   & discharge attempted \\
+\textsc{Pending}   & \textsc{Discharged}  & $D = \mathit{true}$ (early) \\
+\textsc{Pending}   & \textsc{Compensated} & $t > t_d$, $\kappa$ fires \\
+\textsc{Attempted} & \textsc{Discharged}  & $D = \mathit{true}$ \\
+\textsc{Attempted} & \textsc{Compensated} & $t > t_d$, $\kappa$ fires \\
+\textsc{Pending}   & \textsc{Defaulted}   & $t > t_d$, $\kappa$ fails \\
+\textsc{Attempted} & \textsc{Defaulted}   & $t > t_d$, $\kappa$ fails \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{Taxonomy}
+\label{sec:obligation-taxonomy}
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{l l l l}
+\toprule
+\textbf{Obligation type} & \textbf{Scope} & \textbf{Trigger} & \textbf{Compensation $\kappa$} \\
+\midrule
+\multicolumn{4}{l}{\textit{Deterministic-date (timer at registration)}} \\
+Bond coupon & Unit & Timer at coupon date & Default event \\
+Option expiry & Unit & Timer at termination date & N/A (auto-expire) \\
+IRS reset & Unit & Timer at reset date & Default event \\
+Futures daily VM & Unit & Cron at exchange EOD & Position liquidation \\
+SBL term loan return & Unit & Timer at maturity & Buy-in (GMSLA~9.3) \\
+\midrule
+\multicolumn{4}{l}{\textit{Event-triggered (timer at event time)}} \\
+SBL recall return & Unit & Recall signal & Buy-in (GMSLA~9.3) \\
+SBL manuf.\ dividend & Unit & Corp.\ action record date & Cost attribution \\
+SBL collateral subst. & Unit & Demand / eligibility change & Shortfall escalation \\
+CSA VM delivery & Agreement & Margin call computation & Close-out netting (ISDA) \\
+CSA IM delivery & Agreement & Regulatory schedule & Close-out netting \\
+Collateral substitution & Agreement & Schedule amendment & Close-out netting \\
+SBL collateral top-up & Unit & MTM threshold breach & Recall / default \\
+Close-out netting & Agreement & Default event & Waterfall / loss alloc. \\
+\midrule
+\multicolumn{4}{l}{\textit{Regulatory}} \\
+SFTR report & Unit & SBL lifecycle event & Regulatory penalty \\
+SLATE report & Unit & SBL lifecycle event & Regulatory penalty \\
+EMIR report & Unit & Trade/lifecycle event & Regulatory penalty \\
+Settlement instruction & Unit & Settlement-type transaction & Failed settlement \\
+\bottomrule
+\end{tabular}
+\caption{Obligation types by trigger and scope. Deterministic-date obligations are scheduled at unit registration; event-triggered obligations are created when the triggering event is processed; regulatory obligations are created alongside the business event.}
+\label{tab:obligation-types}
+\end{table}
+
+\subsubsection{The obligation store}
+\label{sec:obligation-store}
+
+Obligations live where everything else lives: in the one event log. The store is what a reader recovers from that log, not a second place where truth is kept.
+
+\begin{definition}[Obligation store]
+\label{def:obligation-store}
+The \emph{obligation store} $\mathcal{O}$ is the set of obligations recovered from the event log by filtering to obligation-typed entries. Each obligation is added atomically within the transaction that creates its triggering event; each state transition is a logged state-only transaction.
+\end{definition}
+
+\noindent The obligation store is a projection of the event log. Each change to an obligation's state is a logged transaction (Definition~\ref{def:obligation-store}). The stored value is a read cache, overwritten in place. Replaying the log to any instant rebuilds the value that held then, so overwriting loses nothing. A logged transaction is the only thing that changes the value. The value exists from the obligation's creation onward.
+
+\subsubsection{Registration}
+\label{sec:obligation-registration}
+
+Obligations register through two channels. At \textbf{unit registration}, the lifecycle function extracts dated obligations from the CDM \texttt{EconomicTerms} (coupon, reset, termination schedules), one per date. These correspond one-to-one with the scheduler's timers (\S\ref{sec:temporal-scheduler}). They make explicit what the timer alone left implicit: each has a defined discharge predicate and compensation action. At \textbf{event processing}, the lifecycle function returns, alongside the event's moves and state deltas, any obligation the event creates. The executor commits the obligation registration atomically with the triggering event.
+
+Registration cannot rest on a workflow author remembering to create the obligation. The principle below places it in the lifecycle function's output contract instead.
+
+\begin{principle}[Obligation completeness]
+\label{princ:obligation-completeness}
+A lifecycle function processing an obligation-creating event includes the obligation in its output. A function that omits a required obligation is incorrect, irrespective of whether its moves are valid.
+\end{principle}
+
+\noindent The CDM event-type enumeration bounds the test space, so this principle is enforceable by property-based testing. For each obligation-creating event type (Table~\ref{tab:obligation-types}), the generator produces events and the postcondition verifies a non-empty, well-formed obligation list. A typed return that mandates an obligation list for obligation-creating event types makes omission a compile-time error.
+
+\subsubsection{The obligation workflow}
+\label{sec:obligation-workflow}
+
+Each obligation is managed by one workflow, either spawned per obligation or embedded in the unit or agreement lifecycle workflow that owns its source. The pattern is uniform: a selector waits on a discharge signal channel and a deadline timer. On a discharge signal, the handler checks $D$ against ledger state. If $D$ is satisfied, the obligation becomes \textsc{Discharged} and the workflow completes. Otherwise the obligation becomes \textsc{Attempted} and the workflow waits. When the timer fires at $t_d$, the handler re-checks $D$. If $D$ is satisfied, the obligation becomes \textsc{Discharged}. Otherwise the handler commits $\kappa$ through the executor, reaching \textsc{Compensated} on success and \textsc{Defaulted} (raising a default event) on failure. The workflow ID is derived deterministically from $o.\mathit{id}$, so the engine's duplicate-start rejection prevents double-spawning.
+
+\subsubsection{Liveness invariants}
+\label{sec:obligation-invariants}
+
+Three invariants govern the subsystem. In plain terms: every obligation reaches a terminal state by its deadline (P21); discharging or compensating it moves value only through the executor, so conservation is never bypassed (P22); and discharging it twice changes nothing (P23).
+
+\begin{invariant}[P21---Obligation Liveness]
+\label{inv:P21}\label{inv:obligation-liveness}
+For every $o \in \mathcal{O}$ with deadline $t_d$:
+\[
+\forall\, t > t_d : \quad o.\mathit{state} \in \{\textsc{Discharged},\; \textsc{Compensated},\; \textsc{Defaulted}\}.
+\]
+No obligation persists in \textsc{Pending} or \textsc{Attempted} beyond its deadline.
+\end{invariant}
+
+\begin{invariant}[P22---Obligation Conservation]
+\label{inv:P22}\label{inv:obligation-conservation}
+Every discharging move set and every compensation move set for $o$ satisfies the conservation law $Q(u) = 0$ (P1). The obligation mechanism does not bypass the executor.
+\end{invariant}
+
+\begin{invariant}[P23---Obligation Idempotency]
+\label{inv:P23}\label{inv:obligation-idempotency}
+Discharging the same obligation twice, by $o.\mathit{id}$, has no incremental effect: $D$ is checked before moves are emitted, and if already satisfied no moves are produced. This composes with transaction-ID idempotency (P5) and lifecycle idempotency (P6).
+\end{invariant}
+
+\subsubsection{Proof of liveness}
+\label{sec:liveness-proof}
+
+The proof follows the obligation's own path. The obligation is registered; a workflow with a timer exists for it; the timer survives failures and fires; the total handler then lands in a terminal state. Each step is a lemma.
+
+\begin{theorem}[Obligation liveness]
+\label{thm:obligation-liveness}
+Under the executor, engine, and obligation store, P21 (Invariant~\ref{inv:P21}) holds: no obligation persists in \textsc{Pending} or \textsc{Attempted} beyond its deadline.
+\end{theorem}
+
+\begin{proof}
+Five lemmas compose.
+
+\textbf{L1 (Registration completeness).} Every obligation-creating event registers an obligation in $\mathcal{O}$. By Principle~\ref{princ:obligation-completeness}, registration is part of the lifecycle function's output contract; the executor commits it atomically with the triggering event; property-based testing verifies a non-empty obligation list per obligation-creating event type.
+
+\textbf{L2 (Workflow creation).} Every $o \in \mathcal{O}$ is managed by a workflow with a timer at $t_d$. The executor's post-commit hook spawns it; the deterministic workflow ID makes the engine reject double-spawning.
+
+\textbf{L3 (Timer durability).} The timer at $t_d$ is persisted by the engine and survives server restarts, worker deployments, version upgrades, and data-centre failovers---a guarantee of the engine (\S\ref{sec:exec-requirements}).
+
+\textbf{L4 (Timer fires).} The timer fires at $t_d$, by the engine's durable-execution guarantee. \textit{Prerequisite}: the engine cluster is available at $t_d$. Cluster availability is an operational prerequisite, not a framework property; multi-region replication mitigates but does not eliminate the dependency.
+
+\textbf{L5 (Handler totality).} On firing, the handler transitions $o$ out of \textsc{Pending}. The handler is total: $D = \mathit{true}$ yields \textsc{Discharged}; otherwise $\kappa$ fires, yielding \textsc{Compensated} on success and \textsc{Defaulted} (with a default event) on failure. Every branch terminates in a terminal state.
+
+\textbf{Composition.} For $o$ with deadline $t_d$: $o \in \mathcal{O}$ (L1); a workflow with a timer at $t_d$ exists (L2); the timer is durable (L3) and fires (L4); the handler reaches a terminal state (L5). Hence for all $t > t_d$, $o.\mathit{state} \in \{\textsc{Discharged}, \textsc{Compensated}, \textsc{Defaulted}\}$.
+\end{proof}
+
+\noindent P22 follows from P1 and executor exclusivity: every discharging and compensating move passes through the executor, which validates $Q(u)=0$ before commit. P23 composes with P5 and P6. The obligation ID is part of the transaction source metadata. The discharge predicate prevents re-emission. The transaction ID prevents re-commitment. The composition is summarised below.
+
+\begin{center}
+\small
+\begin{tabular}{l l}
+\toprule
+\textbf{Property} & \textbf{Guarantee source} \\
+\midrule
+Every obligation fires & engine durable timer (L4) \\
+No obligation fires twice & idempotency (P5, P6, P23) \\
+Discharge preserves conservation & executor (P1, P22) \\
+Handler reaches terminal state & workflow totality (L5) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Every obligation is thereby tracked, timed, and resolved. This includes obligations created dynamically during the lifecycle, not only those with a deterministic registration-time date.
+
+\subsubsection{Worked example: CSA variation margin call}
+\label{sec:obligation-example-csa}
+
+Alice and Bob hold a CSA over five IRS trades, threshold \$500{,}000, minimum transfer amount (MTA) \$250{,}000. The daily margin workflow computes an aggregate mark-to-market of \$2.3M in Alice's favour; required margin is $\max(0, |\$2.3\text{M}| - \$500\text{K}) = \$1.8\text{M} \geq \$250\text{K}$, so a call is generated and registers an obligation \texttt{csaVM}, committed atomically with the call event: type \texttt{CSA\_VARIATION\_MARGIN} on source CSA-AB; deadline T+1 next business day close; discharge predicate $D$ = Bob's \texttt{coll\_post(USD, CSA-AB)} increased by at least \$1.8M; compensation $\kappa$ = ISDA close-out netting of CSA-AB. \textbf{Discharge}: Bob delivers \$1.8M before the deadline --- $\Delta w_{\mathrm{Bob}}(\mathrm{USD})[\mathrm{own}] = -1{,}800{,}000$, $\Delta w_{\mathrm{Alice}}(\mathrm{USD})[\mathrm{coll\_recv}] = +1{,}800{,}000$, $Q(\mathrm{USD})=0$ --- the signal satisfies $D$ and the obligation lands \textsc{Discharged}. \textbf{Compensation}: Bob does not deliver; the timer fires, $D$ fails, and $\kappa$ terminates all five trades, computes close-out values per the ISDA Master Agreement, and emits one net settlement move through the executor: \textsc{Compensated}.
+
+\subsubsection{Worked example: SBL collateral substitution}
+\label{sec:obligation-example-sbl}
+
+A lender demands substitution: bond XYZ is no longer eligible under the updated collateral schedule (IBP references denote clauses of the ISLA Best Practice Handbook~\cite{isla-ibp}). The eligibility check registers an obligation on loan L123: type \texttt{SBL\_COLLATERAL\_SUBSTITUTION}; deadline one hour before the DVP cut-off (IBP-170); discharge = new eligible collateral posted \emph{and} old released; compensation = collateral-shortfall escalation. \textbf{Discharge}: the borrower delivers German Bund in one four-move transaction, each move satisfying the Single-Coordinate Move Principle (Principle~\ref{princ:single-coord}) --- release \texttt{coll\_post}/\texttt{coll\_recv} of XYZ by the old amount, post \texttt{coll\_post}/\texttt{coll\_recv} of BUND by the new --- so per-unit conservation holds on both units ($\Delta Q(\mathrm{XYZ}) = 0$, $\Delta Q(\mathrm{BUND}) = 0$): \textsc{Discharged}. \textbf{Compensation}: the cut-off passes without delivery; the escalation marks L123 collateral-deficient in the SBL unit state and raises an exposure-breach notification, which beyond the GMSLA grace period triggers recall or default per GMSLA~\S10: \textsc{Compensated}.
+
+\subsubsection{Relationship to SBL invariants}
+\label{sec:obligation-sbl-relationship}
+
+P21 supplies the temporal guarantee underpinning the SBL invariants (P11--P20). It guarantees collateral top-up obligations resolve by deadline, by delivery or by compensation, so P13 (Collateral Sufficiency) cannot be violated by an untracked call. It guarantees each reportable event's reporting obligation fires before its T+1 deadline, or escalates, sustaining P16 (SFTR Completeness). It guarantees recall obligations resolve, so shares cannot remain on loan past a recall deadline without return or buy-in, sustaining P18 (Lender Ownership Invariance).
+
+\subsubsection{Property-based testing for obligations}
+\label{sec:obligation-testing}
+
+Three properties extend the testing framework. \textbf{Registration completeness}: for random obligation-creating events, the output includes a non-empty obligation list with valid deadline, discharge predicate, and compensation action. \textbf{Discharge conservation}: every discharge move set satisfies $Q(u) = 0$. \textbf{Handler totality}: over random obligation states $\times$ \{discharge-before-deadline, no-discharge, compensation-success, compensation-failure\}, the handler reaches a terminal state in every case. The CDM event-type enumeration bounds the obligation-creating event space, making coverage structurally complete.
+
+\subsubsection{Assumptions and limitations}
+\label{sec:obligation-limitations}
+
+Theorem~\ref{thm:obligation-liveness} depends on four assumptions, each at the framework boundary. \textbf{Engine availability at $t_d$}: an unavailable cluster delays the timer until recovery; liveness holds eventually, not instantaneously. \textbf{Executor availability}: an unavailable executor leaves the obligation \textsc{Pending} under retry until recovery. This is a bounded delay, not a permanent failure. \textbf{External cooperation}: discharge conditions requiring counterparty action cannot be compelled; compensation is the contractual fallback. \textbf{Lifecycle-function correctness}: L1 assumes lifecycle functions register all required obligations. This is enforceable by property-based testing and, in a typed implementation, by a mandatory obligation list in the return type. These assumptions match the framework's existing boundary: correctness within the ledger, given infrastructure availability and correct lifecycle functions. External actors and infrastructure availability lie outside it.
+

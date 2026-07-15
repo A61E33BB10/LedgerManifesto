@@ -1,0 +1,286 @@
+\section{The Smart Contracts and Their Triggers}\label{sec:contracts}
+
+We have the door, the log, and the declared data a contract may read. What remains
+is the contract itself: the thing that, when an event fires, works out what must
+change and submits it. This section specifies what a contract is allowed to be,
+shows that trades, lifecycle events, and corporate actions are one kind of machine
+rather than three, and makes the two-layer correctness statement precise on worked
+numbers.
+
+\subsection{One architecture, three triggers}
+
+To the ledger, executing a trade and processing a lifecycle event are the same
+operation: a finite list of atomic moves with optional state changes, obeying
+conservation, admitted at the one door. There is no separate lifecycle subsystem
+inside the ledger, no per-product pipeline, no special data path for corporate
+actions. This is not an incidental economy; it is a direct consequence of the
+thesis. The ledger is a door, some checks, a log, and views, and nothing that
+admits or records a transaction cares where the transaction came from. So
+everything that changes the ledger is a transaction at the same door, and
+everything that produces a transaction presents the ledger with the same shape: a
+proposal to be admitted or refused. The producers' internals differ; the shape they
+present does not.
+
+That shape has three trigger classes, and they differ in what they read, not in
+how they run:
+
+\begin{itemize}[leftmargin=1.5em]
+\item A \textbf{trade} is a contract triggered by execution. The executed trade
+becomes one conserving transaction; for a bespoke instrument the executed trade is
+itself the unit definition, registered at the moment it is done.
+\item A \textbf{lifecycle event} is a contract triggered by \emph{the engine} --- the
+external execution service that fires dated obligations --- when an obligation comes
+due, an expiry, a coupon, an exercise. It reads the unit's current terms and state
+and the observations stamped for it, and it emits the moves that discharge the
+event.
+\item A \textbf{corporate action} is a contract triggered by a confirmed notice ---
+a dividend, a split, a spin-off. It reads the notice's declared parameters and the
+unit's schedule, and it submits the boundary's one transaction, which may carry all
+three of a new terms version, the entitlement moves, and the status writes that set
+the new basis.
+\end{itemize}
+
+Each trigger fires a contract that produces exactly one transaction per firing. That
+one transaction may carry many moves, a terms version, and several status writes at
+once, but it is one atomic commit; a follow-on that a boundary sets in motion --- a
+cascade onto a successor unit, a downstream settlement --- is a separate trigger
+with its own transaction, not a second output of the first.
+
+An option expiry and a stock split are processed by the same shape of machine:
+catch the trigger, read declared data and stamped observations, compute, submit.
+The differences between them are entirely differences in what they read. Nothing
+in the ledger branches on which of the three a given transaction came from.
+
+The corporate-action trigger is a \emph{confirmed} notice, and the gap between an
+announcement and its confirmation is handled deliberately. An announcement enters as
+declared data --- the boundary is known, its effective time recorded --- but it arms
+no operator: until confirmation, no conversion is declared, and nothing about any
+datum adjusts. The unit is marked pending for that boundary. Consumption that would
+cross the announced boundary fails closed and quarantines, because there is no
+operator to carry a number across it; consumption that stays in the unit's standing
+basis --- a fresh print taken before the effective time and read in the frame it was
+taken --- is unaffected and proceeds normally. Confirmation is precisely the act
+that arms the operator, turning the announced boundary from a known-but-inert marker
+into a declared conversion the read seam can apply.
+
+A single door settles quietly what happens when two things land on one unit at one
+instant, because there is no such instant in the log: every commit is totally
+ordered by the door, so events that share an effective time are simply adjacent, in
+a definite order. Two cases are worth stating. When two \emph{boundaries} carry the
+same effective time on the same unit, the same-effective-time weld applies and
+effective order keys on the triple (effective time, declared precedence, bid); if
+the two notices declare no mutual precedence, the second is refused and the unit
+enters a pending-transition state --- fail-closed --- rather than letting the bid
+tie-break silently choose an order for two adjustments that do not commute. When a
+\emph{lifecycle event} and a \emph{boundary} fall together, there is no dedicated
+priority scheme, and none is needed: log commit order fixes which prefix each
+processor reads, prefix-determinism makes each submission a function of that prefix,
+and a settlement booked against a prefix that a boundary later precedes was correct
+on the prefix it read: recomputation reproduces it, diffs to zero, and does not flag
+it. What the retro-effective path guarantees is that the invalidation is exactly
+locatable and repairable, not that it is automatically found. The boundary's window
+$[t_{\text{eff}}, t_{\text{notify}})$ is explicit in the log; replaying the corrected
+chain recomputes what each settlement in the window should have been; and the repair
+is a compensating transaction --- authored outside the ledger, like every repair,
+admitted with lineage to both the settlement it corrects and the boundary that
+invalidated it. The guarantee is order, determinism, and repairability --- not a
+ranking of event types.
+
+A contract, then, is a deterministic, total function from its inputs to one
+transaction --- a finite list of moves together with the terms versions and status
+writes that ride with them --- with no randomness, no hidden state, and no dependency
+on anything not passed to it. Its output alphabet is exactly three things: moves,
+which route units between wallets and never create or destroy them; terms versions,
+appended never edited; and status writes, each an absolute replacement through its
+one legal writer. Conservation holds by construction over the moves, and the terms
+versions and status writes pass through the same admission checks as any other
+transaction. This is also why writing a contract from a legal confirmation is
+transcription rather than engineering. The confirmation already says what happens
+on each date and in each state; the contract is its machine-readable form, adding
+executability and adding nothing to the information.
+
+\subsection{What the contract layer is required to satisfy}
+
+Because a contract is untrusted, ``deterministic and total'' has to be made
+precise enough to check. Four obligations do that, and every implementation of a
+contract --- the reference one, a vendor's system, a rewrite --- is held to exactly
+them.
+
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{Closed inputs.} A contract reads the committed log and the stamped
+observations the log records --- nothing else. No ambient clock, no direct feed, no
+configuration off to the side. The timer that wakes a lifecycle contract is
+delivery, not data: it says \emph{when}, while everything the event \emph{means}
+is in the log. An expiry contract woken an hour late submits the identical
+transaction, because nothing it reads changed in that hour. The engine that fires
+these timers lives outside the trust boundary, named apart from the door, the log,
+and the views, and holding no privileged access of any kind; it is bound only to
+fire durably and to deliver at least once. Because its trigger is delivery and never
+data, an engine that stalls, fails over, fires early, or fires twice can \emph{delay}
+a discharge but cannot corrupt the log: a late delivery submits the same transaction,
+a duplicate delivery is absorbed idempotently at the door, and an early or spurious
+fire finds its observation or due-state not yet in the log and yields a refusal --- a
+rejected proposal, never a corrupt commit.
+\item \textbf{Prefix-determinism.} Given a log prefix, the submission is
+determined. Two runs, or two independent implementations, over the same prefix
+produce equal transactions --- equal move for move, under a \emph{canonical move
+order}, the deterministic total order on a transaction's moves fixed by the
+transaction itself, against which two recomputations are compared --- so equality is
+decided rather than judged.
+\item \textbf{Idempotence keys.} Every submission carries a key derived
+deterministically from its cause: the obligation's identity for a lifecycle
+settlement, the causing boundary paired with the target unit for a corporate-action
+follow-on. A retried submission is bit-identical, carries the same transaction id,
+and the door commits it once. Crash-and-retry cannot double-book.
+\item \textbf{Proposed, never authoritative.} A submission becomes ledger fact
+only by passing the same admission checks as every other transaction. No contract
+holds write privilege; no submission channel bypasses the door.
+\end{itemize}
+
+The reference implementation of a contract is a pure function --- roughly,
+
+\begin{lstlisting}
+handle :: LogPrefix -> Trigger -> Either Refusal Transaction
+\end{lstlisting}
+
+--- and the four obligations are exactly the properties this signature already
+enforces: it takes the log prefix and the trigger and returns a transaction, with
+no argument through which a clock, a feed, or a configuration could enter, and no
+effect it could have except returning the transaction it proposes. Any other
+implementation is conforming precisely insofar as it matches what this function
+does on every prefix.
+
+These four obligations make a contract's \emph{output} checkable, but they say
+nothing about whether an obligation fires at all. That is a separate guarantee, and
+the design carries it as data rather than as hope. Every contractual obligation is a
+first-class logged object, registered atomically with the position it binds and
+carrying three things: a deadline, a discharge predicate, and a compensation action.
+By its deadline it must reach one of three terminal states --- Discharged,
+Compensated, or Defaulted --- so a coupon that should fire and does not is not
+silence but a \emph{Pending-past-deadline} object, visible to any fold of the log
+and therefore a detectable state rather than a missing one. The guarantee is
+conditional, and its primary condition is named: it rests on the engine being
+available at the deadline to deliver the trigger; Section~\ref{sec:framework} states
+the full set of conditions the guarantee stands on. Under an engine outage the
+obligation is reached \emph{eventually}, when delivery resumes, not instantaneously;
+the log never loses the obligation, it only waits for the fire.
+Section~\ref{sec:framework} develops the obligation object and its liveness
+guarantee, including which component drives it to a terminal state.
+
+\subsection{Two layers of correctness, on numbers}
+
+We can now discharge the claim from Section~\ref{sec:thesis} that a contract's
+output is trusted for nothing and verifiable in everything. The subject is the
+contract, not the ledger: the ledger is precisely the trusted component --- it is
+trusted to admit only well-formed transactions and to record them faithfully --- and
+it is the contracts whose output is trusted for nothing and checked against the log
+instead. The claim splits into two layers, and the honest content of the split is
+that one layer is guaranteed and the other is checked.
+
+The first layer is structural, and it holds against a defective contract and a
+malicious one alike, because it never depended on the contract. Whatever a
+contract submits, if the door admits it then it conserves every unit, applies in
+full or not at all, writes every fact through its one legal writer, and dangles no
+reference. A contract cannot break this by being wrong, because being wrong is not
+one of the ways a transaction can be malformed. There is simply no unconserved,
+half-applied, or dangling proposal for the door to let through.
+
+The second layer is economic, and this is the layer a contract can violate.
+Consider a settlement whose declared terms owe \EUR{100} per note, and a defective
+contract that submits a settlement paying \EUR{98}. That transaction is balanced,
+conserving, and basis-consistent. The door has no ground to refuse it --- every
+structural property holds --- and it is admitted. On a 1{,}000-note holding it has
+now booked \EUR{98{,}000} where \EUR{100{,}000} was owed. Nothing at the door
+catches this, and nothing at the door is supposed to. What catches it is
+recomputation: the settlement is recomputed from the log prefix --- the terms, the
+schedule, the registered kinds, the stamped observations are all there --- and
+compared with what was recorded, in canonical form. The comparison reports a
+difference of \EUR{2} per note, \EUR{2{,}000} on the holding. That nonzero
+difference is the defect, located exactly, and it is a defect in the contract, not
+in the ledger. It is repaired downstream by a compensating transaction --- authored
+outside the ledger, by the corrected producer, and resubmitted through the same door
+under a \texttt{corrects} field that names the \EUR{98} settlement it supersedes. The
+ledger admits this repair exactly as it admits any transaction and manufactures none
+of it; the original \EUR{98} settlement stays in the log, marked corrected, so the
+error and its repair both survive.
+
+The corporate-action half of the system runs the same check on the same kind of
+numbers. A declared \texttt{Scale 2}, composed with the schedule, takes a
+\EUR{100} strike to \EUR{50}. A defective contract that appends \EUR{49} instead
+has submitted something structurally admissible --- a well-formed terms version ---
+and it is caught the same way, by recomputing the appended strike from the boundary
+and the schedule and finding the \EUR{1} gap. One architecture, one verification
+mechanism, on both halves: a settlement that should pay \EUR{100} and an adjustment
+that should yield \EUR{50} are checked by the same recomputation, and a wrong
+\EUR{98} or a wrong \EUR{49} is found the same way.
+
+This is the whole of what Principle~\ref{prin:two-layer} claims, now on numbers.
+The ledger \emph{relies on} the structural layer, because it is guaranteed by
+construction and no contract can break it. It \emph{expects} the economic layer,
+and rather than trusting the expectation it makes it checkable: ``the contract
+computed the right number'' is not believed, it is recomputed. A failed
+recomputation is always a producer defect and never a ledger defect, because the
+ledger's part --- admitting only well-formed transactions and recording them
+faithfully --- is exactly the part that was guaranteed.
+
+The component that performs this recomputation deserves a name, because it, and not
+the door, is what makes economic correctness checkable. Call it the \emph{witness}.
+The witness takes the committed log, replays the declared inputs a transaction
+depended on --- the terms, the schedule, the registered kinds, the stamped
+observations --- recomputes the transaction in canonical form, and compares. Every
+input it reads is log-resident and its computation is deterministic, so any
+independent party can run it and reach the identical verdict; who operates it --- the
+firm, a counterparty, an auditor, a regulator --- is a deployment choice, not a
+matter of trust. The witness is not part of the door. The door admits well-formed
+transactions in log order and moves on; the witness reads the committed log after the
+fact. Nothing gates admission, a view, or the settlement projection on a prior
+witness pass, and when the witness runs is an operational decision the deployment
+must schedule. This is why the
+bound is eventually-detected-and-repaired rather than verified-before-consumed: the
+check is real and anyone can run it, but it runs over what is already committed, not
+before it.
+
+\subsection{Provenance is recorded, never acted on}
+
+Every transaction that follows from a boundary carries a tag naming its cause ---
+the boundary that triggered it. It is tempting to think the ledger uses this tag to
+decide how to process the follow-on. It does not. The tag is provenance only. A
+unit's own boundary transaction carries no cause tag, because a boundary is its own
+cause: its identity is the transaction's own entry in the log, and a tag pointing a
+boundary at itself would be redundant at best and circular at worst. Every follow-on
+and cascade, by contrast, carries the causing boundary's identity. But no admission
+check, no valuation, no conversion, and no code path anywhere branches on the tag's
+value. It is read only by the witness that verifies economic correctness, and by
+audit.
+
+The one gate that does look at the tag is a well-formedness check, not a behavioural
+branch: a transaction that names a cause is admitted only if that cause is a
+boundary already committed strictly earlier in the log. This refuses a transaction
+that points at an event not yet recorded, and it structurally rules out a
+transaction that names itself. The tag names the cause; it does not carry the
+conversion. Audit needs the name, arithmetic needs the operator, and the two are
+kept apart on purpose: the tag alone is necessary for provenance and insufficient
+for computation, which is exactly why nothing computes from it.
+
+\subsection{The model-agnostic wall}
+
+One boundary has been implicit throughout and is worth making explicit, because it
+is what keeps the whole architecture indifferent to product complexity. The ledger
+records the outputs of pricing models and never runs a pricing model. Whatever
+computation decided that a structured note was worth what it was worth --- however
+elaborate, however proprietary --- is not something the ledger reproduces,
+validates, or even sees. What the ledger sees is the moves the contract emits and
+the observations stamped into the log. The repricing an event causes is new
+information, and it enters only as a fresh stamped observation; the ledger never
+manufactures it by transforming an old observation into a new one. The gap between
+a transported old price and the next fresh print is market profit and loss, and it
+is left as such, never absorbed into a boundary.
+
+This is why the four obligations above quantify over the log prefix and the stamped
+observations and mention no model. A pricing function is a black box on the far
+side of the wall. A declared operator --- the one generic conversion of
+Section~\ref{sec:data} --- is a known, closed-menu transformation on the near side.
+The wall between them is what lets the ledger process a bespoke note and a plain
+share with the same machine: it never has to understand either one, only to admit
+the conserving transactions their contracts propose and to recompute those
+transactions from data that is entirely in the log.

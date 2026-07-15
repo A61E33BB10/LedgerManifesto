@@ -1,0 +1,74 @@
+\section{Frequently Asked Questions}
+\label{sec:sec20}
+%==============================================================================
+
+Each answer stands on the framework's primitives; cross-references point to the section that establishes the result, never restate it.
+
+\subsection*{Q1: Are move-less lifecycle events valid, and must the executor accept them?}
+
+Yes. A lifecycle event may produce a state change with an empty move list. The transaction is recorded in the move stream as a state-change entry carrying the full CDM event payload; the audit trail and time travel are preserved. Conservation holds trivially: the empty sum is zero for every unit in every wallet.
+
+Such events are not optional records. A barrier knock-out on a product where the owner holds no position transitions the unit from \texttt{ACTIVE} to \texttt{TERMINATED} and emits no moves. Without the recorded state change, \texttt{clone\_at($t$)} for $t$ after the knock-out cannot distinguish ``terminated by barrier breach'' from ``active with zero holders''---economically distinct states, one carrying zero contingent liability and the other a potentially large one. Under IFRS~9 the fair-value liability drops to zero on termination, not on payment; the recorded state change is the record of \emph{why} it disappeared.
+
+Further instances: out-of-the-money expiry whose position-closing move has zero economic effect, suspension and delisting events, and intraday futures trades that update unit state without cash moves (Section~\ref{sec:sec08}). The futures lifecycle already establishes state-only transactions; the principle applies to all product types, and the executor must not reject them.
+
+\begin{remark}
+The state a lifecycle event changes is held in UnitStatus. UnitStatus holds one value per unit, shared---read identically by every holder. Its value changes over time, but UnitStatus is not a separate source of truth: the immutable event log is. Every change is caused by a logged event; the stored value is overwritten in place only as a read cache. Replaying the events up to any point rebuilds the exact value that held then, so nothing is lost by overwriting and there is no other way to change the value. A value exists from registration onward. ``Move-less'' therefore names a transaction that overwrites this cache without altering any wallet balance.
+\end{remark}
+
+\subsection*{Q2: Does the Ledger guarantee Delivery-versus-Payment atomicity?}
+
+Internally, yes, by construction. A DvP trade is a single transaction containing both the securities move and the cash move; the executor commits all moves of a transaction together or none. This follows from the transaction primitive (Definition~2.4, Section~\ref{sec:ledger}), not from a runtime check.
+
+Conservation alone does not deliver DvP: a single-leg transfer balances quantities across wallets and is conservation-preserving. The guarantee is the conjunction of two properties:
+
+\begin{enumerate}[nosep]
+\item \textbf{Transaction atomicity} (executor): all moves in a transaction commit together or not at all.
+\item \textbf{Contract correctness} (smart contract): the trade contract emits both legs---cash and securities---in the same transaction (Section~\ref{sec:contracts}).
+\end{enumerate}
+
+\noindent External settlement atomicity is provided independently by the CSD. The framework guarantees internal consistency; the settlement infrastructure guarantees external settlement (deferred-settlement spec; Section~\ref{sec:settlement-dvp}).
+
+\subsection*{Q3: How does the framework settle physical delivery under lot-size constraints?}
+
+Physical delivery of equities requires whole multiples of the board lot $L$. When exercise produces a non-integer lot quantity, the smart contract delivers $N_{\text{deliver}} = L\lfloor N/L\rfloor$ shares against strike cash and cash-settles the residual at intrinsic value. This is one atomic transaction with two move types: share delivery against strike cash, and a cash payment on the undeliverable residual. Conservation holds because the put payoff $(K - S_T)\times N$ is split between physical and cash legs, not altered.
+
+The lot size is a product term---a property of the underlying security recorded in unit reference data (Section~\ref{sec:unit-store}), not a settlement concern. The contract computes delivery as a pure function of $(K, N, S_T, L)$, making the logic property-testable for conservation, lot compliance ($N_{\text{deliver}} \bmod L = 0$), and economic equivalence (total value transferred equals the payoff for any lot split).
+
+Boundary cases follow from the formula. Exercise below one lot ($N<L$) delivers zero and cash-settles entirely. Exercise an exact multiple of $L$ leaves zero residual and no cash adjustment. Odd-lot markets set $L=1$, so the residual is always zero. The settlement layer projects the single transaction into a securities delivery for the whole-lot quantity and a cash payment for the combined amount; DvP (Q2) applies at both Ledger and CSD level. The lot-adjustment function is shared across physically settled instruments---convertible conversion, warrant exercise, equity-forward delivery; only the payoff formula differs (Section~\ref{sec:contracts}).
+
+\subsection*{Q4: Why is securities lending inside the Ledger rather than in a companion system?}
+
+Five reasons, each a failure of the companion design:
+
+\begin{enumerate}[nosep]
+\item A companion system reintroduces the TOCTOU race, enabling double-lending.
+\item Conservation across the system boundary becomes unprovable.
+\item Collateral becomes invisible, breaking P13 (collateral sufficiency, Section~\ref{sec:sbl-invariants}).
+\item Exposure calculation requires joining two systems.
+\item The ``reserved'' bucket in a companion system discards load-bearing information.
+\end{enumerate}
+
+\noindent The full argument is in Section~\ref{sec:sbl-contract}.
+
+\subsection*{Q5: Why is \texttt{own} a stored coordinate while \texttt{avail} is a projection?}
+
+$\mathrm{own}$ passes the physical-action test: buy and sell modify $\mathrm{own}$ and only $\mathrm{own}$. It is not derivable from the five operational coordinates---two states with identical operational vectors but different $\mathrm{own}$ exist whenever a borrower has sold some but not all borrowed shares. $\mathrm{avail}$ fails the test: every action that changes available inventory also changes $\mathrm{onloan}$, $\mathrm{borr}$, or $\mathrm{own}$. The identity $\mathrm{avail} = \mathrm{own} - \mathrm{onloan} + \mathrm{borr}$ fixes $\mathrm{avail}$ from stored coordinates, so storing it would be a cache, not a fact (Section~\ref{sec:position-vector}).
+
+\subsection*{Q6: Is a scalar balance sufficient for cash, including cash collateral in securities lending?}
+
+The scalar model is sufficient for all cash units. The six-coordinate position vector $(\mathrm{own},$ $\mathrm{onloan},$ $\mathrm{borr},$ $\mathrm{coll\_post},$ $\mathrm{coll\_recv},$ $\mathrm{coll\_rehyp})$ of Section~\ref{sec:position-vector} degenerates to $(q,0,0,0,0,0)$ for any cash unit---the scalar $q$. Cash is not a lendable security: ownership and possession never diverge, so no system tracks $\mathrm{onloan}$ for cash. The lending-specific coordinates ($\mathrm{onloan}$, $\mathrm{borr}$, $\mathrm{coll\_post}$, $\mathrm{coll\_rehyp}$) are never populated for cash; only $\mathrm{own}$ and $\mathrm{coll\_recv}$ are engaged, and $\mathrm{coll\_recv}$ is itself scalar per cash unit.
+
+Cash collateral in securities lending uses only those two scalar coordinates and the SBL loan unit state:
+
+\begin{enumerate}[nosep]
+\item \textbf{Receipt.} Borrower-posted cash collateral enters the lender's $\mathrm{coll\_recv}(\text{USD})$ as a scalar amount earmarked as collateral (Step~1, Appendix~\ref{app:us-sbl-example}). The collateral relationship is recorded in the SBL loan unit state, not in the lending coordinates of the position vector.
+
+\item \textbf{Reinvestment under title transfer (GMSLA~2010).} Title passes outright; the lender owns the cash (Section~\ref{sec:sbl-title-transfer}) and reinvests by ordinary atomic moves---cash leaves $\mathrm{coll\_recv}(\text{USD})$, the instrument enters $\mathrm{own}(\text{MMF})$, both scalar. The obligation to return equivalent cash is held in the loan unit state as \texttt{collateral\_amount} and enforced by the SBL contract's termination pre-conditions (P18, Section~\ref{sec:sbl-invariants}; Section~\ref{sec:sbl-reinvestment}).
+
+\item \textbf{Reinvestment under pledge (US Rule~15c3-3 / MSLA).} The lender holds the cash subject to possession-or-control and reserve-formula requirements; reinvestment is permitted but constrained to approved instruments. The framework models this identically: cash in $\mathrm{coll\_recv}$, reinvestment in $\mathrm{own}(\text{MMF})$, return obligation in the loan unit state. The rehypothecation cap (140\% of customer debit balance, P19, Section~\ref{sec:sbl-invariants}) constrains \emph{securities} rehypothecation, not cash reinvestment (Section~\ref{sec:sbl-title-transfer}).
+
+\item \textbf{Return on termination.} The reinvestment is unwound---MMF units sold, cash returns to $\mathrm{coll\_recv}$---and the collateral is released to the borrower's $\mathrm{own}$ (Section~\ref{sec:sbl-reinvestment}). Every move is scalar; conservation holds at each step.
+\end{enumerate}
+
+\noindent The scalar cash balance, the scalar $\mathrm{coll\_recv}$ coordinate, and the SBL loan unit state jointly represent all cash-collateral operations under both GMSLA~2010 title transfer and US Rule~15c3-3 / MSLA pledge. No extension to the cash model is required.

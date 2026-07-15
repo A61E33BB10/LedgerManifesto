@@ -1,0 +1,802 @@
+\section{The Futures Lifecycle}
+\label{sec:futures}
+
+\providecommand{\code}[1]{\texttt{#1}}
+\providecommand{\ac}{\texttt{ac}}
+\providecommand{\netq}{\mathrm{net\_qty}}
+\providecommand{\unit}{u_{F}}
+\providecommand{\mult}{m}
+
+A listed future stresses every primitive at once. An equity trade is one transaction: cash one
+way, shares the other. A futures trade reads the same, ``buy 10 at 100,'' yet moves no cash at
+inception. Its economic effect unfolds over days, through variation margin, partial closes, and
+settlement. The future is therefore the canonical lifecycle. It is recorded, traded, settled daily,
+expired, and flattened to zero. Each step is one atomic \code{FutStateDelta} over the move and
+conservation primitives of \S\ref{sec:ledger} and the three-home state model of \S\ref{sec:states}.
+The \code{Fut*} types form a futures-engine kernel that \emph{projects onto} the core
+\code{Transaction}, exactly as the CDM and settlement boundary types do, under the same
+naming discipline. The kernel is not a second core. Conservation is shown at each step, not
+asserted. The centrepiece is variation-margin settlement: one event writes the shared settlement
+price once, fans out over the current holders, resets each accumulated cost, and moves cash.
+That settlement price is an externally sourced mark, consumed under single-basis consumption
+(Invariant~\ref{inv:basis}): the mark and the positions it settles stand in one basis.
+
+%==============================================================================
+\subsection{Notation, and where the future's state lives}
+%==============================================================================
+
+The primitives are those of \S\ref{sec:ledger}: wallet, unit, move, conservation. The homes are
+those of \S\ref{sec:states}. Write $\netq(w,u):=h(w,u)$ for the signed holding of wallet $w$
+in unit $u$.
+
+\emph{UnitStatus} is a projection, not a source of truth: a shared per-unit read cache of
+the event log, rebuilt exactly by replay (\S\ref{sec:states-unitstatus}).
+
+\noindent For the future, the fields divide by who reads them and how often they change:
+
+\begin{center}\small
+\begin{tabular}{@{}p{6.2cm}p{3.0cm}p{5.6cm}@{}}
+\toprule
+\textbf{Field} & \textbf{Home} & \textbf{Reason} \\
+\midrule
+\code{multiplier}, \code{currency}, \code{expiry}, \code{clearinghouse}, \code{exchange},
+\code{product\_id} & \emph{ProductTerms}$[\unit]$ & immutable; the CME and ICE contracts are
+distinct units. \\
+\addlinespace
+\code{lifecycle\_stage}, \code{last\_settlement\_price}, \code{last\_settlement\_date} &
+\emph{UnitStatus}$[\unit]$ & one settlement value per contract, read identically by every holder. \\
+\addlinespace
+\code{accumulated\_cost} (\ac) & \emph{PositionState}$[w,\unit]$ & two wallets holding the same
+contract carry different \ac. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Accumulated cost \ac{} is a \emph{conserved} field: $\sum_w \ac(w,u)=0$ for every $u$.
+The identity is enforced one level up, at the event handler (C2), because no production language
+provides a refinement type over a sum of exact integers for free.
+
+\paragraph{The atomic delta.} One event proposes one \code{FutStateDelta} for one unit across the
+three maps: at most one shared \code{FutStage} write, a map of per-holder position deltas
+$(\Delta\netq,\Delta\ac)$, and a map of per-holder cash legs. The delta applies in full or not at
+all (C3). A partially applied delta is not representable. A delta reaches application only through
+\code{futValidate}. That gate discharges conservation --- $\sum_w\Delta f(w,u)=0$ for each conserved
+field --- and returns the abstract witness \code{FutValidDelta}. An unconserved delta cannot be applied.
+
+\noindent\emph{The futures kernel is a boundary, not a core.} \code{FutStateDelta} and its validated
+form \code{FutValidDelta} are the futures engine's own constructions, named apart from the core
+\code{Transaction}. Each validated futures delta \emph{projects onto} one core
+\code{Transaction}, recorded through the single core door \code{applyTx}. The projection carries
+the conserving moves (the edge-sum of the per-holder legs) together with the non-balance rows (the
+\ac{} resets and the shared stage write). The local \code{futValidate} discharges conservation
+\emph{within} the futures kernel before it projects out; the core therefore keeps no separate
+validate gate and remains sealed.
+
+\paragraph{The single dimension bridge.} Contracts, money, and price are distinct types
+(\code{Qty}, \code{Cash}, \code{Price}). The only multiplication in the lifecycle,
+\[
+\mathrm{futMark}(\netq, S, \mult) \;=\; \netq \cdot S \cdot \mult \;:\; \code{Cash},
+\]
+converts contracts at a price into money. \code{Price} carries no addition: two prices are never
+summed, nor moved between wallets. The load-bearing identity $\mathrm{VM}=\netq\cdot S\cdot\mult+\ac$
+typechecks only because both summands are \code{Cash}. \code{Price} and \code{Cash} share one fixed
+minor-unit scale, chosen so $\netq\cdot S\cdot\mult$ lands in \code{Cash}'s unit. The worked example
+carries \code{Price} in whole index points and \code{Cash} in whole dollars for readability. A
+production scale carries \code{Price} in scaled minor units --- a quarter-point for ES, a cent for a
+bond quoted in 32nds --- so sub-point ticks are exact. The arithmetic is integer throughout and never
+divides, so the choice of scale is free: at any scale there is no rounding to break conservation.
+
+The scalar layer --- the three dimensions, \code{futMark}, and the \code{PosQty} parse boundary of
+\S\ref{sec:trade} --- is the kernel's foundation. The type discipline encodes one mental model:
+quantities and cash add, prices do not, so ``a price summed into a balance'' is a type error rather
+than a bug to catch.
+
+\begin{lstlisting}[language=Haskell]
+-- Three dimensions kept apart. Qty and Cash are additive groups; Price is not
+-- (you never sum two prices, nor move one between wallets) -- so Price has no
+-- Monoid instance, and that absence makes "a price summed into a balance"
+-- unspellable rather than merely unintended.
+newtype Qty   = Qty   Integer deriving (Eq, Ord, Show)   -- additive group: the (<>)/mempty
+newtype Cash  = Cash  Integer deriving (Eq, Ord, Show)   --   instances of sec:contracts
+newtype Price = Price Integer deriving (Eq, Ord, Show)   -- deliberately NO Monoid
+newtype Day   = Day   Int     deriving (Eq, Ord, Show)
+
+qneg    :: Qty  -> Qty ;  qneg    (Qty  n) = Qty  (negate n)
+cashNeg :: Cash -> Cash;  cashNeg (Cash n) = Cash (negate n)
+
+-- The single dimension bridge: contracts at a price, scaled by the multiplier,
+-- become money. The only multiplication in the lifecycle, and the only place the
+-- dimensions cross. VM = futMark ... <> ac typechecks only because both are Cash.
+futMark :: Qty -> Price -> Integer -> Cash
+futMark (Qty q) (Price s) mult = Cash (q * s * mult)
+
+newtype WalletId = WalletId String deriving (Eq, Ord, Show)
+newtype UnitId   = UnitId   String deriving (Eq, Ord, Show)
+
+-- The positive-quantity parse boundary (G5). PosQty is abstract: mkPosQty is its
+-- sole constructor, so q <= 0 is unrepresentable downstream of the boundary.
+newtype PosQty = PosQty Qty deriving (Eq, Ord, Show)
+
+mkPosQty :: Qty -> Maybe PosQty
+mkPosQty q@(Qty n) | n > 0     = Just (PosQty q)
+                   | otherwise = Nothing
+
+unPosQty :: PosQty -> Qty
+unPosQty (PosQty q) = q
+\end{lstlisting}
+
+\noindent\emph{Evaluations.} \code{futMark (Qty 10) (Price 100) 50 = Cash 50000};
+\code{futMark (Qty (-10)) (Price 102) 50 <> Cash 51000 = Cash 0} (a \code{Cash}
+sum); \code{Price 100 <> Price 102} is a type error --- \code{Price} has no
+\code{<>}.
+
+%==============================================================================
+\subsection{The instrument and the worked example}
+%==============================================================================
+
+\begin{definition}[The worked instrument]
+One cash-settled listed future $\unit=\code{ES-FUT}$, with $\mult=50$, currency USD, expiry Day 3,
+clearinghouse CME-CH, exchange CME. Wallets A, B, C are traders; CH is the clearinghouse virtual
+wallet, the variation-margin settlement hub whose cash leg is the residual that balances the holders'
+legs.
+\end{definition}
+
+CH stands in as a settlement hub, not as a \emph{novating} central counterparty. Faithful novation
+would interpose CH on the \emph{contract} leg of every trade ($A\,{+}q\,/\,\text{CH}\,{-}q$ and
+$\text{CH}\,{+}q\,/\,B\,{-}q$), so that the two cleared sides never face each other. Clearing
+infrastructure is out of scope. Here CH carries only the variation-margin cash residual. Two rules
+govern every figure:
+
+\begin{itemize}
+\item \textbf{Trade.} For a signed-quantity change $\Delta$ at price $p$, each leg sets
+$\ac \mathrel{+}= -\,\Delta\cdot p\cdot \mult$.
+\item \textbf{Settlement.} At price $S$, the per-holder variation margin is
+$\mathrm{VM}(w)=\netq(w)\cdot S\cdot \mult + \ac(w)$ (cash, routed through CH); then
+$\ac(w)\leftarrow -\,\netq(w)\cdot S\cdot \mult$.
+\end{itemize}
+
+\noindent The whole life, with $\netq$, \ac, and per-step variation-margin cash for $(A,B,C)$:
+
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Step} & \textbf{Event} & \textbf{$\netq$ (A,B,C)} & \textbf{\ac{} (A,B,C)} & \textbf{VM cash (A,B,C)} \\
+\midrule
+Listing    & $\unit$ registered; stage \code{REGISTERED}, no mark; no rows & $(0,0,0)$ & $(-,-,-)$ & $-$ \\
+T1         & A buys 10 from B @100                       & $(10,-10,0)$ & $(-50000,+50000,0)$ & $-$ \\
+Settle d1  & $S_1=102$; shared price $\leftarrow 102$    & $(10,-10,0)$ & $(-51000,+51000,0)$ & $(+1000,-1000,0)$ \\
+T2         & C buys 4 from A @103                        & $(6,-10,4)$  & $(-30400,+51000,-20600)$ & $-$ \\
+Settle d2  & $S_2=101$; shared price $\leftarrow 101$    & $(6,-10,4)$  & $(-30300,+50500,-20200)$ & $(-100,+500,-400)$ \\
+T3         & B buys 4 from C @101 (C $\to$ flat)         & $(6,-6,0)$   & $(-30300,+30300,0)$ & $-$ \\
+Expiry     & stage $\to$ \code{EXPIRED}; final $S=105$   & $(6,-6,0)$   & $(-31500,+31500,0)$ & $(+1200,-1200,0)$ \\
+Close      & units returned to CH; positions $\to 0$     & $(0,0,0)$    & $(0,0,0)$ & $-$ \\
+\bottomrule
+\end{tabular}}
+\end{center}
+
+\noindent The subsections below walk this table in event order. Each event is one \code{FutStateDelta}
+showing the three conservation sums $\sum\Delta\netq$, $\sum\Delta\ac$, $\sum\mathrm{VM}$. The example
+is the argument; the prose names the mechanism.
+
+%==============================================================================
+\subsection{Listing}
+%==============================================================================
+
+Registration writes \emph{ProductTerms}$[\unit]$ (the six immutable terms) and
+\emph{UnitStatus}$[\unit]$ together, establishing ``$u\in$ terms $\iff u\in$ status'' by construction.
+The status initialises to stage \code{REGISTERED} with no settlement mark. No \emph{PositionState} row
+exists: $\code{futPosition}(w,\unit)=\mathrm{None}$ for every $w$.
+
+\code{REGISTERED} denotes a unit recorded in and known to the ledger before any settlement, not
+admission to an exchange. An OTC option or an internal strategy reaches it identically. Two status
+states are unreachable: a never-traded unit carrying a price, and an expired unit lacking a final
+mark. Both are made unspellable by fusing the mark onto the stage:
+\[
+\code{FutStage}=\code{FutRegistered}\;\mid\;\code{FutActive}(\code{Maybe Settlement})\;\mid\;
+\code{FutExpired}\;\code{Settlement}.
+\]
+\code{FutRegistered} carries no mark; \code{FutExpired} always carries one. \code{last\_\allowbreak settlement\_\allowbreak price}
+and \code{last\_\allowbreak settlement\_\allowbreak date} are projections of the \code{Settlement} carried by the stage, not
+independent fields. Conservation holds vacuously: no holders, so every sum is the empty sum, zero
+(C9). Re-registering an existing unit id is a hard error, never a silent reset (C10).
+
+The shared status type and its registration follow.
+
+\begin{lstlisting}[language=Haskell]
+-- FutTerms: the six immutable contract terms, one per unit, co-registered with
+-- FutStatus. ptMultiplier drives mark value and the settlement fan-out. The Fut*
+-- prefix marks this engine as a futures-boundary construction, distinct from the
+-- core types: it PROJECTS onto the core Transaction (see "The atomic delta").
+data FutTerms = FutTerms
+  { ptMultiplier    :: !Integer
+  , ptCurrency      :: !String
+  , ptExpiry        :: !Day
+  , ptClearinghouse :: !String
+  , ptExchange      :: !String
+  , ptProductId     :: !String
+  } deriving (Eq, Show)
+
+-- The mark is FUSED onto the stage, so the two unreachable states
+--   (FutRegistered, Just p)  and  (FutExpired, Nothing)  are unspellable.
+-- FutRegistered carries no mark; FutExpired always carries one; FutActive may or may not.
+data Settlement = Settlement { settlePrice :: !Price, settleDate :: !Day }
+  deriving (Eq, Show)
+
+data FutStage
+  = FutRegistered                -- recorded, never traded: no holders, no mark
+  | FutActive (Maybe Settlement) -- trading; Nothing = not yet settled, Just s = marked
+  | FutExpired Settlement        -- final mark ALWAYS present; absorbing
+  deriving (Eq, Show)
+
+newtype FutStatus = FutStatus { fusStage :: FutStage } deriving (Eq, Show)
+
+-- last_settlement_price/_date are PROJECTIONS of the mark the stage carries,
+-- total over all three stages -- not independent fields.
+settlement :: FutStage -> Maybe Settlement
+settlement FutRegistered  = Nothing
+settlement (FutActive m)  = m
+settlement (FutExpired s) = Just s
+
+settlementPrice :: FutStatus -> Maybe Price
+settlementPrice = fmap settlePrice . settlement . fusStage
+settlementDate  :: FutStatus -> Maybe Day
+settlementDate  = fmap settleDate  . settlement . fusStage
+
+-- The coarse rank REGISTERED < ACTIVE < EXPIRED: the one fact futApplyDelta needs
+-- to reject a regressing stage. It never regresses.
+stageRank :: FutStage -> Int
+stageRank FutRegistered  = 0
+stageRank (FutActive _)  = 1
+stageRank (FutExpired _) = 2
+
+-- Rank alone cannot separate FutExpired 105 from FutExpired 110, so a strict new<cur
+-- guard would re-admit a second Expire. isExpired is the precise absorbing test.
+isExpired :: FutStage -> Bool
+isExpired (FutExpired _) = True
+isExpired _              = False
+
+futRegisteredStatus :: FutStatus
+futRegisteredStatus = FutStatus FutRegistered
+\end{lstlisting}
+
+{\raggedright\noindent\emph{Evaluations.}
+\code{settlementPrice (FutStatus FutRegistered) = Nothing};
+\code{settlementPrice (FutStatus (FutExpired (Settlement (Price 105) (Day 3)))) =
+Just (Price 105)}. The states \code{(FutRegistered, Just p)} and
+\code{(FutExpired, Nothing)} cannot be written.\par}
+
+%==============================================================================
+\subsection{First trade}
+\label{sec:trade}
+%==============================================================================
+
+A buys 10 contracts from B at 100. The trade emits one \code{FutStateDelta}:
+
+\begin{itemize}
+\item \textbf{Shared.} \code{REGISTERED} $\to$ \code{ACTIVE} with no mark (\code{FutActive Nothing}); the
+first trade activates the unit. Any existing mark is preserved --- a trade never wipes the shared price.
+\item \textbf{Per-position.} The contract quantity moves from seller to buyer:
+$\Delta\netq(A)=+10$, $\Delta\netq(B)=-10$. Each leg sets $\ac\mathrel{+}=-\Delta\cdot p\cdot\mult$:
+\[
+\Delta\ac(A) = -(+10)\cdot 100\cdot 50 = -50000,\qquad
+\Delta\ac(B) = -(-10)\cdot 100\cdot 50 = +50000.
+\]
+\item \textbf{Cash.} None: entering a futures position pays no notional.
+\end{itemize}
+
+\noindent Conservation: $\sum\Delta\netq = 0$, $\sum\Delta\ac = 0$, $\sum\mathrm{VM}=0$. State after
+T1: $\netq=(10,-10,0)$, $\ac=(-50000,+50000,0)$. A and B cross from $\mathrm{None}$ to $\mathrm{Some}$
+on first touch; C is still $\mathrm{None}$.
+
+\paragraph{Positive quantity.} A trade leg carries a strictly positive quantity $q>0$, parsed at the
+boundary (\code{mkPosQty}). $q\le 0$ is rejected (\code{NonPositiveQty}) and never recorded. $q=0$
+would promote \code{REGISTERED}$\to$\code{ACTIVE} and create $\mathrm{Some}$-flat rows for two
+never-held wallets, collapsing the never-held/held-flat distinction (\S\ref{sec:close}). $q<0$ would
+swap buyer and seller, violating the move primitive's positivity. The sign of the position change is
+supplied by the leg --- buyer $+q$, seller $-q$ --- not by $q$.
+
+The per-event delta, its conserved image, and the conservation witness follow. The mental model:
+totalling a delta is addition in a monoid, ``conserving'' means the total is zero, and the witness
+type makes an unconserved delta impossible to apply.
+
+\begin{lstlisting}[language=Haskell]
+-- FutPos per (wallet, unit). ac is per (w,u): two wallets holding the same
+-- contract carry different ac -- the field that makes intraday margin correct.
+data FutPos = FutPos { fpNetQty :: !Qty, fpAccumCost :: !Cash }
+  deriving (Eq, Show)
+
+futZeroP :: FutPos               -- flat row created on first touch; held-and-flat baseline
+futZeroP = FutPos mempty mempty
+
+-- Conservation is a monoid identity. Totalling a delta is a monoid homomorphism
+-- -- a map that respects (<>) and mempty -- into Conserved; "conserving" means the
+-- image is mempty. The zero-holder case is the empty fold, mempty (C9); we SUM
+-- deltas, never apportion, so no divide-by-holder-count bug can arise.
+data Conserved = Conserved !Qty !Cash !Cash deriving (Eq, Show)  -- (sum net, sum ac, sum cash)
+instance Semigroup Conserved where
+  Conserved a b c <> Conserved a' b' c' = Conserved (a<>a') (b<>b') (c<>c')
+instance Monoid Conserved where mempty = Conserved mempty mempty mempty
+
+data FutRowDelta = FutRowDelta { rdNetQty :: !Qty, rdAc :: !Cash } deriving (Eq, Show)
+
+-- One event's proposed change: at most one shared FutStage write, per-holder additive
+-- row deltas, per-holder cash legs. Applied in full or not at all (C3).
+data FutStateDelta = FutStateDelta
+  { fsdUnit :: UnitId, fsdStage :: Maybe FutStage
+  , fsdRows :: Map WalletId FutRowDelta, fsdCash :: Map WalletId Cash } deriving (Show)
+
+futNetDelta :: FutStateDelta -> Conserved
+futNetDelta sd =
+       foldMap (\(FutRowDelta nq ac) -> Conserved nq ac mempty) (fsdRows sd)
+    <> foldMap (\c                   -> Conserved mempty mempty c) (fsdCash sd)
+
+-- The C2 witness, ABSTRACT: futValidate is the only constructor, so an unconserved
+-- delta cannot reach futApplyDelta. This is the futures engine's OWN conservation
+-- discharge, distinct from the core (which has no validate gate); the validated
+-- delta projects onto one conserving core Transaction. Conservation is a value-level
+-- fact (a sum of exact integers), so this is a parse boundary, not a free type fact.
+newtype FutValidDelta = FutValidDelta FutStateDelta
+
+futValidate :: FutStateDelta -> Either FutLedgerError FutValidDelta
+futValidate sd | net == mempty = Right (FutValidDelta sd)
+               | otherwise     = Left (FutNotConserved (fsdUnit sd) net)
+  where net = futNetDelta sd
+
+-- A trade activates without wiping any existing mark, and sets each leg's
+-- ac += -(delta signed_qty) * p * m (buyer +q, seller -q). No cash: entry pays no notional.
+activateTrade :: FutStage -> FutStage
+activateTrade cur = FutActive (settlement cur)
+
+tradeDelta :: UnitId -> FutStage -> Integer
+           -> WalletId -> WalletId -> PosQty -> Price -> FutStateDelta
+tradeDelta u cur m buyer seller pq p = FutStateDelta
+  { fsdUnit = u, fsdStage = Just (activateTrade cur)
+  , fsdRows = Map.fromList
+      [ (buyer , FutRowDelta q        (cashNeg (futMark q p m)))
+      , (seller, FutRowDelta (qneg q) (futMark q p m)) ]
+  , fsdCash = Map.empty }
+  where q = unPosQty pq
+\end{lstlisting}
+
+%==============================================================================
+\subsection{Daily variation-margin settlement: the mechanism and the clean case (day 1)}
+\label{sec:settle-mech}
+%==============================================================================
+
+Settlement pays each holder the day's mark-to-market in cash and re-bases the position at the new
+price. Formally: settlement at price $S$, multiplier $\mult$, over the current holders. For each
+holder the reset target is $\mathrm{target}=-\netq\cdot S\cdot\mult$, the row delta is
+$\Delta\ac=\mathrm{target}-\ac$, and the cash leg is
+\[
+\boxed{\;\mathrm{VM}(w) \;=\; -\,\Delta\ac(w) \;=\; \netq(w)\cdot S\cdot \mult + \ac(w)\;}
+\]
+The cash leg is the mirror of the change in accumulated cost. Therefore
+$\sum_w\mathrm{VM} = -\sum_w\Delta\ac$, and variation-margin zero-sum is the \emph{same} fact as \ac{}
+conservation, not a separate reconciliation. The reset discards the entry prices: with
+$\ac\leftarrow-\netq\cdot S\cdot\mult$, the next day's margin needs only $S$ and the position. Each
+daily settlement economically closes and reopens the position at the new price (the resettable-forward
+property).
+
+Settlement is one atomic \code{FutStateDelta} touching both layers:
+\begin{itemize}
+\item \textbf{Shared}, one write: \emph{UnitStatus}$[\unit]$ acquires the mark $(S,d)$. The
+\emph{coarse rank} $\code{REGISTERED}<\code{ACTIVE}<\code{EXPIRED}$ is unchanged: the unit stays
+\code{ACTIVE}. The \emph{embedded mark} updates: the stage becomes
+\code{FutActive (Just (Settlement $S$ $d$))}. The settlement price enters the log only as the
+\code{FSettleVM} event. \code{futReplay} rebuilds the mark, and the fold stays pure at the
+boundary: the shared value is a projection of the log, never an off-log write.
+\item \textbf{Per-position}, a fan-out over the current holders: each row's \ac{} is reset to
+$\mathrm{target}$, and each holder gets the cash leg $\mathrm{VM}(w)$.
+\end{itemize}
+
+\noindent The cash legs are emitted over the holders; the clearinghouse leg is the residual that
+balances them. Since the holder legs already sum to zero, CH's leg is zero throughout this example and
+no CH cash row materialises. This is the special case of a \emph{closed} holder set $\{A,B,C\}$, where
+$\sum_w\netq(w)=0$ at every step. In the Ledger's intended use --- an internal firm system of record
+facing an external clearinghouse --- the firm is generally \emph{not} flat. When $\sum_w\netq(w)\ne 0$
+over the firm's holders, the CH leg is the firm's nonzero net variation margin: the boundary figure
+reconciled against the clearing broker's daily statement.
+
+\paragraph{Day 1: $S_1=102$.} Holders A and B; C has no row and is untouched --- the contract settles
+vacuously over C; the shared price still updates (C9). With pre-settle $\ac=(-50000,+50000)$ and
+$\netq=(10,-10)$:
+\[
+\mathrm{VM}(A) = 10\cdot 102\cdot 50 - 50000 = +1000,\qquad
+\mathrm{VM}(B) = -10\cdot 102\cdot 50 + 50000 = -1000.
+\]
+Reset: $\ac(A)\leftarrow -51000$, $\ac(B)\leftarrow +51000$. Conservation: $\sum\Delta\netq=0$,
+$\sum\Delta\ac = 0$, $\sum\mathrm{VM}=0$. State: $\netq=(10,-10,0)$, $\ac=(-51000,+51000,0)$.
+
+The fan-out, shared by settlement and expiry, is one pure function of the current holders. Per
+holder it does two things: reset \ac{} to the new-price baseline, and pay the mirror of that reset
+as cash.
+
+\begin{lstlisting}[language=Haskell]
+-- Shared by FSettleVM and FExpire. For each holder at price S, multiplier m:
+--   delta ac = (-(net*S*m)) - ac      VM = -(delta ac) = net*S*m + ac
+-- so VM = -(delta ac) exactly: cash conservation IS ac conservation, not a separate
+-- reconciliation. A flat holder gives delta ac = 0, VM = 0; no holders -> empty fan-out.
+settlementFanout :: Price -> Integer -> [(WalletId, FutPos)]
+                 -> (Map WalletId FutRowDelta, Map WalletId Cash)
+settlementFanout s m holders =
+    ( Map.fromList [ (w, FutRowDelta mempty (deltaAc ps)) | (w, ps) <- holders ]
+    , Map.fromList [ (w, cashNeg (deltaAc ps))            | (w, ps) <- holders ] )
+  where deltaAc ps = cashNeg (futMark (fpNetQty ps) s m) <> cashNeg (fpAccumCost ps)
+\end{lstlisting}
+
+%==============================================================================
+\subsection{A subsequent, intraday trade (day 2)}
+%==============================================================================
+
+C buys 4 contracts from A at 103, after the day-1 settle and before the day-2 settle --- A trades
+intraday. One \code{FutStateDelta}, stage already \code{FutActive} (mark preserved):
+\[
+\Delta\netq(C)=+4,\quad \Delta\netq(A)=-4;\qquad
+\Delta\ac(C) = -20600,\quad \Delta\ac(A) = +20600.
+\]
+Conservation: $\sum\Delta\netq=0$, $\sum\Delta\ac=0$, $\sum\mathrm{VM}=0$. State after T2:
+$\netq=(6,-10,4)$, $\ac=(-30400,+51000,-20600)$. C crosses from $\mathrm{None}$ to $\mathrm{Some}$ on
+first touch.
+
+%==============================================================================
+\subsection{Settlement under intraday trading (day 2): the anchor}
+\label{sec:anchor}
+%==============================================================================
+
+{\raggedright
+The day-2 settle at $S_2=101$ runs the same fan-out over holders A, B, C:
+\[
+\begin{aligned}
+\mathrm{VM}(A) &= 6\cdot 101\cdot 50 - 30400 = -100,\\
+\mathrm{VM}(B) &= -10\cdot 101\cdot 50 + 51000 = +500,\\
+\mathrm{VM}(C) &= 4\cdot 101\cdot 50 - 20600 = -400.
+\end{aligned}
+\]
+Conservation: $\sum\Delta\netq=0$, $\sum\mathrm{VM} = -100+500-400 = 0$. Reset
+$\ac\leftarrow(-30300,+50500,-20200)$ with $\sum\Delta\ac=0$. State: $\netq=(6,-10,4)$,
+$\ac=(-30300,+50500,-20200)$.\par}
+
+\begin{principle}[The intraday-margin subtlety forces stored per-position \ac{} (C11)]
+A's day-2 variation margin is $-100$, not the naive $\netq\cdot(S_2-S_1)\cdot\mult =
+6\cdot(101-102)\cdot 50 = -300$. A sold 4 contracts at 103 intraday, one point above the prior mark
+102, gaining $4\cdot(+1)\cdot 50=+200$, which offsets the $-300$ mark loss on the held position. Only
+the stored per-wallet \ac{}, which absorbed the intraday trade, yields the correct $-100$. A
+price-derived model gives the wrong cash. Accumulated cost is therefore per-position stored state with
+a single canonical writer (C11), not a consequence read off the shared price.
+\end{principle}
+
+\noindent The three settlement facts, stated once:
+\begin{enumerate}
+\item \emph{Settlement is a state update split by layer.} The shared part ---
+\code{last\_settlement\_price}, \code{last\_settlement\_date} --- is one write on
+\emph{UnitStatus}$[\unit]$, one value per contract. The per-position part --- the \ac{} reset and the
+cash leg --- is a fan-out over the current holders on \emph{PositionState}$[w,\unit]$. One atomic
+\code{FutStateDelta} touches both.
+\item \emph{One atomic event that fans out, not a derived consequence of the price.} The cash leg is
+real daily money moving between longs and shorts through CH. Every cash move is a recorded,
+conservation-bearing event, so a per-holder pass is unavoidable. The \ac{} reset rides in the same
+atomic delta. The fan-out is forced by the cash, not chosen for the bookkeeping.
+\item \emph{Price only in shared state, consequence only in per-wallet state.} The consequence of
+the shared price --- the \ac{} reset and the variation-margin cash --- lives only in
+\emph{PositionState}$[w,\unit]$ and the move stream.
+\end{enumerate}
+
+\begin{remark}[Direction reversal needs no special case]
+The accumulated-cost rule handles a long-to-short reversal in one trade with no branch. From
+$\netq=+5$, $\ac=-500$ (entered at 100, $\mult=1$), a single sell of 8 at 105 sets
+$\Delta\ac=-(-8)\cdot 105\cdot 1=+840$, so $\ac=-500+840=+340$ and $\netq=-3$. The economic value at
+105 is $340+(-3)\cdot 105 = 25$, exactly the gain from closing the long 5 at \$5 per contract; the new
+short 3 marks forward from here with no extra bookkeeping. The same arithmetic that accumulates a
+position unwinds and reverses it.
+\end{remark}
+
+%==============================================================================
+\subsection{Closing a position to flat}
+\label{sec:close}
+%==============================================================================
+
+B buys 4 contracts from C at 101; C goes flat. One \code{FutStateDelta}:
+\[
+\Delta\netq(B)=+4,\ \Delta\netq(C)=-4;\qquad \Delta\ac(B)=-20200,\ \Delta\ac(C)=+20200.
+\]
+Conservation: $\sum\Delta\netq=0$, $\sum\Delta\ac=0$, $\sum\mathrm{VM}=0$. State: $\netq=(6,-6,0)$,
+$\ac=(-30300,+30300,0)$. C is now flat. Its row is \emph{retained}, $\mathrm{Some}$ at $(0,0)$ --- not
+deleted, not $\mathrm{None}$. The two readings are distinct and both load-bearing. $\mathrm{None}$
+means never held. $\mathrm{Some}$-flat means held and now flat; it is read after close-out for tax
+reporting, wash-sale lookback, and trade reconstruction (C1(a)). The carrier is monotone: once a row
+is created it is never removed (C1(b)). No row deleter exists, because the ledger is abstract.
+
+%==============================================================================
+\subsection{Expiry, final settlement, and the Close}
+%==============================================================================
+
+Expiry is the settlement fan-out of \S\ref{sec:settle-mech} composed with a stage write to
+\code{EXPIRED}. Like a settle, it acts only on an \code{ACTIVE} unit, never a never-traded one
+(\S\ref{sec:invariants}). The final mark $S=105$ fans out over the remaining holders A and B (C is
+flat; its row is touched to no effect):
+\[
+\mathrm{VM}(A) = 6\cdot 105\cdot 50 - 30300 = +1200,\qquad
+\mathrm{VM}(B) = -6\cdot 105\cdot 50 + 30300 = -1200.
+\]
+Conservation: $\sum\Delta\netq=0$, $\sum\mathrm{VM}=0$; $\ac\leftarrow(-31500,+31500,0)$ with
+$\sum\Delta\ac=0$. The coarse rank advances to \code{EXPIRED}: the stage becomes
+\code{FutExpired (Settlement 105 (Day 3))}; the final mark is always present.
+
+\paragraph{Cash settlement and the Close.} No unit is delivered. The economic result is the
+cumulative variation margin already moved. The \emph{Close} step extinguishes every holder's position
+against the clearinghouse, flattening $\netq$ and \ac{} by an additive negation of each row, with no
+further cash. Wallet A held $+6$ and B held $-6$; closing them returns the contracts to CH:
+\[
+\Delta\netq(A)=-6,\ \Delta\netq(B)=+6;\qquad \Delta\ac(A)=+31500,\ \Delta\ac(B)=-31500.
+\]
+The clearinghouse legs are the residual of the holder legs --- zero, since the holder legs balance ---
+so no CH row materialises. Conservation: $\sum\Delta\netq=0$, $\sum\Delta\ac=0$, $\sum\mathrm{VM}=0$.
+State after Close: $\netq=(0,0,0)$, $\ac=(0,0,0)$; rows retained at zero (monotone carrier). Close
+carries no stage write, so it is the one event still admissible on an \code{EXPIRED} unit.
+
+\paragraph{Physical settlement.} The variant differs only at the Close. Instead of flattening against
+CH for cash, the contract converts to delivery. The deliverable unit and the cash payment move
+together as one atomic transaction (delivery versus payment; the settlement interface is
+\S\ref{sec:settlement}). The future's $\netq$ goes to zero, and the holder's wallet gains the
+deliverable. The cash leg is struck at the \emph{final settlement price} $S$, not the trade price.
+Expiry has already marked every position to $S$ through variation margin, so delivery exchanges the
+deliverable for $\netq\cdot S\cdot\mult$ and moves no further mark-to-market. Pricing the delivery at
+any other figure would double-count the variation margin already settled. Per-unit conservation holds
+on each unit separately --- the future, the deliverable, the cash --- and the cross-unit delivery is
+one all-or-nothing transaction. The worked example is cash-settled; the figures above are unchanged by
+this variant.
+
+\begin{theorem}[Closing identity: cash ties to economic PnL]
+Cumulative variation margin per wallet equals the wallet's economic profit and loss. Here
+$A=+1000-100+1200=+2100$, $B=-1000+500-1200=-1700$, $C=-400$, $\text{CH}=0$, summing to $0$; and
+$A=4\cdot(103-100)\cdot 50+6\cdot(105-100)\cdot 50=+2100$,
+$B=4\cdot(100-101)\cdot 50+6\cdot(100-105)\cdot 50=-1700$, $C=4\cdot(101-103)\cdot 50=-400$.
+\end{theorem}
+
+The terminal flatten delta has no stage write and no cash leg. It conserves for free: each conserved
+field already sums to zero over the holders, so the row-by-row negation sums to zero too.
+
+\begin{lstlisting}[language=Haskell]
+-- Terminal flatten: NO stage write (stays EXPIRED, so it does not breach the
+-- absorbing rule), NO cash; every row driven to zero by additive negation. It
+-- conserves because net and ac each already sum to zero, so their negations do too.
+closeDelta :: UnitId -> [(WalletId, FutPos)] -> FutStateDelta
+closeDelta u holders = FutStateDelta
+  { fsdUnit = u, fsdStage = Nothing
+  , fsdRows = Map.fromList
+      [ (w, FutRowDelta (qneg (fpNetQty ps)) (cashNeg (fpAccumCost ps)))
+      | (w, ps) <- holders ]
+  , fsdCash = Map.empty }
+\end{lstlisting}
+
+%==============================================================================
+\subsection{After expiry: state versus derivation}
+%==============================================================================
+
+After the Close, every row is retained at zero: \emph{PositionState}$[w,\unit]=\mathrm{Some}$ flat for
+A, B, C. \emph{UnitStatus}$[\unit]$ holds stage \code{EXPIRED} and final mark $105$.
+\emph{ProductTerms}$[\unit]$ is unchanged --- immutable.
+
+\code{first\_touch\_date} is \emph{not} stored: it is derived from the event log on demand. Caching it
+in \emph{PositionState} would make a replay disagree with itself under a back-dated correction: the
+cached value would reflect the pre-correction order while the fold reflects the corrected one. The
+rule is general. What the fold over the log determines is derived, not stored. Only what the fold
+cannot reconstruct from prior events is state.
+
+%==============================================================================
+\subsection{Invariants threaded through the life}
+\label{sec:futures-invariants}
+%==============================================================================
+
+\begin{invariant}[Per-event conservation, C2]
+Every \code{FutStateDelta} satisfies $\sum_w\Delta\netq=0$, $\sum_w\Delta\ac=0$, $\sum_w\mathrm{VM}=0$,
+discharged by \code{futValidate} before application. Induction over the stream lifts the per-event
+identity to the global invariant (P1). The vacuous case --- a unit with no holders --- is the empty
+sum, zero (C9); conservation sums deltas and never divides by a holder count.
+\end{invariant}
+
+\begin{invariant}[Deterministic replay as a fold, C1(b), P8]
+\code{futReplay} is a Kleisli fold (an error-stopping fold whose combining step halts at the first failure) of the event stream over the ledger:
+$\code{futReplay}(xs\mathbin{<\!\!>}ys)=\code{futReplay}\,xs \mathbin{>\!=\!>} \code{futReplay}\,ys$ ---
+replaying a concatenation equals composing the replays. Checkpoint independence is a consequence of
+this law, not a test; the monotone carrier keeps the key set stable across cuts. The stream is assumed
+\emph{unique} --- de-duplicated at the ingestion boundary by an event key --- because the two event
+kinds differ in idempotency: a duplicated \code{FSettleVM} at a fixed mark is inert ($\Delta\ac=0$,
+$\mathrm{VM}=0$), whereas a duplicated \code{FTrade} accumulates a second position delta. Duplicate
+suppression is a boundary obligation, not a ledger function.
+\end{invariant}
+
+\begin{invariant}[Monotone, absorbing stage]
+The coarse rank $\code{REGISTERED}<\code{ACTIVE}<\code{EXPIRED}$ never regresses; a proposed stage of
+strictly lower rank is rejected (\code{StageRegression}). Settle and expire act only on an
+\code{ACTIVE} unit; both reject a \code{REGISTERED} (never-traded) unit (\code{NotActive}), which has
+no holders and no mark slot --- so a never-traded unit is never silently promoted, and \code{EXPIRED}
+is reachable only from \code{ACTIVE}: the chain is
+\code{REGISTERED}$\to$\code{ACTIVE}$\to$\code{EXPIRED} with no skips. \code{EXPIRED} is
+\emph{absorbing}: the rank guard alone is too weak --- a second expiry has equal rank, and $2<2$ is
+false --- so an explicit absorbing test rejects every stage-writing delta on an expired unit;
+\code{FClose}, which carries no stage write, is the one event still admissible. Re-settling at the same
+price before expiry is a no-op: with $\ac=-\netq\cdot S\cdot\mult$ already, $\Delta\ac=0$ and
+$\mathrm{VM}=0$.
+\end{invariant}
+
+The event dispatcher, the abstract ledger, and the replay fold realise these invariants. One event
+flows through three total functions: \code{futHandle} decides what should happen, \code{futValidate}
+certifies conservation, and \code{futApplyDelta} writes. The stage and positivity guards live once in
+\code{futHandle}. The monotone carrier is the absence of any deleter; the absorbing rule is the
+\code{isExpired} test in \code{futApplyDelta}.
+
+\begin{lstlisting}[language=Haskell]
+-- The four event classes. FTrade carries a RAW Qty (the unparsed input of the free
+-- monoid of events); futHandle parses it once into PosQty. FClose is the one event
+-- with no stage write, so it alone is admissible on an EXPIRED unit.
+data FutEvent
+  = FTrade    UnitId WalletId WalletId Qty Price   -- buyer, seller, qty, price
+  | FSettleVM UnitId Price Day                      -- settlement price, date
+  | FExpire   UnitId Price Day                      -- final price, date
+  | FClose    UnitId                                -- terminal flatten to zero
+  deriving (Eq, Show)
+
+futEventUnit :: FutEvent -> UnitId
+futEventUnit (FTrade u _ _ _ _) = u
+futEventUnit (FSettleVM u _ _)  = u
+futEventUnit (FExpire u _ _)    = u
+futEventUnit (FClose u)         = u
+
+-- The dispatcher: a pure function of (event, current ledger), hence deterministic.
+-- The stage/positivity guards live here once: self-trade (G3); EXPIRED absorbing
+-- (G2); positivity parsed (G5); settle/expire reject REGISTERED, never silently
+-- promoting a never-traded unit (G4); close only after expiry (G1).
+futHandle :: FutEvent -> FutLedger -> Either FutLedgerError FutStateDelta
+futHandle ev l = case Map.lookup u (flUnits l) of
+  Nothing          -> Left (FutUnknownUnit u)
+  Just (terms, us) ->
+    let m = ptMultiplier terms; cur = fusStage us in case ev of
+      FTrade _ buyer seller q p
+        | buyer == seller -> Left (SelfTrade u buyer)            -- G3
+        | isExpired cur   -> Left (UnitExpired u)                -- G2
+        | otherwise       -> case mkPosQty q of                  -- G5: parse once
+            Nothing -> Left (NonPositiveQty u q)
+            Just pq -> Right (tradeDelta u cur m buyer seller pq p)
+      FSettleVM _ s d -> case cur of
+        FutExpired _  -> Left (UnitExpired u)                     -- G2
+        FutRegistered -> Left (NotActive u)                       -- G4
+        FutActive _   -> let (rows, cash) = settlementFanout s m (futHoldersOf u l)
+                         in Right (FutStateDelta u (Just (FutActive (Just (Settlement s d)))) rows cash)
+      FExpire _ s d -> case cur of
+        FutExpired _  -> Left (UnitExpired u)                     -- G2
+        FutRegistered -> Left (NotActive u)                       -- G4 (symmetric)
+        FutActive _   -> let (rows, cash) = settlementFanout s m (futHoldersOf u l)
+                         in Right (FutStateDelta u (Just (FutExpired (Settlement s d))) rows cash)
+      FClose _ -> case cur of
+        FutExpired _ -> Right (closeDelta u (futHoldersOf u l))   -- G1
+        _            -> Left (NotExpired u)
+  where u = futEventUnit ev
+
+-- The ledger, ABSTRACT: no field setter or row/status/cash deleter is exported, so
+-- futApplyDelta (insert/update only) is the sole mutator and that absence IS the
+-- monotone-carrier discipline (C1). Terms and status are FUSED into one map, so the
+-- desynchronised state (one map has u, the other does not) is unrepresentable.
+data FutLedger = FutLedger
+  { flUnits :: Map UnitId (FutTerms, FutStatus)
+  , flPos   :: Map (WalletId, UnitId) FutPos
+  , flCash  :: Map WalletId Cash }
+
+data FutLedgerError
+  = FutReRegistration UnitId | FutUnknownUnit UnitId
+  | StageRegression UnitId FutStage FutStage | FutNotConserved UnitId Conserved
+  | UnitExpired UnitId | NotActive UnitId | NotExpired UnitId
+  | SelfTrade UnitId WalletId | NonPositiveQty UnitId Qty
+  deriving (Eq, Show)
+
+futEmptyLedger :: FutLedger
+futEmptyLedger = FutLedger Map.empty Map.empty Map.empty
+
+-- Co-registers terms AND status as one tuple. Re-registration is a hard error (C10).
+futRegister :: UnitId -> FutTerms -> FutLedger -> Either FutLedgerError FutLedger
+futRegister u terms l
+  | u `Map.member` flUnits l = Left (FutReRegistration u)
+  | otherwise = Right l { flUnits = Map.insert u (terms, futRegisteredStatus) (flUnits l) }
+
+-- Apply a validated delta: total, atomic, monotone. EXPIRED rejects ANY stage write
+-- (absorbing); a bare new<=cur would wrongly reject the ACTIVE->ACTIVE daily
+-- re-settle, so the precise rule is isExpired plus a rank-regression guard. FClose's
+-- fsdStage = Nothing bypasses both. Rows and cash are inserted/updated, never removed.
+futApplyDelta :: FutValidDelta -> FutLedger -> Either FutLedgerError FutLedger
+futApplyDelta (FutValidDelta sd) l
+  | not (u `Map.member` flUnits l) = Left (FutUnknownUnit u)
+  | otherwise = case fsdStage sd of
+      Nothing  -> Right written
+      Just new
+        | isExpired cur                 -> Left (UnitExpired u)
+        | stageRank new < stageRank cur -> Left (StageRegression u cur new)
+        | otherwise -> Right written
+            { flUnits = Map.adjust (\(t,_) -> (t, FutStatus new)) u (flUnits l) }
+  where
+    u   = fsdUnit sd
+    cur = maybe FutRegistered (fusStage . snd) (Map.lookup u (flUnits l))
+    written = l
+      { flPos  = Map.foldrWithKey applyRow (flPos l) (fsdRows sd)
+      , flCash = Map.foldrWithKey (\w c -> Map.insertWith (<>) w c)
+                                  (flCash l) (fsdCash sd) }
+    applyRow w (FutRowDelta dnq dac) mp =
+      let key = (w, u); p0 = Map.findWithDefault futZeroP key mp   -- first touch -> flat
+      in Map.insert key p0 { fpNetQty    = fpNetQty    p0 <> dnq
+                           , fpAccumCost = fpAccumCost p0 <> dac } mp
+
+-- One event end to end: read state -> discharge conservation -> apply. Each futStep
+-- projects onto one core Transaction recorded through the core applyTx; futStep is
+-- the futures engine's narration of that projection, not a second core door.
+futStep :: FutEvent -> FutLedger -> Either FutLedgerError FutLedger
+futStep ev l = futHandle ev l >>= futValidate >>= \vd -> futApplyDelta vd l
+
+-- futReplay is a Kleisli fold -- a fold whose step composes in the Either monad. Its
+-- homomorphism law  futReplay (xs <> ys) = futReplay xs >=> futReplay ys  makes
+-- checkpoint independence a CONSEQUENCE, not a test. The stream is assumed
+-- de-duplicated at ingestion: a duplicate FSettleVM at a fixed mark is inert, but a
+-- duplicate FTrade accumulates a second delta.
+futReplay :: [FutEvent] -> FutLedger -> Either FutLedgerError FutLedger
+futReplay evs l0 = foldM (flip futStep) l0 evs
+
+-- Total accessors. futPosition is the C1 Option accessor: Nothing = never held,
+-- Just futZeroP = held and now flat -- never collapsed.
+futProductTerms :: FutLedger -> UnitId -> Maybe FutTerms
+futProductTerms l u = fst <$> Map.lookup u (flUnits l)
+futUnitStatus :: FutLedger -> UnitId -> Maybe FutStatus
+futUnitStatus l u = snd <$> Map.lookup u (flUnits l)
+futPosition :: FutLedger -> WalletId -> UnitId -> Maybe FutPos
+futPosition l w u = Map.lookup (w, u) (flPos l)
+futCashOf :: FutLedger -> WalletId -> Cash
+futCashOf l w = Map.findWithDefault mempty w (flCash l)
+futHoldersOf :: UnitId -> FutLedger -> [(WalletId, FutPos)]
+futHoldersOf u l = [ (w, ps) | ((w, u'), ps) <- Map.toList (flPos l), u' == u ]
+\end{lstlisting}
+
+%==============================================================================
+\subsection{Escalations}
+%==============================================================================
+
+The two escalations that follow are carried to the register in \S\ref{sec:conclusion}.
+
+\paragraph{FE1 --- Fan-out cost at scale.} A settlement writes one \emph{PositionState} row and emits
+one cash leg per open holder, every day. Across $\sim\!10^{6}$ contracts each with up to thousands of
+holders, daily settlement is $O(\text{open positions})$ writes and cash legs --- a large daily
+fan-out and write amplification. This is intrinsic to per-wallet variation margin. Mitigations
+(batching, snapshotting) trade against the conservation-per-event and single-writer disciplines and
+must be shown to preserve C2 and C11. The cost stands. \emph{Owner:} performance and risk engineering.
+
+\paragraph{FE2 --- The derived-consequence alternative, declined.} Storing only the shared
+\code{last\_\allowbreak settlement\_\allowbreak price} and computing each wallet's mark lazily saves
+nothing on the dominant cost: the cash leg is per-wallet and unavoidable (FE1). It cannot produce the
+correct variation margin for an intraday trader without reconstructing \ac{} anyway
+(\S\ref{sec:anchor}). It would also split the single-writer discipline for \ac{} (C11).
+
+\subsection*{Key Invariants and Consequences}
+
+Valuation and lifecycle processing are projections of state; the following hold once
+conservation is granted. Each is catalogued in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{State-sufficiency.} Portfolio value depends only on current state---wallet
+balances, unit state (including embedded lifecycle state), and the current price
+vector---not on transaction history. Valuation is the linear functional
+$V_t=\sum_u w_t(u)\,P_t(u)$. (\S\ref{sec:valuation}.)
+\item \textbf{PnL path-independence (P10).} $\mathrm{PnL}=V_{t_1}-V_{t_0}$, independent of
+the intermediate transactions. Dual valuation applies two price vectors to one state.
+(\S\ref{sec:valuation}, Theorem~\ref{inv:P10}.)
+\item \textbf{Lifecycle value invariance.} Across deterministic lifecycle
+events---coupons, dividends, resets, redemptions---total value under a given price vector
+is invariant: the instrument's price jump is offset by the explicit cash move. Under
+optionality the invariance holds for intrinsic value only. (\S\ref{sec:intro}; \S\ref{sec:lifecycle}.)
+\item \textbf{Contracts as move generators.} A smart contract is a deterministic program
+emitting sequences of moves; because every lifecycle effect is a move, conservation P1 is
+preserved with no separate validation. (\S\ref{sec:contracts}.)
+\item \textbf{Lifecycle idempotency (P6).} Applying the same lifecycle event to the same
+unit state produces no additional moves. (\S\ref{sec:lifecycle}, Invariant~\ref{inv:P6}.)
+\item \textbf{Lifecycle purity (P9).} For fixed inputs, lifecycle functions produce
+identical outputs and no effect beyond the return, so valuation and time travel are
+deterministic. (\S\ref{sec:lifecycle}.)
+\end{itemize}
+
+

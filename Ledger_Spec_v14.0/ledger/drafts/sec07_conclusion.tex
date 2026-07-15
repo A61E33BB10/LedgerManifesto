@@ -1,0 +1,186 @@
+\section{Conclusion}\label{sec:conclusion}
+
+\subsection{The thesis, now shown}
+
+One claim carried this document: the ledger is the orchestrator of the output of
+many smart contracts. The contracts run outside its trust boundary. Each is
+triggered by an event, reads the declared data and stamped observations it is
+allowed to see, works out what must change, and produces transactions. The ledger
+runs none of that product-specific logic. It is four things and nothing more --- a
+single door that admits or refuses each proposed transaction, an immutable log that
+records what the door admits, a family of views computed from the log, and one
+generic operator application at the read seam. Everything a product needs beyond
+those four lives in its contract, on the far side of the boundary.
+
+That was asserted at the start. The tour discharged it. Eight economically distinct
+products crossed the same door: a cash equity through a split, a dividend forecast,
+a cleared future's daily margin, a structured note, a special dividend, a spin-off,
+an elective merger, and a securities loan. No two share a payoff, a lifecycle, or a
+settlement convention. Yet none required product-specific logic inside the ledger;
+the two generalisations the tour did force --- the aggregate weld and the custody
+coordinate --- are product-agnostic widenings of an existing check and an existing
+coordinate. Each differed only in what its contract read and what it
+produced --- the moves, terms versions, and status writes it emitted --- and every
+one of those crossed the identical door, landed in the identical log, and was read
+back by the identical views. A structured note is not a special case of the machine;
+it is the same machine handed a different contract. Adding the ninth product is
+writing a ninth contract, not extending the ledger. The claim that the ledger holds
+nothing product-specific is now a demonstrated fact, because eight products passed
+through and the only generalisations they forced were product-agnostic.
+
+Each stop also closed one design question, by showing the mechanism absorb a real
+product with real numbers rather than by argument. The eight closes are the load the
+thesis actually bears, and they are worth collecting in one place.
+
+\subsection{Each stop, and the choice it settled}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}p{3.5cm}p{10.5cm}@{}}
+\toprule
+\textbf{Tour stop} & \textbf{Design choice it substantiated} \\
+\midrule
+Cash equity \& split
+& Single-basis consumption composed in declared order: a quantity and a price meet
+in one frame only, fixed by the declared boundary and not by arrival order. An
+adjustment is a declared operator applied at read, never a restatement of stored
+shares. \\
+
+Dividend forecast
+& A forecast enters as a stamped observation of a registered kind, one dimension per
+component --- never as a model number the ledger must trust. The kind's invariance
+witness catches a mis-declared component before it can mark the position. \\
+
+Listed futures
+& Variation margin is ordinary conserved transactions keyed per settlement day. There
+is no privileged variation-margin engine; the door that carries a share purchase
+carries a future's entire margin life, and initial margin sits outside as posted
+collateral. \\
+
+Structured note
+& The model-agnostic wall: the pricing that decided the note's worth is never opened.
+Two layers protect the record --- the door catches transactions that are broken,
+recomputation from the log catches the ones that are merely wrong. \\
+
+Special dividend
+& The adjustment schedule's three layers --- class default, declared override,
+designated discretion --- behind a totality gate that fails closed. Bespokeness is a
+higher-precedence layer of declared data, not a branch in code. \\
+
+Spin-off
+& Cross-instrument transport is one atomic multi-unit transaction, and a mark is
+carried only at the level the data supports --- the pair while only the pair is
+stamped --- never fabricated per component from a price the notice could not contain. \\
+
+Elective merger
+& Holder choice enters as logged data. The per-holder weld cannot apply when holders
+elect differently, so the door checks the aggregate weld instead; the contract stays
+deterministic and replays to the same per-holder transactions. \\
+
+Securities lending
+& Generalise the coordinate, not the architecture. The same door, the same
+conservation, and views as folds of the same log carry a loan's position and
+entitlement mechanics, collapsing back to a scalar when ownership and possession
+coincide. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Read down the right column and one pattern is unmistakable. Every choice pushes
+product-specific knowledge out of the ledger and into declared data a contract reads:
+the split's frame, the forecast's dimensions, the special dividend's override, the
+merger holder's election. The ledger's own conduct never varies across the eight. It
+admits, records, and reads back --- the same three acts, on every product.
+
+\subsection{What the whole design rests on}
+
+The reason eight products could share one machine is that a small set of invariants
+holds by construction rather than by care, and every product inherits them for free.
+An unconserved transaction cannot be built, because a move is a transfer and has no
+way to express a quantity appearing from nowhere; conservation is therefore not
+checked but guaranteed. A transaction applies in full or not at all, so no product
+can leave the log in a half-written state. The log is append-only, so a recorded fact
+is never overwritten --- an adjustment is a new entry read through a declared operator,
+never a restatement of an old one. There is one door, so there is one place where
+well-formedness is decided and one place a proposal can be refused. Defaults fail
+closed: an unregistered datum kind is unconsumable, a stale datum met with no declared
+conversion is a typed refusal, an incomplete adjustment schedule blocks registration.
+And the model-agnostic wall keeps every pricing decision on the contract's side of the
+boundary, entering the ledger only as a stamped observation the door never interprets.
+These are the properties that made the tour uneventful. Each is enforced once, at the
+door or in the types, and no contract --- careful, careless, or hostile --- can reach
+around them.
+
+What remains is to state these commitments in the compact, formal register they
+deserve, drawing the guarantees together as one synthesis.
+
+\subsection{The formal synthesis}
+
+Nothing here is new; each statement compresses a guarantee the preceding
+sections established in plain terms.
+
+\paragraph{Conservation is inherited from the generator.} A move subtracts a
+quantity from one wallet and adds the same quantity to another: its net effect
+on a unit's total across all wallets is zero, and a transaction, a finite list
+of moves, nets a sum of zeros. Formally, net change per unit is a homomorphism
+from move sequences under concatenation to quantities under addition, fixed by
+its values on the generators.
+
+\begin{proposition}\label{prop:syn-conservation}
+Every move nets to zero, so the net-change map is the zero homomorphism --- it
+factors through the trivial group --- and no expressible transaction can create
+or destroy quantity.
+\end{proposition}
+
+\paragraph{The log is free, and every view is a fold out of it.} State holds no
+information the event sequence does not: replay to any point rebuilds the exact
+state that held then, and every view --- balance, valuation, profit and loss,
+report --- is a fold of the one log, determined by what it does with a single
+transaction. Two folds of one log cannot disagree about a fact recorded once;
+the reconciliation guarantee of Section~\ref{sec:thesis} is this uniqueness.
+
+\begin{proposition}\label{prop:syn-fold}
+A view is the unique homomorphism from sequences of admitted transactions under
+concatenation to state transformations under composition, extending its
+per-transaction action; replay is therefore deterministic, independent of
+where it is cut, and re-reads history rather than re-executing any producer.
+\end{proposition}
+
+\paragraph{Conversion is an arrow that exists or does not.} A datum crosses a
+basis boundary only by the operator the boundary declared, from a closed menu;
+omission declares nothing, and the crossing is refused.
+
+\begin{proposition}\label{prop:syn-operators}
+For each datum kind, between two bases on one chain there is at most one
+conversion --- the composite of the declared operators between them, in
+effective order --- and a datum crosses exactly when that composite exists;
+fail-closed is the absence of the arrow.
+\end{proposition}
+
+\paragraph{A contract is a recomputable function.} A contract is a
+deterministic, total function from the committed log prefix and its trigger to
+one result --- a proposed transaction or a typed refusal. Structural soundness,
+once admitted, is Proposition~\ref{prop:syn-conservation} plus the door's
+checks; economic soundness is checkable because everything the function read
+is in the log: two evaluations of one function on one input are equal.
+
+\begin{proposition}\label{prop:syn-witness}
+Economic correctness is the agreement of the recorded transaction with an
+independent re-evaluation of the producing function on the same committed
+prefix, compared in canonical form: a discrepancy locates a producer defect
+exactly, and the bound is eventual detection and recorded repair, never
+admission-time verification.
+\end{proposition}
+
+\paragraph{One arrow, three names.} A trade, a lifecycle event, and a
+corporate action differ in what fires them and in what they read --- never in
+shape. Each is one arrow from log prefix and trigger to a proposed transaction
+or a typed refusal; every guarantee above is stated over that arrow's inputs
+and output, never over which instance fired, and so holds for every instance,
+including those yet to be written.
+
+One record, freely generated by what the door admits; conservation the zero
+homomorphism on its generators; every view a fold out of it; every conversion
+the one arrow its chain declares; every producer a recomputable function into
+it. Not five disciplines maintained in parallel: one structure, read five
+ways.

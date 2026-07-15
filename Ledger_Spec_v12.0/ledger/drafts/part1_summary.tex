@@ -1,0 +1,28 @@
+\subsection*{Key Invariants and Consequences}
+
+The foundations rest on one primitive---the atomic move of a quantity between two
+wallets---from which the following hold by construction. Each is catalogued, with its
+executable oracle, in \S\ref{sec:invariants}.
+
+\begin{itemize}[nosep]
+\item \textbf{Conservation (P1).} $Q(u)=\sum_w w_t(u)=0$ for every unit $u$ and time $t$.
+Each move debits and credits equal magnitude, so the signed per-unit sum of any
+transaction is the group identity; a conservation failure is an implementation bug, never
+a financial event. (\S\ref{sec:ledger}, Theorem~\ref{inv:P1}.)
+\item \textbf{Atomic commitment (P2).} A transaction applies completely or not at all; no
+partial state is observable, so a lifecycle event commits as one indivisible unit.
+(\S\ref{sec:ledger}.)
+\item \textbf{Log monotonicity (P4).} The event stream is append-only and hash-chained; no
+entry is retroactively rewritten. (\S\ref{sec:unit-store}.)
+\item \textbf{Idempotency (P5, P6).} Re-applying a transaction by \texttt{tx\_id}, or a
+lifecycle event to the same unit state, has no incremental effect.
+(\S\ref{sec:unit-store}.)
+\item \textbf{Determinism and time travel (P8, P9).} Replay of the immutable stream is a
+pure, total fold, and lifecycle functions are pure; \texttt{clone\_at}$(t)$ reconstructs
+balances and unit state identical to the ledger at time $t$. The ledger is a deterministic
+function of its event history. (\S\ref{sec:unit-store}.)
+\item \textbf{Consequence---unreachable internal breaks.} Trading-system/general-ledger
+divergence, PnL/balance-sheet mismatch, and inter-entity breaks are disagreements between
+projections of one record; for activity inside the boundary they are not representable.
+(\S\ref{sec:intro}.)
+\end{itemize}

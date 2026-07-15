@@ -5,3 +5,8 @@
 *.fdb_latexmk
 *.synctex.gz
 *.toc
+.claude/agent-memory/
+.claude/scheduled_tasks.lock
+Ledger_Spec_*/ledger/.claude/
+v15_1_workpapers/.claude/
+Ledger/

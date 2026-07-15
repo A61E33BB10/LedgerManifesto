@@ -1,0 +1,46 @@
+\section*{Preface}
+\addcontentsline{toc}{section}{Preface}
+
+A trading business records the same activity many times over. A trade is captured in the
+trading system, again in the risk system, again in the general ledger, and again in
+regulatory reports. Each is a separate copy of one economic fact. Because the copies are
+kept apart, they drift apart, and the work of checking that they still agree---reconciliation---becomes
+a dominant operational cost and a primary source of error. When two records disagree,
+someone must decide which is right. Sometimes no one notices in time.
+
+This specification removes the cause rather than managing the symptom. It keeps one record,
+not many. Every event in scope is written once, as a single kind of entry: the movement of
+a quantity from one place to another. Nothing is ever overwritten or deleted; entries are
+only added. A position, a profit-and-loss figure (P\&L, the gain or loss on a book), a
+balance sheet, or a regulatory report is not a second copy to be reconciled against the
+first. It is a view computed from the one record, as a total is computed from a list of
+numbers. Among the firm's own records there is nothing to reconcile, because there is only
+one. (Checking that record against outside authorities such as custodians and depositories
+remains a separate activity at the system's boundary; it is the internal reconciliation,
+between the firm's own copies, that this design removes.)
+
+This is what ``conservation by construction'' means, and why it matters in daily
+operation. Conservation is the rule that a quantity is never created or lost inside the
+system: whatever leaves one place arrives somewhere else, exactly. The rule is not a check
+run afterward and hoped to pass; it is built into the only operation the system permits, so
+a record that violated it could not be written in the first place. Three consequences
+follow directly.
+
+\begin{itemize}
+\item The books cannot silently fail to balance. An entry that did not balance is not a
+warning to investigate later---it cannot exist.
+\item Value cannot be created or lost inside the system. Quantities are only moved between
+places. Gains and losses arise from price changes, which are recorded separately and
+plainly, never from a quantity quietly appearing or vanishing.
+\item Any past state can be reproduced exactly. Because the record is only ever added to,
+the system can be rewound to any earlier moment and will show precisely what was known
+then. Audit and investigation work from fact, not from reconstruction.
+\end{itemize}
+
+The same single record serves the wider market context. Where the activity must be
+expressed in the shared industry vocabulary for derivatives---the Common Domain Model
+(CDM), a standard maintained by the International Swaps and Derivatives Association---the
+record maps onto it directly, without a separate translation system to keep in step.
+
+A reader wanting the technical argument should continue to the Abstract and to the Roadmap
+and Reading Guidance, which give the shortest path through the document for each audience.

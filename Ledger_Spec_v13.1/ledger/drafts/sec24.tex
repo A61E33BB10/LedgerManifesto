@@ -1,0 +1,251 @@
+\section{Property Test Catalogue}
+\label{app:properties}
+
+This appendix restates the ten core invariants of Section~\ref{sec:invariants} as executable oracles. Each oracle is a precondition that constrains the generated input and a postcondition the operation under test must satisfy. The CDM enumeration universe (Section~\ref{sec:cdm}) supplies the generators. The framework draws random inputs, applies the operation, and checks the postcondition. A failure yields a minimal counterexample. The invariant prose is stated once in Section~\ref{sec:invariants}; this catalogue gives only the test forms.
+
+Each row of the table reads the same way: given an input satisfying the precondition, the outcome must satisfy the postcondition.
+
+\renewcommand{\arraystretch}{1.3}
+\begin{center}
+\begin{longtable}{@{}p{2.5cm} p{4.4cm} p{5.4cm}@{}}
+\toprule
+\textbf{Invariant} & \textbf{Precondition} & \textbf{Postcondition (oracle)} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Invariant} & \textbf{Precondition} & \textbf{Postcondition (oracle)} \\
+\midrule
+\endhead
+
+P1 Conservation & $\tau$ applied to state $s$, accepted & $\forall u:\ Q_{s'}(u)=\sum_w w(u)=0$ \\
+
+P2 Atomic commitment & $\tau=\langle m_1,\dots,m_n\rangle$; move $m_k$ fails validation, $1\le k\le n$ & $\texttt{execute}(s,\tau)=s$; no partial state observable \\
+
+P3 Referential integrity & $m$ a move in an accepted $\tau$ & $m.\mathrm{src}\in\mathcal{W}\ \wedge\ m.\mathrm{dst}\in\mathcal{W}\ \wedge\ m.\mathrm{unit}\in\mathcal{U}$ \\
+
+P4 Log monotonicity & log $L=\langle e_1,\dots,e_n\rangle$ after any operation sequence & $\forall i>1:\ e_i.\mathrm{prevHash}=H(e_{i-1})$; no $e_j$, $j<n$, rewritten (append-only, hash-chained) \\
+
+P5 Transaction idempotency & state $s$, transaction $\tau$ & $\texttt{execute}(\texttt{execute}(s,\tau),\tau)=\texttt{execute}(s,\tau)$ (dedup by \texttt{tx\_id}) \\
+
+P6 Lifecycle idempotency & $f(u,\mathit{st},d)=(\mathit{moves},\mathit{st}')$; $\mathit{st}'$ already reflects the event & $f(u,\mathit{st}',d)=(\varnothing,\mathit{st}')$; second call emits no moves \\
+
+P7 Ledger isolation & $m$ a move in virtual ledger $\mathcal{L}_v$ & $m.\mathrm{src}\in\mathcal{L}_v\ \wedge\ m.\mathrm{dst}\in\mathcal{L}_v$; no move crosses the virtual/real boundary \\
+
+P8 Snapshot consistency & time $t$ in the log; $s_t$ the state at $t$ & $\forall w,u:\ \texttt{clone\_at}(t).\texttt{balance}(w,u)=s_t.\texttt{balance}(w,u)\ \wedge\ \texttt{clone\_at}(t).\texttt{unit\_state}(u)=s_t.\texttt{unit\_state}(u)$ \\
+
+P9 Lifecycle purity & lifecycle function $f$, fixed inputs $(u,\mathit{st},d)$ & repeated evaluation yields identical $(\mathit{moves},\mathit{st}')$; no effect beyond the return \\
+
+P10 PnL path-independence & price vectors $P_{t_0},P_{t_1}$; any transaction sequence on $[t_0,t_1]$ & $\mathrm{PnL}_{\text{price}}+\mathrm{PnL}_{\text{flow}}=V_{t_1}-V_{t_0}$, independent of the intermediate path \\
+
+\bottomrule
+\end{longtable}
+\end{center}
+\renewcommand{\arraystretch}{1.0}
+
+\begin{remark}[P8 and the projection discipline]
+The P8 oracle reconstructs \emph{both} balances and unit state from the log. \texttt{unit\_state} is read from UnitStatus, a materialised projection of the immutable event log---a read cache the log always rebuilds, never a separate source of truth (Section~\ref{sec:lifecycle}). The oracle is the executable form of that discipline: a catamorphism---replaying the events up to $t$ rebuilds the exact value that held then---so $\texttt{clone\_at}(t).\texttt{unit\_state}(u)=s_t.\texttt{unit\_state}(u)$ holds by construction, and a failure exposes any drift between the cache and the log. The observation \texttt{sameLedger} makes through \texttt{unitStatus} covers \texttt{usBasis}, so P8's generator universe must include boundary transactions with retro-effective $t_{\mathrm{eff}}$.
+\end{remark}
+
+\noindent\textbf{Totality oracles.} Two further oracles are global. The same generator exercises them, but they are not numbered among the core ten:
+\begin{itemize}
+\item \emph{Totality.} For every generated input $i$, $\texttt{execute}(s,i)$ returns success or a well-typed error; it never raises an unhandled exception.
+\item \emph{Valid transitions only.} For every $(\text{product type},\text{state},\text{event})$ triple absent from the product's transition table, the lifecycle function returns an error. This is the executable witness that illegal lifecycle transitions are unrepresentable (Section~\ref{sec:lifecycle}).
+\end{itemize}
+
+\noindent\textbf{PnL inputs.} $V_t$ and the price vectors $P_t(u)$ that drive P10 are produced by the valuation projection (Section~\ref{sec:valuation}). The state-aware price function is specified in Appendix~\ref{app:pricing-coordination}.
+
+\noindent\textbf{SBL, obligation, basis, producer, and vocabulary extensions.} Section~\ref{sec:sbl-invariants} adds ten invariants P11--P20 specific to Securities Borrowing and Lending (collateralisation, lender ownership invariance, partial-return and settlement monotonicity). Section~\ref{sec:obligation-invariants} adds P21--P23 for obligation liveness. Section~\ref{sec:state-basis} adds P24, basis tip agreement, and P25, ingest-door soundness. Section~\ref{sec:sbl-locates} adds P26, locate-capacity admission. Section~\ref{sec:invariants-producer} adds five more: P27, producer agreement (oracle \texttt{recomputeOK}, with the terms-leg oracle \texttt{propTermsRecompute}); P28, cause committed (\texttt{pCauseCommitted}); P29, schedule totality, the witness of \hyperref[cond:C14]{C14} (\texttt{propScheduleTotalGate}, quantifying over the closed \texttt{CAClass}); P30, dimension invariance (\texttt{propDimInvariance}, with the composite-kind oracle \texttt{dkDivSplitOK}); and P31, kind totality at the ingest door (\texttt{pKindTotal}, the P25 shape).
+
+These extensions never relax a core invariant. Every transaction satisfying P11--P23 also satisfies P1--P10. P24 quantifies over log prefixes rather than single transactions, P26 over locate-confirmation commit positions, and P27 over committed logs with a recomputing implementation; each narrows the accepted logs without weakening any oracle.
+
+The executable forms of P11--P23 follow the same precondition/postcondition shape. Those of P24--P31 are given separately: P24 below, P25 with the market-data contract (\S\ref{sec:basis-contract}), P26 as the log-replay check of Section~\ref{sec:sbl-locates}, and P27--P31 as the named suite oracles of Section~\ref{sec:invariants-producer} (\texttt{reference/Ledger.hs}, Part~L and the gates they witness). Three conformance-tier properties --- P32, confirmation gate; P33, elective aggregate invariance; P34, basket joint consumption --- are specified in Section~\ref{sec:invariants-producer}; their executable forms live where \texttt{transport} lives, outside the reference.
+
+P24 asserts that two computations of a unit's basis tip agree: the fold that applies boundary events in booking order, and the projection that ranks them in effective order. The oracle checks the agreement at every accepted prefix of the log.
+
+\renewcommand{\arraystretch}{1.3}
+\begin{center}
+\begin{longtable}{@{}p{2.5cm} p{4.4cm} p{5.4cm}@{}}
+\toprule
+\textbf{Invariant} & \textbf{Precondition} & \textbf{Postcondition (oracle)} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Invariant} & \textbf{Precondition} & \textbf{Postcondition (oracle)} \\
+\midrule
+\endhead
+
+P24 Basis tip agreement & a log $L$; any prefix $L_k=\langle\tau_1,\dots,\tau_k\rangle$ whose replay from the empty ledger is accepted & $\forall u$ registered in $L_k$: $\texttt{usBasis}(u)=\mathrm{effTip}(u,L_k)$---the maximum, in the lexicographic order $(t_{\mathrm{eff}},\mathit{prec},\mathit{bid})$, of the boundary events $L_k$ carries on $u$, or $\mathrm{Origin}(u)$ if it carries none. The booking-order status fold and the effective-order chain projection agree at every prefix \\
+
+\bottomrule
+\end{longtable}
+\end{center}
+\renewcommand{\arraystretch}{1.0}
+
+\begin{remark}[P24 and the time-travel claim]
+The basis-time-travel claim of \S\ref{sec:basis-time-travel} is discharged by P8 together with P24: each accepted-prefix check is a $\texttt{clone\_at}(k)$, and \texttt{sameLedger} observes \texttt{usBasis} through \texttt{unitStatus}. No-regression is a corollary, not a separate test: the maximum of a growing committed set is monotone. The typed oracle is \texttt{p24} (\texttt{reference/Ledger.hs}, Part~L); its recomputation \texttt{effTip} reads the transactions' own boundary events, never the \texttt{ledgerBounds} cache.
+\end{remark}
+
+\medskip
+\noindent\textbf{Typed oracles.} Each oracle above has a typed counterpart. Its precondition and postcondition are both total, so the generator and the checker share one type. The operation under test returns a typed \texttt{Outcome}. \texttt{Accepted} is the \emph{only} constructor that carries a ledger, so a partial (``half-committed'') ledger is not representable. That absence is the \emph{Totality} oracle and the ``no partial state'' half of P2, made structural rather than tested.
+
+The listing fixes the shared vocabulary: the outcome type, the property shape, and the observational equality the oracles use.
+
+\begin{lstlisting}[language=Haskell]
+-- execute = the canonical (Sec. 4) three-home transaction-apply, lifted to
+-- return Outcome; supplied by the implementation, not a symbol defined here.
+data Outcome = Accepted Ledger | Rejected TxError   -- no third "crashed" case
+
+-- A property: a precondition constraining the generated input and a
+-- postcondition over the outcome of running the operation on it. Both total.
+data Property i o = Property
+  { pre  :: Ledger -> i -> Bool
+  , post :: Ledger -> i -> o -> Bool }
+
+data TxInput = TxInput { tiTx :: OracleTx, tiScope :: Scope }
+data Scope   = Scope   { scWallets :: [WalletId], scUnits :: [UnitId] }
+
+registered :: Ledger -> UnitId -> Bool
+registered l u = maybe False (const True) (productTerms l u)
+
+-- Sum a wallet's holding of u across a wallet set. Summation is a monoid
+-- homomorphism into the Qty group -- the empty set sums to mempty (=0) with no
+-- special case, so a zero-holder unit conserves vacuously (no divide-by-holders).
+unitTotal :: Ledger -> [WalletId] -> UnitId -> Qty
+unitTotal l ws u = foldMap (\w -> maybe mempty psBalance (position l w u))
+                           (Set.toList (Set.fromList ws))
+
+-- Equality of ledgers BY OBSERVATION over the scope -- the only equality the
+-- oracles need; the abstract Ledger exports no structural Eq.
+sameLedger :: Scope -> Ledger -> Ledger -> Bool
+sameLedger sc a b =
+     and [ position a w u == position b w u | w <- scWallets sc, u <- scUnits sc ]
+  && and [ unitStatus a u == unitStatus b u | u <- scUnits sc ]
+\end{lstlisting}
+
+\noindent Five oracles test the same operation, \texttt{execute}, and share the one \texttt{Property TxInput Outcome} shape. Each postcondition that asserts a positive fact is guarded on \texttt{Accepted}, so it claims nothing about a rejected transaction.
+
+\begin{lstlisting}[language=Haskell]
+-- P1 Conservation. On any accepted transaction every unit's holdings sum to
+-- zero across the scope (closed system); a rejected one asserts nothing.
+p1 :: Property TxInput Outcome
+p1 = Property (\_ _ -> True) $ \_ (TxInput _ sc) o -> case o of
+  Rejected _ -> True
+  Accepted l -> all (\u -> unitTotal l (scWallets sc) u == mempty) (scUnits sc)
+
+-- P2 Atomic commitment. Any move failing validation rejects the whole txn;
+-- no partial ledger exists (Outcome cannot carry one).
+p2 :: Property TxInput Outcome
+p2 = Property (\l (TxInput tx _) -> any (invalidMove l) (otMoves tx))
+              (\_ _ o -> isRejected o)
+
+-- P3 Referential integrity. Every move in an accepted txn names a registered
+-- unit and in-scope wallets.
+p3 :: Property TxInput Outcome
+p3 = Property (\_ _ -> True) $ \_ (TxInput tx sc) o -> case o of
+  Rejected _ -> True
+  Accepted l -> all (\m -> registered l (mUnit m)
+                        && inScope sc (mFrom m) && inScope sc (mTo m)) (otMoves tx)
+
+-- P7 Ledger isolation. With Scope = the virtual ledger's wallets, no move
+-- crosses its boundary -- a property of the moves, independent of the outcome.
+p7 :: Property TxInput Outcome
+p7 = Property (\_ (TxInput tx _) -> not (null (otMoves tx)))
+     $ \_ (TxInput tx sc) _ ->
+         all (\m -> inScope sc (mFrom m) && inScope sc (mTo m)) (otMoves tx)
+
+-- P5 Transaction idempotency (dedup by tx_id). Re-running an accepted txn is a
+-- no-op; this oracle re-runs the operation, so it takes it directly.
+idempotentTx :: (Ledger -> OracleTx -> Outcome)
+             -> Scope -> Ledger -> OracleTx -> Bool
+idempotentTx exec sc l tx = case exec l tx of
+  Rejected _  -> True
+  Accepted l' -> case exec l' tx of Accepted l'' -> sameLedger sc l' l''
+                                    Rejected _   -> False
+\end{lstlisting}
+
+\noindent The remaining five test four other operations: the log append, the snapshot rebuild, the pure lifecycle handler, the PnL decomposition. Forcing them into the \texttt{Property} shape would buy nothing. Each is therefore a bespoke total predicate (the restraint rule: stop at the cheaper guarantee).
+
+\begin{lstlisting}[language=Haskell]
+-- P4 Log monotonicity. The log is append-only and hash-chained BY CONSTRUCTION
+-- (built only by `append`, which stamps the predecessor's hash; no rewrite or
+-- delete is exported). The oracle re-checks the link; a break needs API-tamper.
+data Hashed = Hashed { hPrev :: Hash, hPayload :: Transaction, hSelf :: Hash }
+chainOK :: [Hashed] -> Bool
+chainOK es = and (zipWith (\a b -> hPrev b == hSelf a) es (drop 1 es))
+
+-- P8 Snapshot consistency. cloneAt t rebuilds the state at t by replaying the
+-- events up to t (a catamorphism -- replaying the log always rebuilds the exact
+-- value that held then), so snapshot must equal s_t by observation (both
+-- balances and unit state -- sameLedger covers both).
+p8 :: Scope -> Ledger -> Ledger -> Bool          -- cloneAt t  vs  s_t
+p8 = sameLedger
+
+-- A lifecycle handler is a PURE TOTAL function. Purity (no IO in the type) IS
+-- P9: re-evaluation cannot differ and there is no effect to leak.
+type LifecycleFn st ev = UnitId -> st -> ev -> ([Move], st)
+
+-- P6 Lifecycle idempotency. Feeding the handler its own output state emits no
+-- further moves and fixes the state.
+idempotentL :: (Eq st) => LifecycleFn st ev -> UnitId -> st -> ev -> Bool
+idempotentL f u st ev = let (_, st') = f u st ev in f u st' ev == ([], st')
+
+-- Valid-transitions-only. For every (product, state, event) absent from the
+-- transition table, the guarded handler returns an error: not in table => Left.
+-- An illegal transition is thus not representable as success.
+validTransitionsOnly
+  :: (p -> st -> ev -> Bool)                         -- in the table?
+  -> (p -> st -> ev -> Either TxError ([Move], st))  -- the guarded handler
+  -> p -> st -> ev -> Bool
+validTransitionsOnly inTable h p st ev
+  | inTable p st ev = True
+  | otherwise       = case h p st ev of Left _ -> True; Right _ -> False
+
+-- P10 PnL path-independence. V_t and the price vectors P_t(u) come from the
+-- valuation projection; the decomposition closes regardless of the
+-- intermediate transaction path.
+p10 :: Cash -> Cash -> Cash -> Cash -> Bool      -- pnlPrice pnlFlow V_t0 V_t1
+p10 pnlPrice pnlFlow v0 v1 = pnlPrice <> pnlFlow == v1 <> cashNeg v0
+\end{lstlisting}
+
+\noindent P24 is log-prefix-shaped, like P4 and P8. The check replays every prefix from the empty ledger and compares the cached tip with a recomputation from the transactions' own boundary events. Its oracle and the spec function it recomputes are verbatim from the reference (Part~L):
+
+\begin{lstlisting}[language=Haskell]
+-- | The effective-order tip a log prefix mandates for u, recomputed from the
+--   transactions' own BoundaryEvents -- INDEPENDENT of the ledger's ledgerBounds
+--   cache, so a drifted cache cannot vouch for itself. The spec function of the
+--   basis-chain definition (sec:state-basis), written once, here: the maximum,
+--   in the lexicographic order (t_eff, prec, bid), of the boundary events the
+--   prefix carries on u, or Origin u if it carries none.
+effTip :: UnitId -> [Transaction] -> BasisId
+effTip u txs =
+  case Set.lookupMax (Set.fromList
+         [ (bevTEff be, bevPrec be, bevId be)
+         | tx <- txs, txUnit tx == u, Just be <- [txBoundary tx] ]) of
+    Nothing          -> Origin u
+    Just (_, _, bid) -> Boundary bid
+
+-- P24 Basis tip agreement: at EVERY accepted prefix of the log, the booking-order
+-- status fold (replay) and the effective-order chain projection (effTip) agree on
+-- usBasis for every registered unit. Quantifying over prefixes makes each check a
+-- clone_at(k), so the retro-effective time-travel claim (sec:basis-time-travel)
+-- rides on this oracle plus the existing P8 (sameLedger already observes usBasis
+-- through unitStatus, whose structural Eq covers all four fields). No-regression
+-- is a corollary, not a test: the max of a growing committed set never recedes.
+-- Wrongful ADMISSION of a non-tip SetBasis fails this oracle at that prefix;
+-- wrongful REJECTION is the vacuous side, as in P1/P2's split -- consistent with
+-- catalogue precedent. Log-prefix-shaped like P4/P8, not Property-shaped: the
+-- claim quantifies over prefixes of a log, not over single transactions.
+-- (Generators: BoundaryId is abstract by design, so boundary transactions for
+-- this oracle are compiled IN-MODULE, minting deterministic content addresses --
+-- no production caller gains a minting door.)
+p24 :: [Transaction] -> Bool
+p24 txs = all prefixOK [ take k txs | k <- [0 .. length txs] ]
+  where
+    prefixOK pfx = case replay pfx emptyLedger of
+      Left _  -> True   -- a rejected prefix asserts nothing (rejection is P2's half)
+      Right l -> all (agrees l pfx) (Set.toList (Set.fromList (map txUnit pfx)))
+    agrees l pfx u = fmap usBasis (unitStatus l u) == Just (effTip u pfx)
+\end{lstlisting}
+
+\noindent The full self-contained listing is collected in \texttt{reference/Ledger.hs}. It supplies the helpers \texttt{inScope}, \texttt{isRejected}, \texttt{invalidMove}, the \texttt{Move}/\texttt{OracleTx} types, the \texttt{TxError} and \texttt{Hash} types, the \texttt{Cash} group inverse \texttt{cashNeg}, and the \texttt{total} coverage witness. It reuses the \texttt{Ledger} library and its total accessors.
+

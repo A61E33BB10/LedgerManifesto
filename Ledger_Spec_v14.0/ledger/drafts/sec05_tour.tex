@@ -1,0 +1,49 @@
+\section{The Product Tour}\label{sec:tour}
+
+The three sections before this one built one machine: a single door, a handful of
+checks, an append-only log, and views computed from it, fed by contracts that read
+only declared data and stamped observations. The claim was that this one machine
+carries every post-trade product, not a family of machines each shaped to its asset
+class. A claim like that is not settled by argument. It is settled by running real
+products through the machine and watching it hold.
+
+That is what the next eight sections do. Each takes one product family, picks the
+event on it that is hardest for the design, and works that event through in full.
+The stops are ordered by machinery, not by asset class: the trade and the split
+first, because they are the plainest triggers; then two lifecycle products, a listed
+future and a structured note; then corporate actions in ascending order of
+bespokeness, from a special-dividend override to a spin-off to an elective merger;
+and securities lending last, because it is the one stop that changes what a position
+\emph{is}, and so tests whether the architecture survives that change.
+
+Every stop keeps the same five-part shape, so that what differs between products is
+visible against what does not.
+
+\begin{itemize}[leftmargin=1.5em]
+\item \textbf{The trigger.} What fires --- an executed trade, a dated obligation
+coming due, a confirmed corporate-action notice.
+\item \textbf{The contract that catches it.} Which of the three trigger classes runs,
+and what declared data and stamped observations it reads.
+\item \textbf{The transactions it produces.} The moves and status writes it submits,
+shown as numbered rows with their exact quantities.
+\item \textbf{What the door checks.} Which admission check is load-bearing here, and
+what it refuses.
+\item \textbf{The design choice it substantiates.} One sentence, at the close, naming
+the single decision from the mechanism sections this product would break without.
+\end{itemize}
+
+The stops share one setting --- a single firm's book over one year --- but each is a
+self-contained worked example, and each opens with its own stated starting position
+rather than inheriting a share count from the stop before. A recurring name, ACME,
+carries the narrative: the same firm trades ACME, sees it split two-for-one, receives
+a dividend forecast on it, holds an option over it through a September special
+dividend, watches it spin off a subsidiary, and the following March sees it acquired
+in an elective merger; the securities-lending stop works that same September through a
+book that has lent part of its ACME. The tour makes no claim that one exact holding is
+carried unchanged from stop to stop --- each stop states the position it works with, so
+that what the machine does to that position is visible without the reader tracking a
+running balance across a year. Two stops run their own lines, because the architecture
+is not equity-shaped and the tour should not pretend it is: a dollar-denominated listed
+future, and a structured note whose pricing the ledger never sees. Every number within
+a stop is exact, and every one is a number the log would produce for the position that
+stop states.

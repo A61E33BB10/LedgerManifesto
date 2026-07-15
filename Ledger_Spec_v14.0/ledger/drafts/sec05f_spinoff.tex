@@ -1,0 +1,80 @@
+\section{The Spin-Off}\label{sec:tour-spinoff}
+
+A spin-off moves value across instrument lines: one holding becomes two. This stop
+shows the ledger doing that in a single transaction, and --- the harder part --- being
+honest about a price it does not yet have. In November, ACME spins off a subsidiary.
+Write the parent as $A$ and the two resulting lines as $A_1$ (the continuing ACME) and
+$A_2$ (the new company). The book holds 1{,}000 $A$, marked \EUR{100}, so \EUR{100{,}000}.
+
+\subsection{One transaction across two lines}
+
+The confirmed notice says each share of $A$ entitles the holder to one $A_1$ and one
+$A_2$. The corporate-action contract reads it and submits a single transaction that
+issues 1{,}000 $A_1$ and 1{,}000 $A_2$ into the book's wallet against the 1{,}000 $A$
+it resolves --- $A_1$ and $A_2$ each registered as units at their origins, with their
+own datum kinds. Because it is one transaction, the two new lines appear together or
+not at all; no reader can catch the book holding $A_1$ but not yet $A_2$, and
+per-unit conservation holds on each line separately, each new share issued by a move
+from a virtual wallet. This is cross-instrument transport, and it is one atomic
+multi-unit transaction, not a sequence that some interleaving could observe half-done.
+
+The transaction carries the entitlement --- the quantities. What it cannot carry is the
+children's prices, and this is the point of the stop. No notice can contain a price
+formed after it. In practice both lines often trade \emph{when-issued} in the days
+before the distribution settles, so per-component prices may well exist ahead of the
+first regular-way session; but a when-issued print is market data, not terms, and the
+notice that issues the shares still does not contain it. Say the lines settle near
+$A_1 = \EUR{80}$ and $A_2 = \EUR{20}$ once they trade regular-way. Whether the
+continuing parent is modelled as a fresh unit $A_1$ at all is itself a choice --- ACME's
+listing and ISIN usually survive the spin-off, so a deployment may keep the parent line
+and register only the new child; this stop registers both to work the general two-line
+case.
+
+\subsection{A mark carried only as far as the data supports}
+
+So on the morning after the spin-off, before the children have printed, what is the
+holding worth? The stale \EUR{100} parent mark still exists, stamped in the parent's
+basis. The declaration at the boundary is \texttt{Recompose} of $A$ onto the basket
+$\{A_1 \mapsto 1,\ A_2 \mapsto 1\}$, and that basket datum was jointly stamped at the
+successors' origins. It is consumable, but only jointly. It licenses a mark on the
+\emph{pair}: the combined 2{,}000 shares --- 1{,}000 $A_1$ and 1{,}000 $A_2$ together
+--- carry \EUR{100{,}000}, which is exactly the pre-spin value, phantom-free, so the
+overnight risk of the combined position is readable at the open.
+
+What it refuses is a mark on either child alone. To place a number on $A_1$ by itself,
+one would have to divide the \EUR{100{,}000} between the two lines in some proportion
+--- and that proportion is exactly the decomposition the notice never contained. Its
+absence is what single-basis consumption refuses on: the per-component kinds stay
+pending until fresh per-component observations arrive to supply it. So the combined pair
+can be valued and its overnight risk read, but the two lines cannot yet be hedged or
+margined against each other, because separating their risk needs the very split that is
+still pending. That split is not refused forever, only until it is observed: the
+issuer's cost-basis allocation, or the first regular-way session's volume-weighted
+prices, later supplies it --- the allocation as attested declared data, the prices as
+stamped observations of their own. The basket step is a bridge, not
+a standing conversion; it retires the moment the children carry their own fresh stamps,
+after which valuation proceeds component by component.
+
+The discipline earns its keep against a tempting error. Suppose someone carries the
+stale \EUR{100} onto $A_1$ as though it were $A_1$'s price --- treating the parent
+number as passing through unchanged --- and then adds the fresh $A_2$ print:
+\[
+  \underbrace{1{,}000 \times 100}_{A_1,\ \text{stale, assumed}} +
+  \underbrace{1{,}000 \times 20}_{A_2,\ \text{fresh}}
+  = \EUR{120{,}000}.
+\]
+Against a true \EUR{100{,}000}, that is a phantom \EUR{20{,}000} --- and it is exactly
+$A_2$'s value counted twice, once embedded in the stale parent price and once as the
+fresh $A_2$ print. The ledger refuses it twice over. Identity is a declared operator,
+never assumed, so there is no conversion carrying $A$ onto $A_1$ alone for the stale
+mark to ride; and single-basis consumption refuses mixing a stale pair value beside a
+fresh single-component print. Once both children have printed --- $A_1$ at \EUR{80},
+$A_2$ at \EUR{20} --- the basket bridge retires and the mark is component-wise:
+$1{,}000 \times 80 + 1{,}000 \times 20 = \EUR{100{,}000}$, each on its own chain. The
+value crossed the boundary as a whole and came out a sum of parts only when the parts
+had prices of their own.
+
+\emph{Cross-instrument transport is one atomic multi-unit transaction, and a mark is
+carried at the level the data actually supports --- the pair, while only the pair is
+stamped --- never fabricated per component from a price the notice could not have
+contained.}

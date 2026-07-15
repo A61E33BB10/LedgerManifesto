@@ -1,0 +1,97 @@
+\section{Implementation and Operations}
+\label{sec:sec11}
+\label{sec:implementation}
+%==============================================================================
+
+The architecture is specified at the design level: data structures, algorithms, and interfaces an implementation must provide. No implementation language is assumed.
+
+\subsection{Three-Layer Architecture}
+\label{sec:sec11-layers}
+
+The system has three layers. A CDM business event enters at the persistence layer, is decomposed into balance deltas at the computation layer, and is reflected as state at the projection layer.
+
+\begin{enumerate}[nosep]
+\item \textbf{Move stream} (persistence). The immutable, append-only log of atomic moves: the canonical internal record. Each move carries full provenance---timestamp, source contract, metadata, external references.
+\item \textbf{Aggregation engine} (computation). A pure GroupBy from a set of moves to net change per $(\text{wallet},\text{unit})$ key. Having no side effects, it parallelises across independent keys.
+\item \textbf{Projection} (state). Wallet balances and unit status, derived from the move stream through the aggregation engine.
+\end{enumerate}
+
+The projection is a cache, not a record. Corruption of the projection---hardware fault, lost node---is repaired by replaying the move stream from the last verified snapshot. Nothing is lost: the move stream is append-only and immutable (P4).
+
+\begin{remark}[The projection is a rebuilt value, not a second source of truth]
+UnitStatus holds one value per unit, shared---read identically by every holder. Its value changes over time, but UnitStatus is not a separate source of truth: the immutable event log is. Every change is caused by a logged event; the stored value is overwritten in place only as a read cache. Replaying the events up to any point rebuilds the exact value that held then, so nothing is lost by overwriting and there is no other way to change the value. A value exists from registration onward. The same holds for wallet balances: the projection layer is a catamorphism over the log---meaning replaying the events always rebuilds the exact balance and status that held at any chosen instant (P8).
+\end{remark}
+
+\subsection{Balance-Update Algorithm}
+\label{sec:sec11-update}
+
+A transaction $\tau=\{m_1,\dots,m_n\}$ is applied in four steps.
+
+\begin{enumerate}[nosep]
+\item \textbf{Validate.} Every move references an existing wallet and unit; $\tau$ satisfies conservation (C2, P1).
+\item \textbf{Aggregate.} Net change per $(\text{wallet},\text{unit})$ key by GroupBy over the moves.
+\item \textbf{Apply.} Update balances atomically; on any failure, roll back the whole transaction (P2).
+\item \textbf{Snapshot.} Persist the updated projection as a checkpoint for later queries.
+\end{enumerate}
+
+\subsection{Constant-Cost Profit and Loss}
+\label{sec:sec11-pnl}
+
+Profit and loss over $[t_0,t_1]$ loads the snapshots and prices at the endpoints, computes $V_0$ and $V_1$, and returns $V_1-V_0$. The cost is $O(n)$ in instruments held, not in moves, because the result depends only on the endpoint states (state-sufficiency, P10). A portfolio of $10{,}000$ instruments and $1{,}000{,}000$ moves reads $10{,}000$ balances, not $1{,}000{,}000$ moves. Valuation inputs are supplied by the market-data and valuation satellites; this section assumes prices at $t_0$ and $t_1$ as given.
+
+\subsection{Fault Tolerance}
+\label{sec:sec11-faults}
+
+\noindent\textbf{Late events.} Each event carries two timestamps: economic (``what happened'') and booking (``when it was learned''). Append-only insertion admits an event after its economic time without mutation. Financial statements and regulatory returns project on the economic timestamp at the reporting date; the booking timestamp supports the as-known view.
+
+\noindent\textbf{Duplicate events.} Idempotency is structural at two levels. A transaction carries a unique identifier; a re-applied identifier is rejected (P5). A lifecycle event is gated on unit status: if the status shows the event complete, the lifecycle function returns no moves and no state change (P6). CDM event-qualification functions perform this check, excluding both duplicate and out-of-sequence processing.
+
+\noindent\textbf{Contradictory external state.} Virtual wallets mirror external counterparties. A disagreement between an external confirmation (ISO 20022 feedback) and the internal record is detected by comparing virtual-wallet balances to the external statement. Resolution is not automated: the discrepancy is surfaced, a human or external process determines the correct state, and that resolution is recorded as a transaction in the move stream.
+
+\noindent\textbf{Stale market data.} The conservation layer---moves and balances---is independent of price feeds and operates correctly when they fail; only the valuation projection degrades. Value-dependent settlements (managed-account settlements, Section~\ref{sec:managed}; margin; total-return-swap resets) produce economically incorrect moves if driven by stale prices. An implementation gates such settlements on data-quality checks and defers settlement when price quality is insufficient, rather than booking known-stale values for later correction. Staleness handling and degradation policy are specified by the market-data and deferred-settlement satellites.
+
+\noindent\textbf{Move-stream integrity.} The canonical record is replicated and protected against corruption by cryptographic hash chaining (P4). Periodic verification---recomputing balances from the raw stream and comparing to the cached projection---detects silent corruption. The canonical-record design removes internal inconsistency between records but concentrates availability risk; deployment addresses this through replication, backup, and disaster recovery.
+
+\noindent\textbf{Partial failures.} Atomicity is all-or-nothing (P2): a transaction that cannot complete rolls back entirely, leaving the move stream consistent. Crossing process restarts requires write-ahead logging or equivalent crash-recovery semantics.
+
+\subsection{Corrections as Events}
+\label{sec:sec11-corrections}
+
+The move stream is immutable; an error is corrected by a compensating transaction that reverses the original and books the correct version. This is event sourcing: state derives from an append-only log, and a correction is an event, not a mutation. The incorrect moves remain in the stream, preserving error history for audit.
+
+The compensating transaction references the original through a \texttt{corrects} field in its metadata, forming an explicit correction chain. This linkage is a first-class metadata requirement: it distinguishes economic events from error corrections on replay.
+
+A trade amendment---a change of terms, such as a notional increase---is distinct from a cancellation. An amendment is a CDM \texttt{TermsChangeEvent}: the contract's unit status advances to the new terms, and any economic difference is captured as a settlement move. The original terms remain in the stream. A formal correction algebra (anti-moves, amendment chains, their composition, and the interaction of corrections with snapshot consistency) is an open problem (Section~\ref{sec:conclusion}).
+
+\subsection{From Moves to Settlement Instructions}
+\label{sec:sec11-settlement}
+
+A lifecycle event that generates moves---option exercise, coupon payment, margin call---also settles externally. The ledger move is the internal record of the economic event; the settlement instruction is the external message that transfers cash or securities between custodian, CCP, or payment-system accounts.
+
+The mapping is a projection. Each move carries source wallet, destination wallet, unit, and quantity. The settlement layer translates wallet identifiers to external accounts (BIC, IBAN, CSD account), unit identifiers to security identifiers (ISIN, CUSIP), and quantity to settlement amount. Because the event model is CDM and CDM maps to ISO 20022, the translation is a struct-to-struct transformation, not a business computation. The information content of every settlement instruction is fully determined by the move and requires no additional capture. The settlement-layer interface and instruction timing are specified in Section~\ref{sec:settlement} and the deferred-settlement satellite.
+
+\subsection{ISO 20022 Interface}
+\label{sec:sec11-iso}
+
+Message generation is projection: the CDM object is the semantic content, the ISO 20022 message its serialisation. Every field of a \texttt{sese.023} Securities Settlement Instruction is already present in the CDM representation of the move.\footnote{\texttt{sese.023} is the ISO 20022 business message identifier for the Securities Settlement Instruction; under the ISO 20022 message-definition identifier scheme the full identifier \texttt{sese.023.001.\textit{NN}} fixes variant and version~\textit{NN}.}
+
+\begin{center}
+\begin{tabular}{l l}
+\toprule
+\textbf{ISO 20022 field (sese.023)} & \textbf{CDM source} \\
+\midrule
+\texttt{SecurityIdentification} (ISIN) & \texttt{Product.security.identifier} \\
+\texttt{SettlementQuantity}            & \texttt{Move.quantity} \\
+\texttt{SettlementAmount}              & \texttt{Move.quantity} $\times$ price \\
+\texttt{TradeDate}                     & \texttt{BusinessEvent.effectiveDate} \\
+\texttt{SettlementDate}                & \texttt{Transfer.settlementDate} \\
+\texttt{DeliveryReceiveIndicator}      & Move direction \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Cash messages (\texttt{pacs.008}, \texttt{pacs.009}) follow the same principle: the CDM \texttt{Transfer} carries payer, payee, amount, currency, and value date; the ISO message adds only transport fields (BIC routing, message identifiers).
+
+The traceability chain is deterministic at every step: smart contract $\to$ move (with contract reference) $\to$ ISO 20022 instruction (with \texttt{EndToEndId} and \texttt{TxId}) $\to$ external confirmation (matching identifiers) $\to$ status update in the event log. A returned confirmation (\texttt{sese.025} for securities, \texttt{camt.054} for cash) is ingested back into the move stream, closing the settlement cycle within one framework.
+
+%==============================================================================
