@@ -1,0 +1,169 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{microtype}
+\setlist{nosep,leftmargin=1.4em}
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+\title{\vspace{-3.5em}The Next Step for v16.0: Material Gaps against v11.0\\[2pt]
+\large An archaeology review --- TuringAward}
+\author{}
+\date{2026-07-15}
+\begin{document}
+\maketitle
+\vspace{-3em}
+
+\section{Method}
+I inventoried the whole v11.0 corpus and classified each material item against the v16
+artifact. \textbf{v11.0 read:} the unified spec body (\texttt{ledger/drafts/sec01--20},
+\texttt{appA--I}, via the file set and the signed \texttt{CHANGELOG\_v10.3\_to\_v11.0.md});
+\texttt{deferredSettlement.tex} (2129 lines) with its Pareto declaration;
+\texttt{market\_data\_mvp\_v1.0/v2.0.tex}; \texttt{data/ledger\_data\_v1.0.tex};
+\texttt{valuation/ledger\_valuation\_v1.0.tex}; the convergence and sign-off memos.
+\textbf{v16 artifact:} \texttt{Ledger\_Spec\_v16.0/ledger/ledger\_v16\_0.tex} --- the single
+consolidated, certified file (110\,pp). It is the only v16 candidate in the repository, so no
+panel ruling on artifact identity was needed; the identification was unambiguous and is
+recorded here as required. Each v11 item was marked PRESENT (cited in v16), TRANSFORMED
+(cited, with what changed), or ABSENT. Every ABSENT item was then subclassified MISSING
+(valuable, no evidence of deliberate removal) versus RETIRED, using the v15-era
+\texttt{EXCLUSIONS.md} register (E1--E76), the named companions in v16 Ch.~17
+(Worked-Examples, SBL-Operations, Track-B, Managed-Account, Simulation), and the out-of-scope
+list as the deliberate-retirement trail. RETIRED items are dropped unless their retirement is
+argued a mistake; none met that bar. \emph{Finding: v16 is a remarkably complete absorption of
+v11.} The vast majority of v11 is PRESENT or TRANSFORMED --- the three-home model, the futures
+variation-margin identity, the coordinate vector and coverage invariant, corporate actions and
+the market-data operator, close-out netting, the settlement-obligation unit with its
+partial-edge split and cum/ex market-claim, virtual ledgers and the TRS, bitemporal time
+travel, and an executable-check regime with firing witnesses. Five gaps survived the filter.
+
+\section{Material Gaps}
+
+\textbf{NS-01 --- The settlement--custody reconciliation identity is gone.}
+v11's deferred-settlement spec carried an explicit algebraic identity binding the ledger's
+internal balances to the external nostro/depot books across the open settlement window:
+$\mathrm{nostro}_{\mathrm{ext}} = \mathrm{own}(\mathrm{ccy}) + \sum_{\mathrm{cpty}}
+w_{PS}[\cdot] - \mathrm{inflight\_out} + \mathrm{inflight\_in}$, with a depot analogue, both
+computable in time bounded by the wallet count rather than the transaction count
+(\texttt{deferredSettlement.tex} \S8.1--8.5, invariant DS3; the Conservation Lifting Theorem
+\S8.8 makes the identity a corollary). The same identity appears independently in the SBL chapter as the custodian check
+$\mathrm{own}+\mathrm{borr}+\mathrm{inflight}=\mathrm{depot}$ (\texttt{sec16}, L466), and
+appendix~C lists nostro/vostro and custodian/depot breaks as failures the design detects.
+\emph{Absent in v16:} Ch.~11 re-books \texttt{owned} at
+instruction and carries the instruction-to-settlement gap in the settlement-obligation unit,
+but states no reconciliation identity to the custodian; ``reconcile against the custodian'' is
+named at the boundary and never made computable (the closest thing, dual valuation's per-venue
+price check, reconciles \emph{value}, not the position/cash balances). This is the one
+internal--external check the constitution keeps \emph{in} scope (reconciled against at the
+boundary), yet it is the ledger's only defence against the exact drift that motivated the
+deferred-settlement work. \emph{Lens:
+L2 (transactions and data --- reconciliation).} \emph{Reinstate:} add one subsection to Ch.~11
+stating the nostro/depot identity as a projection over \texttt{owned} plus the open
+settlement-obligation units per counterparty, with the three-way classify (clean /
+expected lead-lag / break) that distinguishes an open-window state from a true break, and one
+executable property asserting the identity holds within tolerance on generated settlement
+histories. \emph{Cost:} $\approx$1\,pp, no new primitive (it reads existing coordinates and
+units). \emph{Risk:} low; the risk of omission is higher --- a settlement book with no
+computable custody check re-admits the reconciliation failure the framework exists to abolish.
+
+\textbf{NS-02 --- No reference currency, FX translation, or currency minor-unit variation.}
+Four v11 documents carry a currency dimension: the data layer registers currencies with
+per-currency \texttt{minor\_units} (USD 2, JPY 0) (\texttt{ledger\_data\_v1.0.tex} $L_1$);
+the market-data MVP works a bitemporal EUR/USD restatement to the pip; valuation calibrates FX
+state (3--5 latent factors); and deferred settlement models a cross-currency trade as a parent
+FX obligation with two child legs, the open legs a \emph{quantified Herstatt exposure}
+(\texttt{deferredSettlement.tex} \S7.4, DS10). \emph{Absent in v16:} the specification assumes a
+single implicit currency throughout --- ``exact integers in minor units,'' ``exact in cents''
+--- with no reference-currency NAV, no FX-rate observation feeding a translation operator, and
+no cross-currency settlement leg or Herstatt visibility. A book valued and settled in one
+currency is not the trading book in scope. The ``cents'' assumption is itself a latent defect:
+rounding a JPY figure to two decimals is a hundred-fold error. \emph{Lens: L9 (numerical
+computation --- currency arithmetic and minor units).} \emph{Reinstate:} state that money is an
+integer count at the currency's declared minor-unit scale (a datum of the currency unit, not a
+global constant); admit the FX rate as an ordinary recorded observation; make reference-currency
+NAV an FX-translation projection over the same composition; and carry a cross-currency
+settlement obligation as two legs whose open state projects as Herstatt exposure. \emph{Cost:}
+$\approx$1--1.5\,pp across Ch.~7 (valuation) and Ch.~11 (settlement). \emph{Risk:} medium ---
+FX translation touches the valuation and settlement projections, but adds no new primitive (an
+FX rate is an observation, a translation is pricing).
+
+\textbf{NS-03 --- The client-isolation (segregation) theorem, and its false-theorem warning,
+were dropped.}
+The v10.3$\to$v11.0 changelog records a correctness-critical correction: v10.3's ``conservation
+alone enforces segregation by algebra'' was a \emph{false theorem} --- it permits a cross-client
+move --- replaced in v11 (\texttt{sec09}, \texttt{thm:seg}, L240) by segregation as a theorem holding
+only under $\mathrm{CONS}\wedge\mathrm{LOC}\wedge\mathrm{C4}$ (conservation, locality, and the
+capability-read condition); the same ``conservation alone is insufficient'' warning drives the
+singleton-bilateral mandate invariant (L44). The v15 exclusions register (E31) explicitly
+promised ``the segregation theorem itself is carried.'' \emph{Absent in v16:} client isolation
+\emph{within} a ledger rests on a single sentence --- ``authorisation is checked against the
+manager'' (Ch.~3, Wallets) --- with no theorem, no locality/capability precondition, and no
+record of the warning that conservation alone is \emph{insufficient}. (v16 does carry the
+\emph{cross-ledger} realm isolation, v11's P7 --- ``the bridge is an observation, never a
+move'' (Ch.~10) --- but that is a different property: it isolates the virtual ledger from the
+true one, not one client's wallets from another's inside one ledger.) The gap is not
+decorative: it is the property under which one manager cannot move another beneficial owner's
+assets. A register that claims an item is carried while the artifact omits
+it is the strongest possible evidence of a MISSING, not a RETIRED, item. \emph{Lens: L1
+(concurrency and isolation --- and L8 capability; the safety property a single writer does not
+by itself supply).} \emph{Reinstate:} state the isolation theorem in Ch.~6 or Ch.~4 ---
+authorised balance change is confined to wallets the acting manager holds a capability for, so
+conservation \emph{plus} the capability-read gate \emph{plus} move-locality makes a cross-client
+move unrepresentable --- with an executable property that an unauthorised cross-wallet move is
+refused. \emph{Cost:} $<$0.5\,pp. \emph{Risk:} low; it names a guarantee the door already
+enforces but the prose leaves as an aside.
+
+\textbf{NS-04 --- The recursive partial-settlement split has no termination or
+fragmentation bound.}
+v11 bounded partial-fill fragmentation: a partial cascade terminates within $D_{\max}=2$ else
+the residual goes \texttt{Failed}$\to$\texttt{Compensated}, with per-step conservation and
+monotonic advance (\texttt{deferredSettlement.tex} \S6.3, invariants DS11a/DS11b).
+\emph{Diminished in v16:} Ch.~11's partial edge splits a settlement-obligation unit ``again by
+the same edge, recursively,'' with no depth or fragment-count bound stated. It terminates only
+because quantity is a finite integer, so a $Q$-unit instruction can fragment into up to $Q$
+live obligation units, each entering the obligation-liveness queue --- an operational and
+liveness cost the v11 bound existed to cap. \emph{Lens: L3 (specification and verification ---
+liveness and a variant function for termination).} \emph{Reinstate:} add the fragment bound and
+its variant to the partial edge (residual strictly decreases; beyond the declared depth the
+residual is failed-and-compensated rather than re-split), and property-test that no generated
+settlement history exceeds it. \emph{Cost:} a few lines in Ch.~11 and one property in Ch.~15.
+\emph{Risk:} low; it strengthens an existing edge and cannot weaken a proved property.
+
+\textbf{NS-05 --- The economic-recomputation oracle does not pin the contract-code version.}
+v16's economic check re-runs the map on the recorded event and compares:
+\texttt{contract e (ledgerBefore e) === txRecorded} (Ch.~15, \texttt{prop\_recompute}). This is
+sound only against the contract as it stood when the event was admitted. v11's data layer pinned
+this explicitly: a \texttt{VersionPin} with a \emph{contract} axis alongside schema, model, and
+canonicalisation, so a recomputation years later is deterministic
+(\texttt{ledger\_data\_v1.0.tex} \S5.2). \emph{Absent in v16:} ProductTerms are versioned and
+contracts are called ``versioned functions,'' but nothing records \emph{which} contract-code
+version a recomputation must use; an amended contract silently re-derives a different
+transaction and the oracle either false-fails or false-passes. Replay is safe (it re-reads
+transactions, never re-executes contracts), but the \emph{economic} oracle re-executes and is
+therefore under-specified. \emph{Lens: L3 (verification --- reproducibility of the check
+itself).} \emph{Reinstate:} record the contract-code version on the transaction (or bind it to
+the ProductTerms version already recorded) and state that \texttt{prop\_recompute} reads the
+contract version in force at that log position. \emph{Cost:} one sentence in Ch.~15 plus a field
+note in Ch.~5. \emph{Risk:} low; it closes a determinism hole in a check the specification
+already relies on.
+
+\section{Declaration}
+\textbf{Lenses applied:} L1 (isolation --- NS-03), L2 (reconciliation --- NS-01), L3
+(verification/liveness --- NS-04, NS-05), L9 (numerical/currency --- NS-02); L8 (capability)
+considered jointly with NS-03. \textbf{Lenses dismissed:} L4 (algorithms/complexity --- no
+hidden hard subproblem; the fold is linear); L5 (abstraction/language --- v16's type discipline
+is sound and idiomatic); L6 (systems architecture --- conceptual integrity is intact, one
+document, one writer); L7 (networks --- no transport is specified; delivery is the untrusted
+machines' concern, already handled); L10 (learning --- no learned component is load-bearing for
+any safety property, by design). \textbf{Confidence:} MEDIUM-HIGH. The v16 read was complete and
+the v11 companion inventories were thorough; the residual unknown is whether NS-01 (the
+custody reconciliation identity) is judged in-scope or an external-authority matter the owner
+intends to leave at the perimeter --- I read it as in-scope because the constitution keeps
+boundary reconciliation in scope, but that is the one call an owner could decide the other way.
+\textbf{Decision log:} DL-01 $\mid$ archaeology $\mid$ which file is the authoritative v16
+artifact? $\mid$ single certified consolidated file present, no rival $\mid$ ruling:
+\texttt{ledger\_v16\_0.tex}, unambiguous $\mid$ no panel convened; no ambiguity met the
+threshold for a vote.
+\end{document}
