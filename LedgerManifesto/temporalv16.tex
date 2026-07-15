@@ -1,0 +1,216 @@
+% temporalv16.tex — Temporal execution addendum for the Ledger Spec v16.0
+% Produced by five independent temporal-engineer instances (TE-1..TE-5) under the
+% convergence protocol; unanimous register, three rounds, no panel ruling required.
+% Placement: LedgerManifesto/, the repository's convention for cross-cutting documents
+% (the Manifesto, TuringReview, next_step_v16 all live here); not genuinely ambiguous,
+% so no Decision Panel placement ruling was needed.
+% This is a SUBSTRATE PROPOSAL, not an amendment. The ledger's event log remains the
+% sole book of record; Temporal workflow histories are never the source of truth.
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage{microtype}
+\setlength{\emergencystretch}{2em}
+
+\title{\textbf{Temporal as Execution Substrate for the Ledger v16}\\
+\large An addendum: five-engineer consensus, v1.0}
+\author{TE-1 \ldots{} TE-5 (temporal-engineer $\times$5), converged}
+\date{15 July 2026}
+
+\begin{document}
+\maketitle
+
+\section{The Way}
+
+Temporal runs the two \emph{untrusted} machines and nothing else. The Event Monitor and
+the Events Executor become durable, replayable orchestration; the Transaction Executor
+and the immutable log stay outside Temporal as the trusted single writer, fronted by one
+idempotent propose-to-door activity --- the only write path. The ledger log is the sole
+book of record. Temporal history is a disposable execution cache, and the acceptance
+test is operational: wipe the Temporal cluster, and the entire workflow population
+re-derives from the ledger --- UnitStatus re-read, watches re-armed, nothing lost.
+
+\textbf{One workflow per unit.} Each unit runs one long-lived workflow, keyed by its
+\texttt{unitId}, walking the unit's product graph. The workflow's pending timers and
+signal-waits equal the current node's out-edge set --- the armed watch list of the
+graph-consistency invariant. The in-memory node is a mirror, never authoritative; it is
+rehydrated from the ledger on start, on ContinueAsNew, and on any doubt. Units the
+ledger itself creates --- the settlement-obligation unit, a market-claim unit, the
+partial-split successor legs --- start their own independent unit-workflows
+(signal-with-start, no Temporal parent--child coupling: parental linkage is
+ledger-absent relational state). Branches of a unit's own graph, such as the
+market-claim branch at a node, stay inside that unit's single workflow.
+
+\textbf{Side effects live in activities only.} Capture an arrival, fetch a projection,
+evaluate a contract, propose to the door, emit a settlement instruction --- each is an
+activity. Workflow code holds timers, signal-waits, selectors, and sequencing, and
+nothing else. Smart contracts run in version-pinned, queue-routed activities (never
+local activities), so ledger economics never enters Temporal's replay or versioning
+surface: the ledger replays by re-reading admitted transactions, Temporal by re-reading
+its own history, and the two never meet.
+
+\textbf{Watches.} Date watches are in-workflow durable timers; observation and barrier
+watches are signal-driven evaluation against recorded observations, never a timer poll.
+Temporal Schedules serve system cadence only (end-of-day sweeps, overdue-watch
+reconciliation) --- a 252-fixing swap is one workflow, not 252 schedules. The lifecycle
+declared$\to$armed$\to$fired/expired is authoritative in the ledger: arming writes the
+recorded acknowledgement through the door, and Temporal supplies only the liveness half.
+
+\textbf{The boundary.} Capture precedes routing: a pushed arrival is recorded through
+the door --- capture envelope, quarantine-or-route --- by the ingestion activity before
+any workflow signal exists. Signals carry timing and reference (a cause identifier, a
+log position), never economic payload, and every signal has a record-derived backstop:
+a lost signal costs latency, never the record. The settlement interface remains a pure
+projection with no write privilege; settlement failure returns as a recorded external
+event and walks the settlement-obligation unit's graph --- never a Temporal-side
+compensation or saga rollback.
+
+\textbf{Idempotence.} The door's cause-derived transaction identifier, computed from
+recorded inputs and never from Temporal run or attempt identifiers, absorbs Temporal's
+at-least-once activity delivery into exactly-once commitment. Temporal's own
+deduplication is tolerated as optimisation, never trusted for correctness.
+
+\section{Decision Register}
+
+Unanimous after three rounds. R-01..R-21 as amended in Round 2; R-22..R-27 added from
+Round-1 missing-decision returns.
+
+\begin{enumerate}[label=\textbf{R-\arabic*.}, leftmargin=*, itemsep=1pt]
+\item Temporal runs only the two untrusted machines; the Transaction Executor is an
+  external single-writer service fronted by one idempotent door activity (M6).
+\item The ledger log is the sole book of record; Temporal history is disposable;
+  wipe-and-rebuild from the ledger is the standing acceptance test (C-2.2).
+\item One long-lived workflow per unit, keyed by plain \texttt{unitId} in the
+  authoritative production namespace; lineage is a namespace-level fact, and
+  \texttt{lineageId:unitId} is reserved for shared simulation namespaces where
+  non-authoritative lineages deliberately co-locate.
+\item The workflow's node and watch set mirror the ledger and are rehydrated from it;
+  pending timers and signal-waits equal the current node's out-edge set.
+\item Every side effect is an activity; workflow code is orchestration only.
+\item Contracts run in version-pinned activities, never workflow code.
+\item Idempotence is the door's cause-derived txid from recorded inputs; at-least-once
+  delivery becomes exactly-once at the door; Temporal dedup is never load-bearing.
+\item Date watches are durable timers; condition watches are signal-driven evaluation
+  over recorded observations, never polls.
+\item Schedules serve system cadence only; per-unit contractual dates never use them.
+\item The watch lifecycle is authoritative in the ledger; arming is a recorded
+  acknowledgement through the door; Temporal supplies liveness (M1, M3).
+\item Signals carry timing and reference only, never payload (M4), with record-derived
+  backstops.
+\item Capture precedes routing: envelope-first through the door before any signal
+  (M8, TA-ARRIVAL); a signal is never the sole record of an arrival.
+\item Updates serve human gates only (forward repair, quarantine disposition,
+  authorised fork), returning the door's admit/refuse; boundary capture never rides an
+  Update; Queries are a non-authoritative liveness view.
+\item Ledger-created units start their own independent unit-workflows
+  (signal-with-start, no parent--child coupling); graph branches stay in the owning
+  unit's workflow; corporate-action cascades fan out as signals to existing units, each
+  firing proposing its own txid. \emph{Round-3 note: TE-2's dispute withdrawn on the
+  certified partial-edge text --- the split legs are genuinely new units.}
+\item ContinueAsNew at node transitions and every K fixings, carrying only
+  \{unitId, nodeId, log-cursor\}; rehydration and disaster recovery are the same
+  re-derivation.
+\item No run/execution timeouts on unit workflows; liveness is bounded by watch windows
+  and obligation deadlines surfaced as overdue items. Door activity: short
+  start-to-close, unlimited retry for transient failures only (see R-22). Long waits are
+  timer-plus-signal; only egress and batch activities heartbeat.
+\item Two versioning axes stay separate: Temporal Build-IDs/GetVersion for
+  orchestration (ContinueAsNew boundaries as cutover points); ProductTerms versions on
+  the log for economics, which alone bear C-2.2.
+\item Task queues split by trust and scaling: door (sole write credential, serialized,
+  backpressure-alarmed), contracts (read-only, versioned), ingestion (must-not-lose),
+  unit-orchestration (idle-many), settlement (egress-only).
+\item Search attributes (unit, node, next watch due, obligation status, overdue and
+  quarantine flags) are an ops projection reconciled to the ledger, never authoritative.
+\item Authorised forks and simulated ledgers run in isolated namespaces against their
+  own lineage's door, never the production door (C-12.5, C-2.8).
+\item Economic errors are repaired forward through the door; a Temporal
+  non-determinism bug degrades to a liveness incident, never wrong ledger state.
+\item A door \emph{refusal} is a returned value, not a retryable error: it breaks the
+  retry loop and stands as a visible blocked/overdue item awaiting declared precedence
+  or a corrected proposal --- never retried to infinity, never a crash.
+\item A late or back-dated observation is an ordinary capture-through-the-door arrival;
+  affected workflows re-fire on the correction signal under a new txid; the valid-time
+  re-derivation is a pure ledger fold --- Temporal never rewinds workflow state.
+\item Settlement failure is a recorded external event walking the unit's graph, never a
+  Temporal compensation; the settlement projection proposes nothing.
+\item Signal-arrival order is orchestration sequencing only; the committed order is
+  decided at the door alone (C-2.7).
+\item EvaluateContract is a normal queue-routed activity, never a local activity.
+\item Fan-out to possibly-not-running workflows uses signal-with-start; record-first
+  capture remains the correctness backstop.
+\end{enumerate}
+
+\section{What Temporal Must Never Own}
+
+The book of record --- the immutable, hash-chained log and every fact folded from it.
+Balances, the three homes, PnL, NAV, every projection. Invariant enforcement:
+conservation, coverage and its right-of-use gate, consistency of reference, the
+admission decision itself. The total order of transactions. Idempotence keys. The watch
+lifecycle's recorded facts (declared, armed, fired, expired). Quarantined events and
+capture envelopes. The close-out net and CLM-CO. Anything the ledger must reconstruct
+alone: if losing Temporal would lose it, the design is wrong --- Temporal owns
+schedules-in-flight and orchestration position, and nothing else.
+
+\section{Operational Constraints}
+
+\textbf{Determinism rules for workflow code.} No wall clock (\texttt{workflow.Now} only,
+and never feeding a contract), no randomness, no iteration over unordered maps, no
+direct I/O, no local activities for contract evaluation; all non-determinism lives in
+activities whose results Temporal records.
+
+\textbf{Versioning plan.} Orchestration changes ride Worker Versioning; old runs drain
+to their next ContinueAsNew boundary, which is the standing cutover point, so GetVersion
+patches are rare. Economics changes are new ProductTerms versions plus new version-pinned
+pure functions on the record; they never touch workflow code.
+
+\textbf{Timeouts.} Door activity: start-to-close of seconds, unlimited retry on
+transient failure, refusal returned as a value (R-22). Contract evaluation:
+start-to-close bounded by pricing cost, heartbeat none. Ingestion capture:
+schedule-to-close tight, since capture loss is the one unacceptable latency. Egress and
+batch reconciliation: heartbeated. No workflow run or execution timeouts (R-16).
+
+\textbf{ContinueAsNew policy.} At every product-graph node transition and every K
+fixings (K sized to keep history well under the server limit); carried state is the
+identifier triple only; everything else rehydrates from the ledger.
+
+\textbf{Worker topology.} Five queue families (door, contracts, ingestion,
+unit-orchestration, settlement) with separate worker pools, credentials, and scaling;
+the door pool alone holds ledger-write credentials, sized to the single writer, with
+schedule-to-start latency alarmed as the backpressure signal.
+
+\section{Declaration}
+
+\textbf{Rounds used.} Round 0 (five independent papers), Round 1 (21-entry consolidated
+register: 18 unanimous, 3 disputed, 6 missing decisions raised), Round 2 (amended
+register: 49 of 50 rulings AGREE), Round 3 (single scoped fact-check on R-14 against the
+certified v16.0 partial-edge text; dispute withdrawn). \textbf{Final register status:
+UNANIMOUS on all 27 entries. No Decision Panel ruling was required.}
+
+\textbf{Decision Log.} DL-01 $|$ Phase 2 $|$ authoritative v16 artifact $|$ single
+candidate (\texttt{ledger\_v16\_0.tex}, certified) $|$ no panel convened $|$ n/a.
+DL-02 $|$ Phase 2 $|$ R-14 dispute (split legs: new units or branches?) $|$ resolved by
+the certified specification text, not by vote; TE-2 withdrew $|$ no panel convened $|$
+5--0. DL-03 $|$ Phase 3 $|$ placement $|$ repository convention (all cross-cutting
+documents live beside the Manifesto: TuringReview precedent) $|$ not genuinely
+ambiguous; no panel convened $|$ n/a. \textbf{DEFERRED-TO-OWNER: none} --- the substrate
+proposal demands nothing of the Constitution; every entry keeps the ledger as sole
+truth.
+
+\textbf{Independence caveat (recorded, not absorbed).} The five instances share the
+temporal-engineer agent type's persistent memory; TE-5 disclosed consulting it. Round-0
+independence is therefore partial. Mitigation: the adversarial round structure, the
+register-level dispute discipline, and the Round-3 fact-check against the specification
+text rather than any instance's recollection.
+
+\textbf{Confidence: HIGH} on the architecture mapping and the negative space (they
+restate the specification's own trust boundary); \textbf{MEDIUM} on the operational
+constants (K for ContinueAsNew, timeout values), which are estimates pending a load
+model --- the single biggest unknown is production event volume per unit per day, which
+sizes history growth, the door pool, and the ContinueAsNew cadence.
+
+\end{document}
