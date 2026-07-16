@@ -1,0 +1,358 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+
+\titlespacing*{\section}{0pt}{3pt}{1pt}
+\titleformat*{\section}{\large\bfseries}
+\setlength{\parskip}{0pt}
+\setlength{\abovedisplayskip}{3pt}\setlength{\belowdisplayskip}{3pt}
+\setlength{\emergencystretch}{1em}
+
+\theoremstyle{definition}\newtheorem{definition}{Definition}
+\theoremstyle{plain}\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}\newtheorem{remark}{Remark}
+
+% ---- Frozen notation: single source of truth. Never type a symbol literally. ----
+\newcommand{\Log}{L}
+\newcommand{\ev}{e}                  % event
+\newcommand{\st}{x}                  % true state
+\newcommand{\obs}{y}                 % observed value
+\newcommand{\acc}{p}                 % accuracy = precision = 1/variance
+\newcommand{\Amap}{A}                % observation map
+\newcommand{\Rcov}{R}                % noise covariance
+\newcommand{\mean}{\mu}
+\newcommand{\cov}{\Sigma}
+\newcommand{\Vsub}{V}                % constraint subspace
+\newcommand{\Ent}{H}                 % differential entropy (E1)
+\newcommand{\KL}{D}                  % relative entropy / information gain (E3)
+\newcommand{\Ncal}{\mathcal{N}}
+\DeclareMathOperator{\fold}{fold}
+\DeclareMathOperator{\tr}{tr}
+
+% verdict marks
+\newcommand{\yes}{\ensuremath{\checkmark}}
+\newcommand{\no}{\ensuremath{\times}}
+\newcommand{\hf}{\ensuremath{\circ}}
+
+\title{\vspace{-2em}Ledger Entropy: Does an Entropy of the Log Exist?}
+\author{Ledger Entropy Seminar}
+\date{\today}
+
+\begin{document}
+\maketitle
+\vspace{-2.2em}
+
+\begin{center}\fbox{\parbox{0.95\linewidth}{\small\textbf{Non-normative.}
+This note is an exploratory seminar work product. It states no requirement, binds no
+design, and amends no part of the specification or the Constitution. A negative result is
+a successful outcome.}}\end{center}
+\vspace{-0.4em}
+
+\section{The Question}
+The events of a ledger are not always fully verified. The loose statement ``each event
+carries a probability of being accurate'' is not crisp. We make it crisp by a restriction:
+every event under study records an \emph{observed value}, and observed $=$ true $+$ Gaussian
+noise. Under that restriction, does a \emph{ledger entropy} make sense? If entropy is the
+wrong functional, which functional is right? We define what kind of object such an entropy
+would be, name three candidates, and test each. The verdict is a qualified yes: a single
+absolute entropy of a ledger does not make sense, but a well-posed relative functional does.
+
+\section{Setting}
+Fix a valuation time and one conservation triple (unit, coordinate, agreement). Ten objects,
+in dependency order.
+
+\begin{enumerate}[leftmargin=1.4em,itemsep=0pt,topsep=2pt]
+\item \textbf{Log} $\Log$ --- a finite append-only sequence of admitted events, ordered by admission.
+\item \textbf{Event} $\ev_i$ --- one admitted record appended to the log at position $i$.
+\item \textbf{Observed-value event} --- an event carrying a numerical reading $\obs_i\in\mathbb{R}^{d_i}$ together with an accuracy $\acc_i>0$.
+\item \textbf{Noise model} --- the assumption $\obs_i=\Amap_i\st+\varepsilon_i$, with $\varepsilon_i\sim\Ncal(0,\Rcov_i)$, $\Rcov_i=\acc_i^{-1}I$, independent across events; $\Amap_i$ is a fixed observation map. Accuracy is precision: $\acc_i$ large means $\Rcov_i$ small.
+\item \textbf{Candidate-log configuration} --- a finite log together with its fixed noise model and prior; the complete data on which any functional is evaluated.
+\item \textbf{True state} $\st\in\mathbb{R}^n$ --- the unobserved vector of which the events are noisy readings.
+\item \textbf{The fold} --- the measurable map $\fold$ sending a configuration to its posterior parameters $(\mean,\cov)$, measurable in the readings $(\obs_i)$.
+\item \textbf{The posterior} --- the Gaussian law $\Ncal(\mean,\cov)$ on the true state induced by prior and noise model via $\fold$.
+\item \textbf{Attestation} --- a refinement of an observed-value event that raises its accuracy $\acc_i$ (shrinks its noise), leaving $\Amap_i$ fixed.
+\item \textbf{Constraint subspace} $\Vsub\subseteq\mathbb{R}^n$ --- the affine subspace $\{\st:C\st=c\}$, $\operatorname{rank}C=r$, on which conserved quantities are fixed; the posterior is supported on $\Vsub$, so its ambient covariance $\cov$ is rank-deficient.
+\end{enumerate}
+
+\noindent\textbf{Notation.} $\Log$ log, $\ev_i$ event, $\obs_i$ reading, $\acc_i$
+accuracy/precision, $\Amap_i$ observation map, $\Rcov_i$ noise covariance, $\st$ true state,
+$(\mean,\cov)$ posterior mean and covariance, $\Vsub$ constraint subspace, $\Ent(\cdot)$
+differential entropy, $\KL(\cdot\,\|\,\cdot)$ relative entropy (Kullback--Leibler). No symbol
+is introduced elsewhere.
+
+\section{Candidate Definitions}
+What is random is not the state --- it is a fixed unknown --- but our \emph{belief} about it,
+the posterior. Any ledger entropy is a functional of that posterior. Three candidates.
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt,topsep=2pt]
+\item[\textbf{E1}] \emph{Absolute differential entropy of the state posterior:}
+      $\Ent=\tfrac12\log\det(2\pi e\,\cov)$.
+\item[\textbf{E2}] \emph{Hybrid mixture total.} Keep also the discrete layer: a configuration
+      $K$ records which candidate log is true, with weights $w_k$ built from the accuracies
+      $\acc_i$. The posterior is the mixture $\pi=\sum_k w_k\,\Ncal(\mean_k,\cov_k)$, and E2 is
+      its total entropy, combining discrete bits and continuous nats. This is the literal
+      reading of ``probability of being accurate.''
+\item[\textbf{E3}] \emph{Relative entropy / invariant information gain:} $\KL(\text{posterior}\,\|\,\text{reference})$,
+      equal on the observation channel to the mutual information $I(\st;\obs)$, with closed form
+      $\tfrac12\log\det\!\big(I+\cov\,\Amap^{\!\top}\Rcov^{-1}\Amap\big)$.
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{lcccccc}
+\toprule
+ & well-posed & invariant & compositional & attest.-mono. & conserv.-compat. & computable \\
+\midrule
+\textbf{E1} & \no & \no & \yes & \yes & \no & \yes \\
+\textbf{E2} & \no & \no & \hf$^{a}$ & \yes & \no & \no \\
+\textbf{E3} & \hf$^{b}$ & \yes & \yes & \yes & \yes & \yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent{\footnotesize \yes\ holds unconditionally; \no\ fails, with a counterexample in
+Results; \hf\ holds under a stated side-condition.
+$^{a}$ the joint chain-rule total is additive over independent sub-logs, but the observable
+marginal does not factor.
+$^{b}$ well-posed once a reference is supplied; the ledger supplies it (see Verdict and
+Declaration).}
+
+\medskip
+\noindent The two E1 failures are \emph{independent}: invariance fails for units, conservation
+fails for degeneracy, and repairing one does not repair the other (Prop.~\ref{p:unit},
+Prop.~\ref{p:cons}, and its remark). E2 inherits both and adds a third, sharper one. E3 fails
+nothing structural; its only \hf\ is the reference, which the ledger itself resolves.
+
+\section{Results}
+Throughout, the prior is Gaussian and proper on the free directions of $\Vsub$; observations
+are linear-Gaussian.
+
+\begin{proposition}[attestation reduces differential entropy]\label{p:attest}
+An observation $\obs=\Amap\st+\varepsilon$, $\varepsilon\sim\Ncal(0,\Rcov)$, $\Rcov\succ0$, sends
+the posterior $\Ncal(\mean,\cov)\mapsto\Ncal(\mean',\cov')$ with
+$\cov'^{-1}=\cov^{-1}+\Amap^{\!\top}\Rcov^{-1}\Amap$, hence $\cov'\preceq\cov$ and
+$\Ent'\le\Ent$. The drop equals the information gained,
+$\Ent-\Ent'=\tfrac12\log\det(I+\cov\,\Amap^{\!\top}\Rcov^{-1}\Amap)=I(\st;\obs)\ge0$, with
+equality iff $\Amap$ loads on no non-degenerate direction.
+\end{proposition}
+\begin{proof}
+The information form is standard conjugacy. Then
+$\cov-\cov'=\cov\Amap^{\!\top}(\Amap\cov\Amap^{\!\top}+\Rcov)^{-1}\Amap\cov\succeq0$, of the form
+$M^{\!\top}\!AM$ with $A\succ0$; determinant is monotone under the Loewner order on positive
+definite matrices, so $\det\cov'\le\det\cov$ and $\Ent'\le\Ent$. The identity
+$\det\cov/\det\cov'=\det(I+\cov\Amap^{\!\top}\Rcov^{-1}\Amap)$ follows from
+$\cov'^{-1}=\cov^{-1}(I+\cov\Amap^{\!\top}\Rcov^{-1}\Amap)$; it is $>1$ iff $\Amap\ne0$ on a
+free direction.
+\end{proof}
+
+\begin{proposition}[conservation forbids an absolute entropy]\label{p:cons}
+Exact conservation $C\st=c$, $\operatorname{rank}C=r$, confines the posterior to the affine
+subspace $\Vsub$, which is Lebesgue-null in $\mathbb{R}^n$. Then $C\cov=0$, $\det\cov=0$, and the
+ambient $\Ent=\tfrac12\log\big((2\pi e)^n\det\cov\big)=-\infty$. On $\Vsub$ with its
+$(n-r)$-dimensional Lebesgue measure, $\Ent_{\Vsub}=\tfrac12\log\big((2\pi e)^{n-r}\det{}_{+}\cov\big)$
+is finite, where $\det_{+}$ is the product of the nonzero eigenvalues.
+\end{proposition}
+\begin{proof}
+$\operatorname{Var}(C\st)=C\cov C^{\!\top}=0$ gives $C\cov=0$, so $\cov$ is singular and the ambient
+formula is $-\infty$. Restricting to an orthonormal basis of the tangent space of $\Vsub$
+replaces $\det\cov$ by $\det_{+}\cov$, which is finite.
+\end{proof}
+\begin{remark}[the two obstructions are independent]
+$\Ent_{\Vsub}$ cures degeneracy but not units: under a basis change $B\mapsto BM$ of $\Vsub$,
+$\Ent_{\Vsub}\mapsto\Ent_{\Vsub}+\log|\det M|$. Fixing the support does not fix the scale.
+\end{remark}
+
+\begin{proposition}[differential entropy is not reparameterization-invariant]\label{p:unit}
+For an invertible smooth change of coordinates $\obs=g(\st)$,
+$\Ent(\obs)=\Ent(\st)+\mathbb{E}\big[\log|\det J_g(\st)|\big]$; for a linear rescale $\obs=B\st$,
+$\Ent(B\st)=\Ent(\st)+\log|\det B|$.
+\end{proposition}
+\begin{proof}
+Change of variables in the density, $p_{\obs}(\obs)=p_{\st}(g^{-1}(\obs))\,|\det J_{g^{-1}}|$,
+substituted into $-\int p\log p$ (Cover--Thomas, ch.~8).
+\end{proof}
+\noindent Consequence: recording the free coordinates in cents rather than dollars
+($B=100\,I_{n-r}$) shifts $\Ent$ by $(n-r)\log100$. The absolute number, and even its sign, is a
+unit artefact. Only differences, relative entropy, and mutual information survive --- which is
+exactly the closed form of Prop.~\ref{p:attest}, invariant because the unit Jacobians cancel in
+the density ratio, and finite on $\Vsub$ because the singular directions of posterior and
+reference cancel there. This is E3.
+
+\paragraph{Chain-rule identity (E2), and its unit caveat.}
+For the discrete configuration $K$ and state $X$,
+$\Ent(K,X)=\Ent(K)+\sum_k P(k)\,\Ent(X\mid K=k)$; this is an exact identity. But $\Ent(K)$ is
+dimensionless Shannon (bits, $\ge0$, invariant) while $\Ent(X\mid K=k)$ is differential (carries
+units, sign-indefinite, non-invariant). Their sum adds bits to nats-with-units and inherits the
+reparameterization dependence of Prop.~\ref{p:unit}. This is the \emph{sharpest} obstruction to
+E2: it ships only with a declared quantization scale $\delta$ (using
+$\Ent_\delta(X)\approx\Ent(X)-(n-r)\log\delta$ throughout), or by keeping the pair
+$(\Ent(K),\Ent(X\mid K))$ unsummed, or by going relative on both --- which is again E3.
+
+\paragraph{Second law (Heuristic).}
+The claim ``entropy is non-decreasing between attestations and drops at each'' is
+\emph{false as stated}. With a deterministic fold and a static latent state, conservation-preserving
+moves push measure forward with $|\det|=1$, so $\Ent$ is constant between attestations and falls
+only at them (Prop.~\ref{p:attest}); an append-only observation ledger has entropy that only
+ever ratchets \emph{down}, the opposite of a thermodynamic second law. A genuine non-decrease
+requires an injected diffusion prior $Q\succeq0$ ($\cov\mapsto F\cov F^{\!\top}+Q$), a modelling
+choice not forced by the framework. With it the picture is a sawtooth: rise by $Q$ between,
+drop at each attestation. Status: heuristic, conditional on a declared $Q$.
+
+\paragraph{Mixture marginal (cited fact).}
+The marginal of the E2 mixture $\sum_k w_k\Ncal(\mean_k,\cov_k)$ has no closed-form differential
+entropy (Huber et al., 2008); only bounds and approximations exist. So the single E2 total is
+not closed-form computable, and summing its $2^{|\Log|}$ configuration terms is exponential.
+
+\section{Worked Example}
+This instantiates Prop.~\ref{p:attest} (attestation) and Prop.~\ref{p:unit} (units). One
+instrument; wallets $A$, $B$, issuer $I$; latent quantity the true price $\st$. Accuracy is
+precision, $\acc=1/\text{variance}$.
+
+\vspace{-0.5em}\begin{center}\small
+\begin{tabular}{llll}
+\toprule
+event & effect & reading & noise \\
+\midrule
+$\ev_1$ issue 100 to $A$ & $I:-100,\ A:+100$ (exact) & --- & none \\
+$\ev_2$ observe price & valuation & $\obs_1=50.00$ & $\acc_1=100$ ($\sigma_1=0.10$) \\
+$\ev_3$ transfer $A\!\to\!B$ qty 40 & $A:-40,\ B:+40$ (exact) & --- & none \\
+$\ev_4$ attest $\ev_2$ & valuation & $\obs_2=50.04$ & $\acc_2=400$ ($\sigma_2=0.05$) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\emph{Chair ruling (ratified): quantities are exact; only values are noisy.} A move is
+an instruction, not a measurement. Conservation vanishes by paired-leg construction precisely
+because the two legs are the same number posted with opposite signs. If a transfer quantity were
+a noisy observation, either both legs share the draw (the noise cancels in the wallet sum and the
+``noise'' is illusory) or the legs are independent draws (conservation is violated in
+expectation, which the framework forbids). So after $\ev_3$, $A$ holds exactly $60$ units and $B$
+exactly $40$; all uncertainty lives on the price.
+
+\smallskip\noindent\textbf{Posterior, two independent ways.}
+Sequential update (flat prior; $\ev_2$ sets $\Ncal(50.00,0.01)$; gain
+$K=0.01/0.0125=0.8$): mean $=50.00+0.8(0.04)=\mathbf{50.0320000000}$, variance
+$=0.2\times0.01=\mathbf{0.0020000000}$. Batch precision-weighting ($\acc_1=100,\acc_2=400$):
+variance $=1/500=\mathbf{0.0020000000}$, mean $=0.002(100\cdot50.00+400\cdot50.04)=\mathbf{50.0320000000}$.
+Identical to ten digits: $\st\sim\Ncal(50.032,\,0.002)$.
+
+\smallskip\noindent\textbf{E1, two independent ways.} $\Ent=\tfrac12\ln(2\pi e\,\sigma^2)$
+(closed form) versus $-\int f\ln f$ (numerical quadrature, $\pm12\sigma$):
+
+\vspace{-0.5em}\begin{center}\small
+\begin{tabular}{lccc}
+\toprule
+state & variance & $\Ent$ closed (nats) & $\Ent$ quadrature (nats) \\
+\midrule
+after $\ev_2$ & $0.01$  & $-0.883647$ & --- \\
+after $\ev_4$ & $0.002$ & $\mathbf{-1.688366}$ & $\mathbf{-1.688366}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The negative sign and the unit-dependence of these levels are exactly
+Prop.~\ref{p:unit}: read the price in cents and every $\Ent$ shifts by $\ln100$. The
+\emph{change}, however, is invariant. \textbf{E3:} the attestation deposits
+$\Ent-\Ent'=\tfrac12\ln(0.01/0.002)=\tfrac12\ln5=\mathbf{0.804719}$ nats
+$=1.160964$ bits $=I(\st;\obs_2\mid\obs_1)$, matching
+$\tfrac12\ln(1+\acc_2\sigma_{\text{before}}^2)=\tfrac12\ln(1+400\cdot0.01)=\tfrac12\ln5$; and
+$\KL(\text{posterior}\,\|\,\text{prior})=0.4559$ nats. The two marks agree
+($|\Delta|=0.04$ versus $\sigma_1=0.10$, about $0.4\sigma$): no attestation dispute. The
+operator's reading is the per-position mark and its confidence interval --- $A$'s line
+$60\times50.032=3001.9\pm2.7$, $B$'s $40\times50.032=2001.3\pm1.8$ --- and the per-attestation
+gain in bits, both invariant; not $\Ent$ itself.
+
+\section{Verdict}
+\emph{Signed, GROTHENDIECK, Chair.}
+The word ``entropy'' is the wrong word for a ledger, and the right functional is
+\emph{relative entropy}, the invariant information gain E3.
+An absolute entropy of a ledger state (E1) fails two independent tests: it is not
+\emph{invariant} --- Prop.~\ref{p:unit}, dollars-to-cents moves the number and its sign --- and it
+is not \emph{conservation-compatible} --- Prop.~\ref{p:cons}, the conservation law pins the state
+to a subspace where the ambient entropy is $-\infty$. Curing one does not cure the other. The
+hybrid total (E2), which takes the ``probability of being accurate'' literally, inherits both and
+adds a third and sharper defect: it sums Shannon bits to differential nats, quantities of
+different type, and has no closed form. What survives all six tests is E3: the relative entropy of
+the current posterior against a reference, equal to the information the event deposits about the
+truth. It is unit-invariant (the Jacobians cancel in a ratio); degeneracy-safe (posterior and
+reference share the constraint subspace, so singular directions cancel); additive over
+independent sub-logs, hence checkpoint-independent and order-insensitive; monotone under
+attestation; and cheap, needing only the marginal covariance on the coordinates an observation
+touches. The one thing E3 needs is a reference, and the ledger already keeps one: the
+\emph{as-known-at} state before the event. So the honest object is not ``the entropy of the
+ledger'' but ``the information this event added, measured against what was known before.''
+Entropy does not make sense as a level. Information gain makes sense as a difference. That
+difference is the functional the ledger admits.
+
+\section{Open Questions and Related Work}
+\textbf{Classification.} Under the restriction, this is a constrained Kalman / information filter
+over a Gaussian field --- a linear-Gaussian estimation problem in an entropy costume. Every
+candidate is a scalarization of the posterior covariance $\cov$: E1 is $\log\det\cov$
+(D-optimality), $\tr\cov$ and $\lambda_{\max}(\cov)$ its A- and E-optimality siblings. E3 is the
+Bayesian experimental-design criterion (Lindley), which turns the survivor into a policy: point
+the scarce attestation budget at the observation of largest expected gain.
+
+\smallskip\noindent\textbf{Related work} (contribution / bearing on this question).
+{\small \emph{Shannon} 1948 --- coding rate of a source; fixes what this is not, the log is a record.
+\emph{Jaynes} 1957 --- the prior is max-entropy given the conservation moments.
+\emph{Kalman} 1960 --- the actual engine; the restricted ledger is an information filter.
+\emph{Kullback--Leibler} 1951 --- relative entropy, the invariant object E3.
+\emph{Amari} --- Fisher information $\cov^{-1}$ as metric; $\KL$ is its second-order form.
+\emph{Baez--Fritz--Leinster} 2011 --- entropy as information loss along a map; the fold is lossless replay, so the analogue is gain, not loss.
+\emph{Fritz} 2020 --- Markov categories; a second telling of the update only.
+\emph{Pearl} --- belief propagation, the feasible computation on the sparse coordinate graph.
+\emph{Valiant} (PAC) --- ``probability an event is accurate'' as a learnable reliability parameter, orthogonal to the functional.
+\emph{Dempster--Shafer} --- the imprecise-probability layer the Gaussian restriction deletes; needed back only if $\acc_i$ were an interval.
+\emph{Lindley} 1956 --- Bayesian experimental design, the operational keep.
+\emph{Prior art, not a source:} the audit-risk model $AR=IR\times CR\times DR$ (AICPA; ISA/AU-C 200) is a heuristic product of subjective probabilities, with no derivation the ledger could reuse.}
+
+\smallskip\noindent\textbf{Open.} (i) The diffusion prior $Q$ that would make a second law
+non-vacuous --- what, if anything, in the framework supplies it. (ii) A discrete-layer attestation
+calculus: E2 read as ``which events are admitted'' is a genuine object; its well-posed relative
+form is unsettled. (iii) Computability at scale: for $\sim10^{6}$ live coordinates a global
+$\log\det$ is governed by the treewidth of the coordinate-dependency graph, which must be
+measured, not assumed; the local E3 gain is cheap regardless.
+
+\begin{remark}[second telling; delete this box and nothing above changes]
+In the Kleisli category of the Giry monad, the noisy log is one arrow $\Theta\to S$: a tensor of
+Gaussian observation channels followed by the deterministic fold. The posterior is its Bayesian
+inverse; attestation is post-composition of a further channel. Information gain is a monoid
+homomorphism $([\text{Event}],{+}{+})\to(\mathbb{R}_{\ge0},+)$, which is why the total of E3 is
+checkpoint-independent and order-insensitive by construction. No proof above rests on this
+paragraph.
+\end{remark}
+
+\section{Declaration}
+\textbf{Sessions.} Sessions 1--4 were used: nine independent Session-1 formalizations by distinct
+routes (analytic, symmetry, honesty gate, categorical, unifying object, rigor veto, architecture,
+classification, framing); a Session-2 synthesis into E1/E2/E3 against the six criteria; a
+Session-3 worked example; this Session-4 write-up.
+
+\smallskip\noindent\textbf{Chair rulings.} (1) \emph{The toy decision:} quantities are exact,
+only values are noisy, on the conservation argument given in the Worked Example --- ratified. (2)
+\emph{The reference gap:} the reference E3 requires is \emph{closed} for the incremental gain and
+remains a \emph{conjecture} for any absolute total. The incremental reference is the previous
+as-known-at posterior, which the bitemporal doctrine already maintains --- no new object is
+posited, so the per-event gain is well-posed. A cumulative total would need a canonical origin
+(the initial prior); that the max-entropy-given-conservation prior is that origin is natural but
+not forced, hence a conjecture, not a proposition.
+
+\smallskip\noindent\textbf{Labels.} The rigor constraints W1--W7 were enforced: every
+differential quantity names its reference; only invariants are headline numbers; all statements
+live on the constraint subspace of dimension $n-r$; bits and nats are never summed without a
+declared $\delta$; each object is named; the second-law claim names the diffusion prior it needs;
+the mixture marginal is invoked only with its no-closed-form citation. Only
+Propositions~\ref{p:attest}--\ref{p:unit} carry proofs; the chain rule is an identity with a
+caveat; the second law is a heuristic; the mixture fact is cited. The E3 closed form is stated as
+a corollary of Proposition~\ref{p:attest}, not minted as a new theorem --- the one label decision
+this chair made to stay within the approved set.
+
+\smallskip\noindent\textbf{Dissents, independence, confidence.} No dissents. The nine notes
+shared no cross-reading yet converged by distinct routes --- either strong evidence or a common
+prior in the authors' training; recorded as convergence, not proof. Confidence: high on the
+classification and the invariance argument; medium on global computability, which hinges on a
+treewidth that must be measured.
+
+\end{document}
