@@ -1,0 +1,355 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=0.88in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{array}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{7pt}{3pt}
+\titlespacing*{\subsection}{0pt}{5pt}{2pt}
+\titleformat*{\section}{\large\bfseries}
+\titleformat*{\subsection}{\normalsize\bfseries}
+\setlist{nosep,leftmargin=1.4em}
+\setlength{\parskip}{1.5pt}
+\setlength{\parindent}{0pt}
+\newtheorem{invariant}{Invariant}
+\title{\vspace{-3.5em}Deferred Settlement, v16-Native\\[1pt]
+\large The open window between trade-date recognition and custody movement ---\\
+\large deferred-settlement design cell, converged Round 10, seven approvals \quad
+{\normalsize 2026-07-16}}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+\vspace{-4.5em}
+
+\section{The Problem}
+
+Equity markets settle on a delay. On Monday at 14:32:11 UTC a portfolio wallet $w$
+buys 100 XYZ at \$50.00 --- \$5{,}000.00 against 100 shares, T+2, settling
+Wednesday. The trade is economically complete on Monday: exposure held, cash owed,
+dividends due from that instant. The custody fact happens on Wednesday, when the
+depository moves the shares and the cash agent debits the nostro. Between the two
+lies the open settlement window $[T, t_d]$; its length is a parameter --- T+1, T+2,
+T+0, T+5 on a cross-border fail --- never a doctrine.
+
+The window makes a number real before anything moves. XYZ closes at \$52.00 on
+Tuesday. The book must show $+\$200.00$ of unrealised profit at Tuesday's close ---
+recognised, capital-bearing, reported --- while the custodian still reports
+\$1{,}000{,}000.00 and zero XYZ, exactly as on Monday morning. Both records are
+right: different facts, different calendars, different authorities. Collapse them
+and the system fails one way or the other: debit the nostro at $T$ and the
+statement breaks by \$5{,}000 all window with nothing left to absorb Wednesday's
+real debit; recognise nothing until $t_d$ and Tuesday's \$200 does not exist ---
+profit and loss, risk, and capital misstated. The design must keep both facts,
+separately observable and separately attested, bound by an identity computable
+inside the system. A bound living in prose is checked in a spreadsheet, and the
+spreadsheet is a second store of truth --- the defect this ledger abolishes.
+
+v16.0 already carries the machinery: trade-date booking as a declared term, the
+settlement-obligation unit with its \texttt{instructed}/\texttt{settled}/\texttt{failed}
+node, the partial edge, market claims, the event-kind registry, the bitemporal
+doctrine. What it lacked was the bound (gap NS-01). This document is that bound.
+
+\section{The Design}
+
+Everything below is recorded events and folds of them. No state exists outside the
+log: no mirror wallet, no stored settlement status, no stored break register, and the
+execution substrate owns no fact.
+
+\subsection{Events: the witness kinds}
+
+External assertions cross the one door as registered, typed, moveless observations
+--- provenance carried, quarantined when malformed, superseded only at the tip of a
+per-(account, as-of) chain, never edited. Three asserter classes, one trust
+assumption (TA-CUSTODY, \S5):
+
+\begin{itemize}
+\item \textbf{Balance statements} (camt.053, the depot statement): per account and
+unit, a balance at an as-of time; fields account, coordinate, balance in integer
+minor units, as-of, statement-id, supersedes-ref. An unresolvable account
+quarantines and re-admits when the reference resolves. Each account declares a
+cadence on its venue calendar; a missed cadence mints an overdue item --- a dark
+custodian never leaves a stale CLEAN standing. Statements are authenticated under
+an identified key; keys live in a valid-timed registry, and a revocation carries a
+compromise-effective time $t_c$ scoping re-quarantine deterministically.
+\item \textbf{Settlement and cash confirmations} (sese.025, camt.054), including
+partial clips, always recorded --- a clip below the venue's declared minimum fill
+size accumulates on the one live residual instead of splitting it.
+\item \textbf{Penalty advices and emission receipts} (semt.044; dispatch-intent,
+dispatch receipt or CSD acknowledgment, match confirmation with its matching
+timestamp, cancellation confirmation). The dispatch-intent is recorded
+\emph{before} the send --- the egress dual of witness-before-signal --- and keys
+the repair discriminator. The dispatch receipt is an internal-egress witness (our
+gateway attesting our own send), its detection indirect. The matched date and
+timestamp are CSD-asserted, single-source: bounded and confronted, never verified.
+\end{itemize}
+
+\subsection{The fold}
+
+Each event kind folds into a fixed consequence. Instruction: the paired
+\texttt{owned} re-book and the moveless minting of the settlement-obligation unit at
+\texttt{instructed} (legs, due date, positive inherited minimum fill size, root
+settlement-instruction reference, per-unit settlement channel) --- on a declared
+atomic-finality venue (a TA-TERMS term) the unit is born \texttt{settled} and no
+timer is armed, so the T+0 race is unrepresentable. Confirmation: the moveless walk
+to \texttt{settled}. Partial clip at or above the floor: the certified split ---
+settled leg plus one live residual, root reference inherited. Fail notice, or the
+due-date watch reading cumulative confirmed quantity short of instructed: the walk
+to \texttt{failed} and the fails cascade. Repair event: in-place repair when no
+dispatch-intent is recorded; otherwise cancel-and-re-instruct on the recorded
+cancellation confirmation, one atomic transaction. Recall: a paired lent-coordinate
+move plus a possession-plane return leg; a terminally failed return routes to
+close-out, the defaulter's wallet receiving the securities it cannot return, paired
+with the lender's write-off, a valued claim minted against collateral. Custody
+statement: no balance change --- the reconciliation projection reads it.
+Reconciled penalties book, per (participant, currency, period), an \texttt{owned}
+charge plus a penalty settlement-obligation unit discharged by the collection
+advice. A buy-in delivery discharges the failed residual it compensates; it never
+books a second long.
+
+CSDR penalties fold over dated confirmation clips keyed by root reference, on
+sequential windows: late-matching over $[\mathrm{ISD}, M)$ or $[\mathrm{ISD}, M]$
+as the matching timestamp falls before or after the venue's declared settlement
+cut-off on day $M$; settlement-fail over $[\max(\mathrm{ISD}, M),\,
+\min(\text{settlement},\text{buy-in},\text{cancellation}))$ --- ISD inclusive, all
+right endpoints exclusive, no day charged under both. Each advice line passes
+three decidable checks: its own arithmetic, exact (quantity $\times$ its reference
+price $\times$ rate $=$ its amount); its reference price against that business
+day's recorded close from the SECR-designated source, within a governed
+de-minimis tolerance; its failing quantities against our clip fold. CLEAN or
+BREAK --- no fuzzy middle class. A lateness charge against us is confronted with
+the matched instruction's own send-completion witness; if that witness is absent
+from the log, the advice line quarantines as an open item, never a silent CLEAN.
+
+\subsection{The invariants}
+
+\begin{invariant}[The reconciliation identity]\label{inv:identity}
+For every custody account $a$, unit $u$, and recorded statement with as-of time
+$t$, the residual
+\[
+r(a,u,t) \;=\; \mathrm{stmt}(a,u,t) \;-\; \sum_{w \in W(a)}
+\bigl[\mathrm{owned} - \mathrm{lent\_out} + \mathrm{borrowed}
++ \mathrm{inflight\_out} - \mathrm{inflight\_in}\bigr](w,u,t)
+\]
+is zero within the tolerance declared for $(a, u)$. $W$ maps each wallet's mass to
+exactly one account per coordinate class (total, disjoint, covering); the in-flight
+sums run over the directed legs of $w$'s unsettled settlement-obligation units.
+The three-way reading is a report projection, not part of the invariant:
+CLEAN iff $r \approx 0$ and the in-flight explanation $F = 0$; EXPECTED-LEAD-LAG
+iff $r \approx 0$ and $F \neq 0$, each line carrying the obligation-liveness status
+of its naming units; BREAK iff $r \neq 0$, identified by (account, coordinate,
+residual sign), recomputed from the log, never stored, repaired forward only.
+\end{invariant}
+
+\begin{invariant}[The Spine: the as-of read-set]\label{inv:spine}
+Everything Invariant~\ref{inv:identity} reads --- balances, in-flight legs, the
+account map $W$, the tolerance schedule, the signing key --- folds in force at the
+statement's as-of time. Registry facts, tolerances, and keys are recorded declared
+data with valid time, amended forward only. A past classification is never
+rewritten by a later amendment; a revoked key re-quarantines exactly the statements
+admitted in $[t_c, \text{discovery}]$ under it.
+\end{invariant}
+
+\begin{invariant}[The Binding: one-parameter construction]\label{inv:binding}
+Every transaction that creates or changes a settlement-obligation unit's legs
+derives the legs and the balance moves from one restated parameter set, so a unit
+whose legs disagree with its booking cannot be constructed and
+$\Delta r = 0$ is a theorem of the transaction shape. Successors net recorded
+settled mass per coordinate, at the amounts actually moved. The forward-or-return
+decision is taken independently per coordinate: forward leg of
+$\mathrm{restated}-\mathrm{settled}$ where restated $\geq$ settled; return leg of
+$\mathrm{settled}-\mathrm{restated}$, opposite direction, where it is not. All legs
+are positive. Legs partition into units by external instruction --- each unit's
+legs belong to exactly one root reference (a function, not a bijection: one
+reference carries several units only through the certified partial split, whose
+inheritance the penalty fold depends on). Whether a mixed correction settles
+netted or gross is a declared term of the agreement, and both conserve
+identically. In numbers (price corrected to \$10.00 over 30 settled at \$50.00):
+netted, receive 70 free of payment plus a \$500.00 cash return; gross,
+delivery-versus-payment 70 against \$700.00 plus a \$1{,}200.00 compensation ---
+either way predicted nostro is $999{,}000 + \mathrm{out} - \mathrm{in} =
+998{,}500.00$ mid-window and total cash paid ends at the restated
+\$1{,}000.00.
+\end{invariant}
+
+\begin{invariant}[Terminality: settled mass is terminal]\label{inv:terminality}
+Recorded settled mass is never retired, never negated, never raced. Successors net
+it; corrections below it unwind it forward through return obligations; a
+settlement confirmation racing a pending cancellation resolves in settlement's
+favour, and the pending repair re-routes to a post-settlement compensating
+transaction --- never a hung amendment.
+\end{invariant}
+
+\subsection{Temporal mapping}
+
+The workflow is the settlement-obligation unit's own unit-workflow, started by
+signal-with-start on the recorded instruction; the record is primary, and a wiped
+substrate re-derives every workflow, timer, and in-flight quantity from the log.
+Activities are the four side-effecting steps: capture a witness through the door
+(before any signal exists), evaluate the unit's contract, propose to the door,
+emit the instruction. The timer firing at $t_d$ is the due-date watch's liveness
+half and carries no data: it wakes the unit; the recorded quantities and the
+contract decide. A witness signal carries only the log position of an
+already-recorded fact --- a lost signal costs latency, never the record. Egress
+runs intent, send, receipt capture; emission idempotence rides (unit, node), never
+a substrate identifier. A split completes the parent workflow and starts one per
+successor; an atomic-finality unit arms no timer at all.
+
+\section{Worked Example}
+
+Buy 100 XYZ at \$50.00; $T$ Monday, $t_d$ Wednesday (T+2); closes \$50.00 /
+\$52.00 / \$51.50. Pre-trade: $\mathrm{owned}(\mathrm{USD}) = 1{,}000{,}000.00$,
+$\mathrm{owned}(\mathrm{XYZ}) = 0$; statements: nostro $1{,}000{,}000.00$, depot
+$0$; both accounts CLEAN ($r=0$, $F=0$); $V = 1{,}000{,}000.00$.
+
+\textbf{Monday, $T$.} One transaction: move owned(XYZ) 100, seller $\to$ $w$; move
+owned(USD) $5{,}000.00$, $w \to$ seller; the unit SO-1 minted at
+\texttt{instructed} (deliver 100 in, pay $5{,}000.00$ out, due Wednesday).
+Conservation: $\Sigma_{\mathrm{XYZ}} = +100 - 100 = 0$;
+$\Sigma_{\mathrm{USD}} = -5{,}000 + 5{,}000 = 0$. Balances: owned XYZ $100$, USD
+$995{,}000.00$. $V_T = 995{,}000 + 100 \times 50.00 = 1{,}000{,}000.00$: a fair
+exchange, zero profit and loss at the trade instant. Identity --- nostro:
+$995{,}000 + 5{,}000 - 0 = 1{,}000{,}000 = $ statement, $r=0$, $F \neq 0$:
+EXPECTED-LEAD-LAG, named by SO-1. Depot: $100 + 0 - 100 = 0 = $ statement:
+EXPECTED-LEAD-LAG.
+
+\textbf{Tuesday close, \$52.00.} No moves; conservation vacuous.
+$V_{T+1} = 995{,}000 + 100 \times 52.00 = 1{,}000{,}200.00$: \emph{profit and loss
+$+\$200.00$, unrealised, with zero cash movement and zero custody movement.} The
+custodian still reports $1{,}000{,}000.00$ and $0$; the identity still balances
+through SO-1's in-flight legs. The \$200 is real, the custody silence is real, and
+the record carries both without contradiction.
+
+\textbf{Wednesday, finality.} sese.025 and camt.054 cross the door as moveless
+observations; SO-1 walks \texttt{instructed} $\to$ \texttt{settled} --- zero moves,
+conservation vacuous, owned untouched. Statements: depot $100$, nostro
+$995{,}000.00$. Identity: $995{,}000 + 0 - 0 = 995{,}000$ and $100 + 0 - 0 = 100$:
+CLEAN, CLEAN. $V_{T+2} = 995{,}000 + 100 \times 51.50 = 1{,}000{,}150.00$;
+settlement contributed zero to $V$ at every step.
+
+\textbf{Fail and recover (buy-in).} Monday and Tuesday as above; the $+\$200.00$
+stands. Wednesday: no confirmation; the due-date watch fires; cumulative confirmed
+$0 < 100$; SO-1 walks to \texttt{failed} on the full 100. Owned untouched,
+statements unchanged, legs still in-flight under the unsettled unit: both accounts
+read $r = 0$, $F \neq 0$ --- EXPECTED-LEAD-LAG, its naming unit printed as ``SO-1
+failed, overdue 1~bd'', never a false BREAK. Thursday a buy-in executes at the
+\$51.50 mark. Its delivery confirmation discharges SO-1 (settled-by-buy-in): no
+second long; owned XYZ stays 100. One compensating cash transaction, three paired
+moves: $5{,}000.00$ seller $\to w$ (the unearned trade-date payment returns);
+$150.00$ seller $\to w$ (the differential, borne by the failing party);
+$5{,}150.00$ $w \to$ buy-in counterparty. $\Sigma_{\mathrm{USD}} = +5{,}000 + 150
+- 5{,}150 = 0$ on $w$: owned(USD) remains $995{,}000.00$ --- the buyer paid
+exactly \$5{,}000.00 for its 100 shares; the \$150.00 landed on the failing
+seller. Once the buy-in settles: depot 100, nostro $995{,}000.00$, CLEAN, CLEAN;
+the buy-in date closes the penalty window.
+
+\section{What Was Considered and Rejected}
+
+\begin{itemize}
+\item \emph{Debit the nostro at $T$.} The statement breaks by \$5{,}000 all
+window; Wednesday's real debit has nothing to discharge.
+\item \emph{Recognise nothing until $t_d$.} Tuesday's \$200 does not exist;
+trade-date accounting, risk, and capital misstated.
+\item \emph{Mirror wallets} (the v11 contras and depot/nostro mirrors): our own
+copy of the custodian's book --- a second store that itself needs reconciling.
+The unit's legs and the recorded statement replace both.
+\item \emph{Stored obligation rows, break registers, materialised statuses.} All
+computable from the record; storing them re-admits divergence.
+\item \emph{Multi-source quorum on statements.} A statement is not a price; a
+quorum over one custodian's own account is theatre.
+\item \emph{An in-flight coordinate on PositionState.} A projection stored twice.
+\item \emph{A recursion depth cap on partial splits} (adopted Round~1, deleted
+Round~2: exactly one residual is ever live, and a cap drops witnessed
+confirmations). Replaced by the venue minimum fill size plus aggregation.
+\item \emph{An ``expected difference'' band on penalty reconciliation} (adopted
+Round~4, retired Round~5): an ungoverned band masks a real overcharge. Replaced by
+three decidable checks.
+\item \emph{An identity-excluded payable coordinate:} an identity with an
+exclusion list is an identity with a memorised hole.
+\item \emph{A sixth trust assumption per message family:} a new named assumption
+is earned by a different proposition, never a different publisher.
+\end{itemize}
+
+\section{Declaration}
+
+\textbf{Rounds used: 10.} Seven named reviewers (correctness-architect, minsky,
+jane-street-cto, nazarov, sbl-specialist, regulatory-reporter, rosetta-cdm); every
+break answered with a mechanism or a counterexample; four interim constructions
+falsified by review and corrected in print (the depth cap, the parallel penalty
+windows, the single-sided write-off, the bundled mixed-case successor). Round 10:
+seven approvals, each with an attack record.
+
+\textbf{DS1--DS19 disposition} (the v11 acceptance checklist; none silent):
+
+{\footnotesize\renewcommand{\arraystretch}{0.88}
+\setlength{\LTpre}{4pt}\setlength{\LTpost}{4pt}
+\begin{longtable}{@{}llp{8.6cm}@{}}
+\toprule
+DS & Invariant & Disposition \\
+\midrule
+DS1 & Economic exposure at $T$ & Satisfied: owned re-books at instruction; no settlement event moves it. \\
+DS2 & Conservation & Satisfied: per (unit, coordinate) at the one door; no carve-out. \\
+DS3 & Reconciliation identity & Satisfied: Invariant~\ref{inv:identity}, closed by this design (gap NS-01). \\
+DS4 & No discharge without witness & Satisfied: node walks only on recorded triggers; no clip is ever dropped. \\
+DS5 & Replay determinism & Satisfied: Spine + tip-only supersession; same log, same classification. \\
+DS6 & Idempotent finality messages & Satisfied: cause-derived identity at the door. \\
+DS7 & Failure non-reversal & Satisfied: failure is a recorded event; unwind is compensating, forward. \\
+DS8 & Status monotonicity & Satisfied: property of the unit's certified product graph. \\
+DS9 & Buy-in compensation closure & Satisfied: trade plane by the binding; possession plane by close-out routing. \\
+DS10 & Cross-currency Herstatt & Subsumed: routed to the NS-02 currency workstream (interface below). \\
+DS11a & Partial per-step conservation & Satisfied: certified split; $q_s + q_r = Q$; parent retires from zero. \\
+DS11b & Partial monotonicity, bound & Satisfied: positive inherited fill-size floor + aggregation (closes NS-04). \\
+DS12 & Variant degeneration T+0..T+5 & Satisfied: the cycle is a declared term; atomic finality births the unit settled. \\
+DS13 & --- & Not defined in the source checklist (v11 numbering gap); nothing to disposition. \\
+DS14 & Penalty schema determinism & Satisfied: both CSDR penalties, partitioned windows, decidable checks, booked cash leg. \\
+DS15 & Default close-out & Satisfied: certified close-out; the fails cascade routes into it. \\
+DS16 & Bitemporal restatement & Satisfied: longer log, never an edit; supersession tip-only. \\
+DS17 & Capability-scoped status writes & Satisfied: one writer, the unit's own contract. \\
+DS18 & DvP atomicity & Satisfied at ledger level, stated honestly: CSD atomicity reconciled, never guaranteed. \\
+DS19 & Witness-identity determinism & Satisfied: cause-derived identifiers; origin authenticity on statements. \\
+\bottomrule
+\end{longtable}}
+
+\textbf{Interfaces to queued problems.} DS10's cross-currency legs and Herstatt
+projection go to the NS-02 currency workstream (an FX leg is two
+settlement-obligation units whose joint open state projects as exposure); the
+close-out claim's accrued rebate/fee/manufactured-payment income leg goes to the
+billing/income workstream (the claim is never the complete close-out amount); the
+executable-property set --- identity, Binding constructibility, window partition,
+race interleavings, each with a required firing witness --- goes to the test
+regime.
+
+\textbf{Decision log.} DL-01 (panel, 3--0): the custodian statement crosses the
+one door as a registered witness event kind, and TA-CUSTODY is named ---
+proposition: a recorded custody assertion faithfully renders its asserter's book;
+owner: data governance; violation: misrender, forgery, replay, silence; detection:
+Invariant~\ref{inv:identity} classifying BREAK, signature and sequence
+verification, the cadence watch; residual: the coincidental misrender, the
+send-to-CSD-entry gap, the matched-date assertion inside a genuinely late window.
+DL-02 (unanimous, 7--0): penalty advices and emission receipts ride under
+TA-CUSTODY as enumerated asserter classes --- a new named assumption is earned by
+a different proposition, never a different publisher.
+
+\textbf{Deferred to the owner (spec-pass proposals, not constitutional
+amendments).} Naming TA-CUSTODY as the fifth trust assumption edits one sentence
+of the v16.0 specification, Chapter~16: ``The boundary rests on four named trust
+assumptions and no other'' becomes ``\dots five \dots: TA-KIND, TA-TERMS,
+TA-EXDATE, TA-ARRIVAL, TA-CUSTODY,'' with the four-part clause above appended.
+This is precisely a specification amendment: the constitution (C-4.12) names the
+trust-assumption pattern and fixes no count; only the specification sentence
+enumerates four. The venue cut-off's faithfulness rides the existing TA-TERMS.
+Both edits are parked with exact text for the owner's spec pass.
+
+\textbf{Confidence.} HIGH on the design: ten adversarial rounds, seven reviewers,
+every mechanism individually attacked, all residual trust honestly named. The one
+open obligation is execution: the property set is specified with required firing
+witnesses but has not yet run, and a property that has never fired witnesses
+nothing. Confidence becomes final when the witnesses fire.
+
+\end{document}
