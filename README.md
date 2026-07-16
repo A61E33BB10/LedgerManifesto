@@ -14,6 +14,7 @@ rated against nothing, and every specification, test, and review is rated agains
 | Document | Status | Where |
 |---|---|---|
 | Constitution v1.3 (115 clauses) | Adopted — sole authority | `LedgerManifesto/ledger_manifesto_v1_3.tex` / `.pdf` |
+| Constitution v1.4 | Drafted — ratification pending | `LedgerManifesto/ledger_manifesto_v1_4.tex` / `.pdf` |
 | Specification v16.0 (108 pp) | Certified (CONCORDIA signed) | `Ledger_Spec_v16.0/ledger/ledger_v16_0.tex` / `.pdf` |
 | Deferred Settlement v2.0 (5 pp) | Converged — design cell + 7-reviewer board, 10 rounds | `LedgerManifesto/deferredSettlement.tex` / `.pdf` |
 | Temporal execution addendum | Adopted register (5-engineer consensus) | `LedgerManifesto/temporalv16.tex` / `.pdf` |
@@ -44,6 +45,7 @@ EXCLUSIONS.md        What the system deliberately does not do.
 3. The deferred-settlement design: `LedgerManifesto/deferredSettlement.pdf`.
 4. For execution on Temporal: `LedgerManifesto/temporalv16.pdf`.
 
-The three constitution files `ledger_manifesto.tex`, `ledger_manifesto_v1_2.tex`, and
-`ledger_manifesto_v1_3.tex` are v1.1, v1.2, and v1.3. The latest governs; earlier
-versions are kept because pass records cite them.
+The constitution files `ledger_manifesto.tex`, `ledger_manifesto_v1_2.tex`,
+`ledger_manifesto_v1_3.tex`, and `ledger_manifesto_v1_4.tex` are v1.1 through v1.4.
+v1.3 governs until v1.4 is ratified; earlier versions are kept because pass records
+cite them.
