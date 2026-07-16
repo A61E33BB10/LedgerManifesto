@@ -8,5 +8,7 @@
 .claude/agent-memory/
 .claude/scheduled_tasks.lock
 Ledger_Spec_*/ledger/.claude/
+archive/specs/Ledger_Spec_*/ledger/.claude/
 v15_1_workpapers/.claude/
+archive/workpapers/v15_1_workpapers/.claude/
 Ledger/
