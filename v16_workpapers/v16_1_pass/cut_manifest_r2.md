@@ -56,15 +56,17 @@ The deleted "exists / unique / finitely many steps / independent of discovery or
 - cascade -> "The legs share one $\mathit{causeEventId}$ … yet differ in $(\mathit{contractId},\mathit{unitId},\mathit{seq})$, so **each carries a distinct cause-derived identifier**"
 Each deleted "rides the X" clause is the one-liner of the corresponding table cell.
 
-### (b5) "One writer per fact…" recap — duplicated by Invariant `inv:writer`
+### (b5) "One writer per fact…" recap — duplicated by `inv:writer` (one writer) + `prin:one-home` (one home)
 **Location:** ch14/`ch:invariants`, paragraph immediately after Invariant `inv:writer`
 [One legal writer] (~line 5124).
 **Removed (compression, old -> new):**
 - OLD: `One writer per fact, one home per fact (Chapter~\ref{ch:homes}): a fact cannot be written into disagreement with itself, because no second writer and no second home exist to hold a rival copy. This is what keeps the three homes --- ProductTerms, UnitStatus, PositionState --- free of the divergence a second store would breed. Each is a \emph{materialised projection}:`
 - NEW: `Each of the three homes --- ProductTerms, UnitStatus, PositionState --- is a \emph{materialised projection}:`
 - DELETED: "One writer per fact, one home per fact (Chapter~homes): a fact cannot be written into disagreement with itself, because no second writer and no second home exist to hold a rival copy. This is what keeps the three homes … free of the divergence a second store would breed."
-**Surviving carrier — Invariant `inv:writer` [One legal writer] (verbatim, sits directly above the cut):**
-"Every non-balance fact has exactly one legal writer --- the smart contract of the instrument the fact belongs to --- and the Transaction Executor refuses a transaction that writes a fact outside its writer's authority (Chapter~homes, constitution \S 11)." The "materialised projection … not a second store" content the paragraph continues with is retained (surviving sentence, "…a cached, one-writer, rebuildable read of the log, provably equal to the fold it caches, and \emph{not} a second store…").
+**Surviving carriers (two, one per half — corrected per Round-4 A2; the manifest previously cited only `inv:writer`):**
+- **"one writer per fact"** — Invariant `inv:writer` [One legal writer]: "Every non-balance fact has exactly one legal writer --- the smart contract of the instrument the fact belongs to --- and the Transaction Executor refuses a transaction that writes a fact outside its writer's authority (Chapter~homes, constitution \S 11)."
+- **"one home per fact / no rival home"** — Principle `prin:one-home` (ch:invariants, 1949–1953): "No fact is kept in two homes, so no two homes can disagree about it." (This is the true carrier of the *home* half; `inv:writer` carries only the *writer* half.)
+The "materialised projection … not a second store" content the paragraph continues with is retained (surviving sentence, "…a cached, one-writer, rebuildable read of the log, provably equal to the fold it caches, and \emph{not} a second store…"). Correctness-architect A2 (Round 4): 6/6 KEEP-CUT, no RESTORE.
 
 ### (b6) "A second copy is dangerous…" re-explanation — duplicated by Principle `prin:rebuildable`
 **Location:** ch6/`ch:homes`, §"Rebuildable by replay", paragraph on materialised projections

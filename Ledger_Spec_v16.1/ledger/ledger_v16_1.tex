@@ -837,7 +837,11 @@ variance swap reads the same way: 252 fixing edges, and the 252 declared watches
 episode are their guards, exhaustive at registration because the graph is closed at
 registration. A scheduled watch is dated at or after the unit's inception: a node's out-edge
 cannot fire before the node exists, so no traversal the graph schedules lands before the unit
-that carries it \emph{(product-graph well-formedness)}.
+that carries it \emph{(product-graph well-formedness)}. The declared \emph{arms a further watch}
+relation --- an edge whose firing registers a watch on another unit --- is moreover required
+acyclic: a product whose declared arming graph contains a cycle is refused at registration, a
+decidable static check on the declared edges. This bounds the cross-unit arming cascade and
+discharges hypothesis H-WF of the firing closure (Chapter~\ref{ch:machines}).
 
 One class of edge the three-node picture omitted, and constitution \S 7 requires it. OT-1's
 barrier names OMEGA's official close, so OT-1's terms \emph{reference another unit}. Split
@@ -1175,7 +1179,10 @@ fact. A source that later asserts a different execution time does not correct by
 a genuine execution-time contest is a distinct correction event that names the wrong one
 (C-12.4, TA-EXECUTION-TIME), carrying its own cause-derived identifier, so it is never absorbed
 but re-inserted at its true execution position and refolds the tail. Absorption therefore drops
-a duplicate, never a contest.
+a duplicate, never a contest. The duplicate check ranges over the full retained log, superseded
+and voided firings included (retain-not-delete, C-12.5): a duplicate of a voided firing absorbs
+against the retained identifier rather than resurrecting the firing --- had the void deleted it,
+the duplicate would be admitted as new.
 
 Each level earns its place. \emph{Execution time} carries the meaning: buy-then-record-date
 and record-date-then-buy differ in it, and the fold must honour it. \emph{Door time}, strictly
@@ -1236,7 +1243,7 @@ $e$ be newly admitted, $x=\mathrm{exec}\,e$, and $X$ the execution time of the f
   party and every rerun --- sorting after every real door time of its execution instant, so a
   synthesised firing never precedes the observation that triggers it; its cause-derived identifier
   keying on the correction \emph{and the watch it fires} ---
-  $H(\text{correction},\text{watch},\text{occasion})$ --- the \emph{occasion} the record position
+  $H(\text{correction},\text{watch},\text{occasion})$ --- the \emph{occasion}, the record position
   (observation point or scheduled date) at which the watch's edge is evaluated, distinct edges
   giving distinct occasions --- the watch discriminating distinct firings
   as $(\text{contract},\text{unit},\text{seq})$ discriminates a cascade's legs
@@ -1310,12 +1317,18 @@ $A$ is a finite $F\supseteq A$ with $F=A\cup D(F)$.
   monotone least fixpoint. At one execution instant the order is completed by declared precedence
   for a non-commuting pair (an autocall's knock-out before its coupon) or the pair is refused
   (C-2.7, DL-01); the door-then-hash tiebreak orders only pairs that commute, so the recursion is
-  well-defined within an instant as across instants. Among synthesised emissions of one instant
-  the tiebreak is the \emph{derivation order} --- the causal order the forward pass builds,
-  record-derived and reproducible by any party (determinism, P2), each emission strictly above
-  every event, real or synthesised, its predicate reads. Two \emph{commuting} such emissions share
-  the door value~$\top$ and fall wholly to the event hash, definite because the hash admits no
-  collision on the finite domain of well-formed events (H-CR, \S above).
+  well-defined within an instant as across instants. Among synthesised emissions of one instant the
+  order is the \emph{derivation order}: each emission sits strictly above every event, real or
+  synthesised, whose writes its predicate reads \emph{and} every event with which it write-conflicts
+  --- both setting one non-additive home field. This relation is a function of the record --- what
+  each emission reads and writes is recorded --- so the order is identical for every party; the
+  forward pass \emph{computes} it and does not define it. A pair unordered by this relation ---
+  disjoint in reads and in non-additive writes, balance-moves excepted as additive --- genuinely
+  \emph{commutes}, reaches one fold state in either order, and falls wholly to the event hash,
+  definite because the hash admits no collision on the finite domain of well-formed events (H-CR,
+  \S above). A pair that write-conflicts with no reads-dependency to force its order is
+  \emph{non-commuting} --- two firings setting one unit's status --- and is ordered by declared
+  precedence or refused (C-2.7, DL-01), never by the hash.
 \item \emph{Termination.} Under \textup{(H-FIN)} the candidate emission occasions (recorded
   observation points, scheduled dates) within the bounded horizon are finite and each watch fires
   at most once (\texttt{prop\_firedMatchesOneEdge}), and under \textup{(H-WF)} the
@@ -1327,10 +1340,12 @@ $A$ is a finite $F\supseteq A$ with $F=A\cup D(F)$.
 A retained emission whose predicate no longer holds re-runs to a fold-state no-op
 \textup{(H-INERT)}: its contract, re-executed against the refolded state, proposes the empty
 transaction, so a retained superseded emission leaves the fold state the timely side --- which
-never held it --- also reaches. H-FIN's at-most-once clause, H-FWD, and H-INERT are named
-obligations property-tested (Chapter~\ref{ch:testability}); H-WF and H-FIN's finiteness clause
-are structural obligations discharged by product-graph well-formedness (Chapter~\ref{ch:objects})
---- a violated finiteness hangs the closure, it does not fail a test --- and none is an axiom.
+never held it --- also reaches. H-FIN's at-most-once clause, H-FWD, H-INERT, and H-WF are
+property-tested (Chapter~\ref{ch:testability}) --- H-WF by the acyclicity condition on the
+cross-unit \emph{arms a further watch} relation, checked at registration and refusing a cyclic
+product at the door (\texttt{prop\_armingWellFounded}, Chapter~\ref{ch:objects}). Only H-FIN's
+finiteness clause is structural, the per-unit closed node set (Chapter~\ref{ch:objects}); a
+violated finiteness hangs the closure, it does not fail a test. None is an axiom.
 \end{lemma}
 
 The theorem is over fold state alone and claims nothing of settled money, emitted external
@@ -1443,13 +1458,15 @@ refold, and the past-dated firings it synthesises (step~(c)) are the single writ
 a past-dated firing.
 
 The single writer serialises admission and refold: each triggered refold runs to completion over
-its full tail --- a liveness obligation backstopped by the overdue-watch sweep
-(Chapter~\ref{ch:requirements}) --- and only the quiescent closure is the specified, committed,
-observable state; a partial refold is never committed and never observed. Because the total order
-is arrival-independent and the refold idempotent (\S\ref{sec:totalorder}), any interleaving of
-late arrivals reaches one quiescent closure; the sole residual is a same-instant non-commuting
-pair, ordered by declared precedence or refused (C-2.7, DL-01), never by an arrival-order door
-tiebreak.
+its full tail, its termination resting on H-FIN and H-WF (Lemma~\ref{lem:closure}), while the
+overdue-watch sweep (Chapter~\ref{ch:requirements}) backstops a \emph{lost} refold, not a
+non-terminating one. Only the quiescent closure is the specified, committed, observable state.
+Because the fold state is a function of the arrival set (Theorem~\ref{thm:refold}) --- door time
+decides only commuting ties, a non-commuting pair never falling to it --- and the refold is
+idempotent (\S\ref{sec:totalorder}), any interleaving of late arrivals reaches one quiescent
+closure; the sole residual is a same-instant non-commuting pair, including two conflicting
+execution-time corrections of one instant, ordered by declared precedence or refused (C-2.7,
+DL-01), never by an arrival-order door tiebreak.
 
 When the refold changes a unit's state, that unit's orchestration is \emph{signalled to re-read}:
 it discards its in-memory mirror, rehydrates its node and armed-watch set from the refolded
@@ -2089,7 +2106,7 @@ materialised is a view a projection can recompute. Between them the homes carry 
 the contracts need and nothing they do not.
 
 The accrued statistic is order-dependent: each firing reads the previous accrual and extends
-it, so a home rebuilds by re-folding the fixings in execution-time order, not arrival order ---
+it, so a home rebuilds by replaying the fixings in execution-time order, not arrival order ---
 a late print inserts at its execution-time index~$k$ and the tail $A_{k},A_{k+1},\dots$
 recomputes from $k$ forward, identical to timely arrival (Chapter~\ref{ch:contracts}, VS-1;
 Theorem~\ref{thm:timetravel}). Downstream figures already posted against a superseded tail ---
@@ -5190,7 +5207,7 @@ record, so the result is a function of $p'$ alone and reproduces bit-for-bit.
 \end{proof}
 
 The as-of fold of clause~(b) is not the log-order fold of the next theorem, and the
-difference is the crux of the two axes. Replay re-folds the committed transactions of a
+difference is the crux of the two axes. Replay folds the committed transactions of a
 prefix; the as-of view additionally orders the recorded observations by their execution-time
 index, so a back-dated observation --- admitted late in door time, hence last in
 log order --- is folded at execution-time index $k$, re-sequencing the tail $A_k,\dots$ from $k$
@@ -5201,7 +5218,7 @@ replay already carries the as-of answer --- is exactly the single-axis error the
 below closes.
 
 \begin{theorem}[Replay determinism]\label{thm:replay}
-Discarding the ledger and the three homes and re-folding a log prefix reproduces
+Discarding the ledger and the three homes and replaying a log prefix reproduces
 them bit for bit. The apply arrow is deterministic (the determinism of every
 arrow, above), each home is a materialised projection with one legal writer
 (Invariant~\ref{inv:writer}), and a retried or late proposal is
@@ -5261,7 +5278,7 @@ which one is itself a recorded fact.
 
 Replay reconstructs more than balances and the three homes. Every guaranteed observation
 enters the log as a moveless observation-recording transaction
-(Chapter~\ref{ch:marketdata}), so re-folding a prefix reconstructs every recorded
+(Chapter~\ref{ch:marketdata}), so replaying a prefix reconstructs every recorded
 observation as well --- the record \emph{is} the log, no second store, and the
 single-writer discipline (Invariant~\ref{inv:writer}) covers every observation.
 Chapter~\ref{ch:testability} exercises this as
@@ -6211,6 +6228,13 @@ prop_supersededFiringInert_fires =
                         && foldContribution (refoldState l h) f == mempty)
                  (firings (asArrived h)))
     "voided firing retained is a fold-state no-op" genCoveredCallAssignment
+-- H-WF discharge (RT-B): registration REFUSES a product whose declared cross-unit "arms a further
+-- watch" relation is cyclic (a decidable static check) and ADMITS the acyclic; the coverage forces
+-- the cyclic branch so the refusal is exercised, not assumed (no zero-firing gap on H-WF).
+prop_armingWellFounded =
+  forAll genMultiUnitProductGraph $ \g ->
+    cover 1.0 (cyclic (armsRelation g)) "cyclic arming graph generated" $
+      registers g === (if cyclic (armsRelation g) then Refused else Admitted)
 \end{lstlisting}
 
 The watch properties \texttt{prop\_firedMatchesOneEdge} and \texttt{prop\_actionEqualsRecorded}
@@ -6498,7 +6522,7 @@ squared returns.
 
 \paragraph{The record is the log: replay reconstructs every observation.}
 Every observation enters the log as a moveless observation-recording transaction
-(Chapter~\ref{ch:marketdata}), so re-folding a log prefix reconstructs every recorded
+(Chapter~\ref{ch:marketdata}), so replaying a log prefix reconstructs every recorded
 observation --- there is no second store. The property discards everything but the log,
 rebuilds the whole record, and compares; a generator recording observations outside the log
 --- a second door --- fails it at once.
