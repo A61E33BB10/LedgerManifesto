@@ -1,0 +1,566 @@
+% =====================================================================
+%  THE LEDGER FRAMEWORK — Valuation Manifesto, Version 1.0
+%  Governing principles for valuation and profit-and-loss.
+%  Subordinate to the Architectural Constitution
+%  (ledger_manifesto_v1_4.tex) and the Market Data Manifesto 1.1
+%  (MarketDataManifesto_1.1.tex). Rated against both; where it
+%  conflicts with either parent, the parent prevails and the conflict
+%  is parked with exact text.
+%  Drafting lead: THORP. Rigor-check: FORMALIS. Binding support
+%  memos: JACOBI (the PnL calculus), GATHERAL (the inheritance
+%  interface). Review: KLEPPMANN, TALEB. Certification: CONCORDIA.
+%  Source material (not a constraint): the Quantitative Volatility
+%  Corpus, Volumes I--II (Valuation/volume_I.tex, volume_II.tex).
+%  Build: pdflatex (twice). Standard TeX Live; lmodern and microtype
+%  used when available and skipped otherwise.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\IfFileExists{lmodern.sty}{%
+  \usepackage[T1]{fontenc}\usepackage{lmodern}%
+  \IfFileExists{microtype.sty}{\usepackage{microtype}}{}%
+}{}
+\usepackage[margin=2.5cm,marginparwidth=2.0cm,marginparsep=2mm]{geometry}
+\usepackage{parskip}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+% --- article addressing: margin identifiers, mirroring the parents ---
+\IfFileExists{xcolor.sty}{\usepackage{xcolor}}{}
+\ifdefined\textcolor\else\def\textcolor#1#2{#2}\fi
+\newcommand{\vlabel}[1]{\leavevmode\hypertarget{vm-#1}{}%
+  \marginpar{\raggedright\scriptsize\ttfamily\textcolor{gray}{#1}}}
+
+\setcounter{secnumdepth}{0}
+\providecommand{\tightlist}{\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}}
+
+% traceability tag at the close of each article
+\newcommand{\trace}[1]{\par\smallskip{\small\itshape (#1)}}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries THE LEDGER FRAMEWORK}\\[0.9em]
+  {\large\bfseries Valuation Manifesto}\\[0.6em]
+  {\normalsize Governing Principles for Valuation and Profit-and-Loss ---
+   Subordinate to the Architectural Constitution and the Market Data
+   Manifesto}\\[1.4em]
+  Version 1.0 \quad---\quad July 2026
+\end{center}
+
+\vspace{0.6em}
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+
+\begin{center}\itshape
+A valuation is a projection of the record, and each mark earns its place
+by proving itself from the one before.
+\end{center}
+
+\vspace{0.4em}
+
+\begin{center}\textbf{Abstract}\end{center}
+\begin{quote}
+A valuation is not a bare number. It is the value of a unit read at
+coordinates --- a ledger position, a unit state, a corporate-action
+frame, a market-data cut, and the models the price is bound to --- and
+the same coordinates reproduce it to the last minor unit. This manifesto
+states the principles that make valuation and profit-and-loss a
+projection of the one record and nothing beside it. Two layers, kept
+apart on the first page, carry the whole design: each model-priced leg
+\emph{re-enters as a recorded observation}, bound to its model by
+lineage (MD-15); the net asset value, the profit-and-loss, and the
+valuation chain that assembles them are a \emph{projection} of the record,
+storing
+nothing (C-8.2). A unit's current value is a \emph{valuation chain}: each
+mark is proven from the last by a profit-and-loss explain whose residual
+sits below a declared bound, and an unexplained move is a broken chain,
+forbidden. Every mark is dispute-ready, settled by replay, extending the
+Market Data Manifesto's exhibit list. A corporate action is a valuation
+sandwich, its frame re-coordination a zero-profit identity and its
+near-zero residual the proof it went well. A risk report is the same
+valuation on shifted market data --- no second system, no second code
+path. Each principle is an \emph{article} derived from the seven governing
+principles the two parents already fixed --- auditability, reproducibility,
+time travel, correctness, order, simulability, and the derived
+dispute-readiness --- and rests on the clause of a parent that carries it.
+The document is rated against both parents, never the other way round;
+where it conflicts with either, the parent prevails.
+\end{quote}
+
+\vspace{0.4em}
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+
+\section{1. Valuation in the Ledger's Terms}
+
+A \textbf{valuation} is the value of one unit, together with its
+sensitivities, read at a fixed set of coordinates. It is never the truth
+about what the unit is worth; it is what a stated model says the unit is
+worth given stated inputs, exactly as the Market Data Manifesto holds an
+observation to be a fact about what a source said, not about what a thing
+is (MD-1). The value of the whole book is a sum of such per-unit
+valuations over the owned coordinate (C-4.10, C-8.2).
+
+\textbf{Two layers, and they must never be confused.} A stored per-unit
+model price, or a stored greek, is a \textbf{re-entered observation}: the
+ledger runs no model (C-14.9), so a model is evaluated outside the fold
+and its output re-enters through the one door as a recorded observation
+(C-14.15), bound to that model by lineage (MD-15), and stale the moment an
+input it consumed moves (MD-8). The net asset value, the profit-and-loss,
+and the \textbf{valuation chain} that assembles them are of the other
+kind: a \textbf{projection} that computes over the record --- owned
+quantity times price, summed over valued units --- storing nothing and
+rebuilding from the record alone (C-8.2, C-14.11). The projection consumes
+the model-priced legs as \emph{leaves} (MD-12), exactly as it consumes a
+directly observed stock quote: a plain observation enters the same sum. So
+``valuation is a pure function of ledger state'' is a true statement about
+the projection \emph{recipe}; ``a valuation re-enters as an observation''
+is a true statement about each model-priced \emph{leg}. Both hold at once,
+at their own layers, and every principle below follows from the pair. The
+distinction is not pedantry; it is where a defect is repaired. A wrong leg
+is a mismarked observation, re-derived with its model; a wrong total is a
+mis-assembled projection, rebuilt from the record. Confuse the two and you
+repair the wrong thing.
+
+\textbf{Vocabulary, mapped once.} This manifesto uses the fixed names of
+both parents and coins no synonym for any of them (C-Auth.4). It reuses
+\emph{unit}, \emph{wallet}, \emph{balance}, \emph{projection}, \emph{the
+immutable log}, \emph{the market data operator}, \emph{profit-and-loss
+explain}, \emph{explain item}, and NAV; \emph{observation}, \emph{re-entered
+observation}, \emph{frame}, \emph{cut}, \emph{as-of}/\emph{as-at},
+\emph{complete lineage}, and \emph{simulated path} come from the Market
+Data Manifesto unchanged. It coins four names, each checked against the
+fixed set: the \textbf{valuation record}, the \textbf{valuation chain}
+(always two words --- the immutable log alone is hash-chained, C-4.8, and
+``chain'' bare is reserved for it), the \textbf{profit-and-loss explain
+certificate}, and the \textbf{corporate-action valuation sandwich}. A
+scenario perturbation is a \textbf{shift} --- never a ``shift operator'',
+since \emph{the market data operator} names one thing only, the
+corporate-action transform of C-9.2 (MD-13). A scenario is a
+\emph{simulated path} under a recorded shift (MD-11); no ``derived world''
+is coined.
+
+\section{2. The Articles}
+
+Each article derives from one or more of the seven governing principles
+and rests on a clause of a parent --- the Constitution (C-\emph{sec}.\emph{n})
+or the Market Data Manifesto (MD-\emph{n}). The identifiers VM-\emph{n}
+are append-only: never reused, never renumbered.
+
+\vlabel{VM-1}\textbf{VM-1. A valuation is a re-entered observation of a
+unit's price; the book value is a projection over such observations.} The
+two layers of Section~1 are the first article, because every other rests
+on them. Where a price is read directly from the record --- a listed close
+--- it is a plain observation. Where a price is produced by a model, the
+ledger does not run the model (C-14.9); the model runs outside the fold
+and its output, together with the sensitivities computed with it,
+re-enters through the one door as a recorded observation bound to that
+model (C-14.15, MD-15) --- the \textbf{valuation record}. The net asset
+value is then a projection: replay the log to recover the wallet's
+composition, multiply by the current price vector over the valued units,
+and store nothing (C-8.2, C-8.3). What the projection multiplies is a
+mixture of plain and re-entered observations; it treats them alike, as
+leaves (MD-12). No valuation adds a store to the ledger: it is a further
+fold of the same log (C-1.4).
+\trace{Correctness, Reproducibility; C-8.2, C-14.9, C-14.15, MD-6, MD-15.}
+
+\vlabel{VM-2}\textbf{VM-2. A valuation is meaningless without its
+coordinates; the same coordinates reproduce it bit for bit.} A number
+alone is not a valuation. A valuation is fixed only by its coordinates: the
+ledger position it values --- the composition at an \emph{as-of} world-moment,
+recorded at an \emph{as-at} cut (C-2.7, MD-4); the lifecycle state of the
+unit, which pricing depends on and which is read from the ledger, never
+from a store of its own (C-8.3); the corporate-action \textbf{frame} the
+value lives in (MD-13); the market-data \textbf{cut} that fixes which
+observations are in force (MD-6, MD-12); and the models the price is bound
+to (MD-15). The position's as-at cut and the market-data cut are two
+coordinates, not one, and independently selectable: hold the position at
+yesterday's as-at and move the market-data cut to today, and you have
+yesterday's book on today's prices --- a distinct, legal query on which
+profit-and-loss attribution and the shifted worlds of VM-10 both rely.
+Given the same coordinates, any party recomputes the identical
+valuation, to the last minor unit (C-2.2). Reading a recorded valuation
+back is unconditional; \emph{re-deriving} it from its inputs needs the
+retained model --- the one coordinate whose retention is external to the
+record, a governance matter (C-14.15, \S4). Because each input is pinned at
+its own cut and never to a mutable store, a valuation struck ``mid-update''
+cannot arise (MD-8, MD-12): the state a valuation reads is the folded
+state, whole, or the valuation is not struck. A valuation carried without
+its coordinates is not a weaker valuation --- it is not one.
+\trace{Reproducibility, Time travel, Correctness; C-2.2, C-8.3, MD-4, MD-13.}
+
+\vlabel{VM-3}\textbf{VM-3. A unit's value is a valuation chain; each mark is
+proven from the last.} The current valuation of a unit is not an isolated number
+but the head of a \textbf{valuation chain} --- an ordered sequence of
+valuation records, each proven from the one before it by a
+profit-and-loss explain (VM-4). The chain is append-only: a re-mark is a
+new link --- itself a re-entered observation (VM-1) --- forward, never an
+edit of an old one (C-4.8, C-12.4), and the
+value the book showed at any past cut survives unrewritten beside the
+current one (C-12.1). The greeks that close one link seed the next: today's
+exit sensitivities are tomorrow's entry sensitivities, so the explain
+carries measured sensitivities at both ends of every link. Measured
+endpoint greeks are not a convenience: they keep the first two orders
+exact and squeeze any gap in Hessian coverage --- the cross-greeks an
+implementation did not populate --- into the third-order term and the
+residual, rather than smearing it through delta and vega, where it would
+corrupt the very hedge the greeks are supposed to size. The chain is
+the valuation layer's instance of complete lineage (MD-6); it reaches back
+through the price vector and the operator-adjusted inputs to the leaf
+observations. A unit may carry more than one valuation chain at once ---
+one per re-marking convention, cadence, or desk --- and they do not
+compete: each decomposes the one change in net asset value (C-8.4) and
+localises to its own recorded convention coordinate (VM-5).
+\trace{Order, Auditability; C-4.8, C-12.1, C-12.4, MD-6.}
+
+\vlabel{VM-4}\textbf{VM-4. The profit-and-loss explain is the certificate,
+and it states honestly what is exact.} Each link carries a
+\textbf{profit-and-loss explain certificate}: a decomposition of the value
+change between two marks, read the way a desk reads it. Carry first --- the
+value the position sheds or earns as a day passes at unchanged market.
+Then the delta line --- the move read against the entry delta. Then the
+gamma-and-theta balance, the core of the daily explain: convexity earns on
+the move, decay pays for it, and a delta-hedged position turns a profit
+only once the move clears its breakeven, the point where the day's gamma
+gain just covers the day's theta. Then vega, bucket by bucket --- by name,
+by expiry, by strike, never a single number --- with the cross-greeks
+vanna and volga among the higher-order terms. Then the lifecycle and
+state changes the link crossed. And last, one explicit residual (VM-6).
+Two forms of the market lines exist and the certificate must not conflate
+them. The \emph{ex-ante} estimate --- the reading available \emph{before}
+the move, computed from the entry greeks alone --- is
+$\Delta\!\cdot\!\delta + \tfrac12\,\delta^{\mathsf T}\Gamma\,\delta$, the
+delta-and-gamma a desk pre-computes, and carries a
+\emph{deterministic, signed} gap to the reprice equal to the variation of
+gamma over the move. The \emph{exact} decomposition uses the greeks at
+\emph{both} ends: the value change is the move times the average of the
+entry and exit deltas, less a one-twelfth correction for the gamma that
+moved (a both-endpoint quadrature correction), plus a residual $R$ that is
+identically zero only for a book cubic
+in its risk factors. Using entry greeks in place of both-end greeks ``is
+not a smaller model; it is an inconsistent one'', so the certificate names
+which form it used. The residual behaves well only under conditions: for a
+value smooth to fourth order, $R = O(\lVert\delta\rVert^4)$ --- doubling
+the move multiplies its leading part by sixteen; at a digital, a barrier,
+an autocallable, any payoff that is not smooth, $R = O(1)$, the size of
+the discontinuity, the instant a move straddles the feature; and the
+calendar direction is never covered by that bound --- a day of carry near
+expiry lands in $R$ at full size. The certificate therefore \emph{never}
+promises a universally bounded residual. The total the certificate explains is path-independent: it is exactly the
+change in net asset value (C-8.4). Only the \emph{decomposition} depends on
+the marks chosen along the way and on the convention (VM-5) --- the identity
+that the parts sum to $\Delta$NAV holds on every path; the split into parts
+does not, and no second running total of realised profit-and-loss is kept
+beside NAV to disagree with it (C-8.4). Because the residual is the
+balancing term --- the value change less every attributed line --- the
+certificate reconciles to the change in net asset value by construction,
+not by coincidence: it is a projection of that one number, and no split it
+prints can make it disagree with the fold. Attribution decomposes
+$\Delta$NAV; it never recomputes it. This explain \emph{composes} with
+the Constitution's reordering explain: there is one profit-and-loss
+explain, and a reordering-refold line (C-12.6) and a market-factor line
+here are two disjoint kinds under one roof, each attributed to exactly one
+cause. The certificate extends the taxonomy; it does not re-coin the term.
+\trace{Correctness, Auditability, Order; C-8.4, C-12.6, MD-5.}
+
+\vlabel{VM-5}\textbf{VM-5. Attribution is convention-dependent; the
+convention is a declared, recorded term.} How a move splits across the
+greeks is not unique. Where a risk factor is not a market map of its
+driver --- an implied basket correlation is the canonical case --- the
+split between the spot channel and the vol channel depends on which
+quantity the desk holds invariant as the others move, and two conventions
+that reproduce today's marks exactly differ in tomorrow's attribution:
+same marks today, different \emph{attributed} profit-and-loss tomorrow. That invariant is a
+declared, recorded term of the valuation (MD-6). Two consequences follow.
+The same convention reproduces the same attribution, bit for bit, a
+deterministic function of the record. And a dispute about attribution is a
+dispute about convention: replay \emph{localises} it to the differing term
+(MD-14) but does not adjudicate which convention is right, which is model
+choice and out of scope (MD-9, MD-15). The manifesto therefore never
+speaks of \emph{the} attribution as unique, nor of a shadow greek --- the
+value routed through the held-invariant factor --- as a property of the
+market: under the engine default that holds the at-the-money volatility
+constant, every spot-channel shadow number is identically zero, and must
+be flagged as computed under that convention, never quoted as a market
+fact.
+\trace{Correctness, Reproducibility; MD-6, MD-9, MD-14, MD-15.}
+
+\vlabel{VM-6}\textbf{VM-6. ``Explained'' means the residual sits below a
+declared bound; a breach is a recorded fact, never absorbed.} A move is
+\emph{explained} when its residual $R$ falls inside a declared tolerance.
+The tolerance is a declared term, not a universal constant: a valuation is
+certified only when each instrument's residual is within its bound and the
+aggregate is within the aggregate bound, and those bounds are recorded in
+the model configuration, mapping between price space and vol space through
+vega. These bounds roll up: the per-unit residuals aggregate to a
+book-level residual against the aggregate bound, where cross-unit and
+correlation profit-and-loss --- routed under the declared convention
+(VM-5) --- must also come to rest. The residual is itself a re-entered
+observation --- a recorded
+diagnostic, stale if its inputs later move, never a silent pass (MD-9,
+MD-15). It is a sensor, not a rounding error: a residual that is small,
+mean-zero, and regime-independent certifies the bookkeeping is a control
+variate --- a correction whose smallness can be trusted ---; a residual
+that is structurally large, sign-biased, or wakes up
+in stress reports that the honest attribution of this position is a
+scenario, not a greek, and demands re-mark or model review. Two things the
+bound must survive. First, the anti-plug: that the certificate reconciles
+to the change in net asset value proves \emph{nothing} --- the residual is
+the balancing term (VM-4), so the parts sum to $\Delta$NAV whether the move
+is explained or not; only the residual \emph{below its declared bound}
+certifies. Reconciliation is automatic; explanation is earned. Second, the
+bound's own adequacy is a governance assumption, named here as the parent
+named the identifier grain and the delivery frame: a bound set too loose
+makes every move ``explained,'' fires no breach, and empties ``unexplained
+profit-and-loss is forbidden'' (VM-7) in silence. The guard is that the
+residual is recorded whatever the bound --- its sign and regime behaviour,
+not its level alone, are inspectable after the fact --- and that the bound's
+calibration is itself a recorded, reviewable event, so a loosened bound is
+an auditable change, never a silent one. A breached
+bound is booked --- a named line in the profit-and-loss explain (MD-5) ---
+and acted on. A bookkeeping that announces when to stop believing it is
+worth more than one that is elegant while it lasts.
+\trace{Correctness, Auditability; C-2.4, C-13.2, MD-9, MD-15.}
+
+\vlabel{VM-7}\textbf{VM-7. Unexplained profit-and-loss is a broken chain,
+and a broken chain is forbidden.} A link whose residual exceeds its
+declared bound, or whose leaf inputs have moved under it, is not a link:
+it is a broken valuation state, and a broken state cannot hide (MD-8). Two
+mechanisms keep it visible. A projection over a corrected leaf recomputes
+on the next read, so a stale \emph{projection} cannot arise. A re-entered
+valuation record that consumed a corrected or superseded input --- a wrong
+price, a restated corporate action behind its frame --- cannot re-run
+itself (C-14.9); its lineage marks it stale and it stands as a flagged
+open item for re-derivation (MD-8, MD-10), read through a projection that
+carries the staleness flag, never as the raw stored number. Staleness
+propagates forward along the chain: a superseded link flags stale every
+downstream link whose certificate chained from it, and each re-proves
+\emph{forward from the superseding predecessor} --- never editing the old
+proof --- so a certificate can never keep attesting a transition from a
+mark that no longer heads its segment (MD-6, MD-8). The as-known branch
+survives beside the corrected one (C-12.1), so the chain resolves into the
+two honest answers rather than silently forking. Nothing in the
+chain is repaired by overwriting; a correction repairs forward, and where
+money already moved it moves back only under authorised compensation
+(C-12.4). What is forbidden is the \emph{silent} unexplained move: an
+unexplained profit-and-loss is a defect the record must surface, not a
+number the book may carry.
+\trace{Correctness; C-1.5, C-14.9, MD-8, MD-10.}
+
+\vlabel{VM-8}\textbf{VM-8. Every valuation is dispute-ready.} The current
+valuation of every unit is dispute-ready: its chain, the certificates
+along it, and its coordinates suffice to reproduce and defend it, bit for
+bit, against any counterparty --- a valuation dispute and a collateral
+dispute alike. This is the Market Data Manifesto's dispute-readiness
+(MD-14) reached at the valuation layer, and it \emph{extends} that
+manifesto's exhibit list: to the observation, its provenance, the cut, the
+frame, and the bound model, valuation adds the \textbf{valuation chain}
+and its \textbf{certificates}, exhibited as further rows of the one
+replay, never a second replay doctrine. Its bound is exact and inherited:
+replay settles whether the mark is the faithful, deterministic consequence
+of the inputs the record held at its stated coordinates, the as-at pinned
+to the mark's own cut so the number that stood then is reproduced, not a
+later one. It does not settle a two-sided economic dispute --- a
+counterparty's mark, from its own surface and convention, replays bit for
+bit too --- but exhibiting the chain and the convention \emph{localises}
+the disagreement to the differing input, frame, model, or convention,
+which is the value replay delivers (VM-5, MD-14). A collateral dispute is
+bounded the same way: replay settles the \emph{mark} inside the call, never
+the collateral-agreement terms --- haircut, eligibility, netting --- which
+are model choice and out of scope (C-Scope.11).
+\trace{Dispute-readiness (Auditability + Reproducibility); C-2.1, C-2.2,
+  MD-14, MD-15.}
+
+\vlabel{VM-9}\textbf{VM-9. A corporate action is a valuation sandwich; its
+frame re-coordination is not profit-and-loss.} Every corporate action that
+changes a unit's state triggers a \textbf{valuation sandwich}: a valuation
+struck immediately before the transition and another immediately after,
+with a full profit-and-loss explain across the pair. Across the sandwich
+the state and the coordinate frame change discontinuously, so the smooth
+explain of VM-4 does not apply --- there is no smooth move to expand along.
+The only admissible explanation of the jump is the market data operator
+(C-9.2, MD-13): it transports the pre-frame mark into the post-frame,
+acting on leaf observations, with derived objects recomputed from
+operator-adjusted inputs, never scalar-transported. The frame
+re-coordination itself is a \emph{zero-profit identity}: the same value in
+new coordinates, the consistency-of-reference that forbids multiplying a
+new share count by a stale price (C-11.3). Only genuine economics leaving
+or entering the position --- a special dividend paid away --- is
+profit-and-loss, and it earns its own explain line; there is no ``corporate
+action profit-and-loss'' beyond it. That the sandwich residual is
+$\approx 0$ is the proof the action went well, and $\approx$ means exactly
+three declared tolerances and no more: the minor-unit rounding applied once
+at read (C-4.6), the declared convention's own rounding, and the
+calibration tolerance of any re-derived surface or curve (VM-6). A residual
+materially above these is not noise --- it says the operator or the
+delivery frame was mis-declared, which replay localises (MD-14) and MD-8
+and MD-10 handle as a superseding event demanding re-derivation. The
+operator exists only once the action's terms are \emph{resolved}, not
+merely announced; before resolution the frame is provisional and the
+sandwich is struck as such (MD-13). A third timing case is a resolved
+action that reaches the door \emph{late}, after valuations were already
+chained across its ex-date. This is a reordering, not a lineage
+supersession: the intervening links never carried the action in their
+lineage, so they are flagged stale by the reordering trigger (C-2.7,
+MD-5), not by the frame-supersession path of VM-7. The action takes its
+place at the ex-date, its sandwich is struck \emph{retroactively} there,
+and the spurious market-move line the chain had booked --- a two-for-one
+split reaching the door three days late reads as a fifty-percent crash
+until it arrives --- is reclassified as the zero-profit frame
+re-coordination, the reordering carried as its own line in the
+profit-and-loss explain (C-12.6). The loss is never left standing.
+\trace{Order, Correctness, Time travel; C-9.2, C-9.3, C-11.3, MD-13, MD-5.}
+
+\vlabel{VM-10}\textbf{VM-10. Risk is valuation in simulated worlds.} A risk
+report is not a separate system and not a second code path: it is the same
+per-unit valuation recipe of VM-1 applied to \emph{shifted} market data.
+The Constitution already fixes the doctrine --- ``we live in a simulation:
+production is simply the one path whose events happened to be real''
+(C-2.8) --- and the Market Data Manifesto that simulated market data is
+real market data under a different seed (MD-11). A scenario is a simulated
+path in which one or more observations are moved by a recorded
+\textbf{shift}; a greek is a sensitivity read across the base and shifted
+paths. Shifts \emph{compose} --- spot up twenty percent, volatility down,
+in any combination --- each composition yielding a new vector of
+valuations and greeks by re-application of the one recipe. Base and
+simulated worlds share their units, their models, and the market data
+operator; only the market-data state differs. And the gap between the
+greek approximation and a full revaluation is itself a computable,
+recordable fact --- the ex-ante estimation gap of VM-4: the deterministic,
+signed gamma-variation term \emph{plus} the residual $R$ (VM-6), small for
+a smooth book and $O(1)$ where the payoff is not --- so a sound system
+computes both and records their difference, on the same terms as a
+production day, never choosing silently between them. The shift is recorded, exactly as a seed
+is (MD-11): it is the single non-record input of the scenario, so the path
+replays. But a path that recorded only its shift could not replay --- every
+model-priced valuation along it re-enters as an observation like any other
+(VM-1), into the simulated path's \emph{own} record, never as a link in the
+real unit's valuation chain --- so a stress run is a derived object with
+full lineage, dispute-ready on the same terms as production (VM-8). And
+because risk and the books run the one recipe, the risk report and the
+official profit-and-loss cannot disagree by construction: the classic
+risk-versus-books reconciliation break --- two systems, two code paths, two
+numbers --- has no way to arise.
+\trace{Simulability, Reproducibility; C-2.8, MD-11, C-14.11.}
+
+\section{3. The Life of a Valuation}
+
+One unit walks the whole picture. Follow a single long call, struck at
+$100$ on a stock at $100$, three months to expiry, marked at a $30\%$
+implied volatility. Its value is $5.98$, its delta $0.53$, its gamma
+$0.0265$, its decay $-0.047$ per trading day. Each row of
+Table~\ref{tab:chain} is a link; each is proven from the one above.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Link} & \textbf{What changed} & \textbf{Explain into this mark} \\
+\midrule
+Base & struck at all coordinates & value $5.98$; delta $0.53$, gamma $0.0265$ \\
+Carry day & one trading day, spot flat & carry $-0.047$; residual $<0.001$ $\Rightarrow$ $5.93$ \\
+Market move & spot $100 \to 102$, vol held & delta $+1.060$, gamma $+0.053$; \\
+            &                              & ex-ante residual $-0.001$ (bound $0.010$) $\Rightarrow$ $7.09$ \\
+CA sandwich & $2{:}1$ split; strike $\to 50$, & frame re-coordination (zero-profit); \\
+            & deliverable doubles           & economics $0$; residual $\approx 0$ $\Rightarrow$ $7.09$ \\
+\bottomrule
+\end{tabular}
+\caption{A valuation chain of four links on one unit. Each link isolates
+one effect for legibility; on a real book carry and market move fall in a
+single link and both appear as explain lines. The market-move residual is
+the ex-ante gap (the higher-order and gamma-variation content), well inside
+its declared bound. The corporate-action link is a sandwich: the pre-ex
+value $7.09$ in the old frame equals the post-ex value $7.09$ in the new
+one, and the near-zero residual is the proof the split was applied
+consistently --- not a phantom valuation from a new share count against a
+stale price (C-11.3).}
+\label{tab:chain}
+\end{table}
+
+The market-move link also reads as the gamma-and-theta balance of VM-4:
+the $\$2$ move clears this option's breakeven of $\$1.89$, so a
+delta-hedged holder's gamma gain ($0.053$) just covers a day's decay
+($0.047$). Inside the breakeven the day loses; outside it the day earns;
+and that balance, not the delta, is what a long option position is really
+holding.
+
+\textbf{A shifted-world column.} From the base mark, a risk report is one
+more valuation under a recorded shift. Shift spot $+20\%$, to $120$, and
+re-apply the same recipe. The greek estimate is
+$0.53\!\times\!20 + \tfrac12\!\times\!0.0265\!\times\!20^2 \approx +15.9$;
+the full revaluation is $+14.9$ (the mark moves to $20.9$). The gap,
+$\approx +1.0$ --- near a fifteenth of the move, because a twenty-percent
+shift is far outside the regime where the quadratic is a good control ---
+is not an error to be suppressed but a recorded diagnostic (VM-10). The
+shift composes: add a volatility-down leg and the same recipe returns a new
+vector, no second code path.
+
+\textbf{A link that breaks.} Now swap the call for a digital that pays a
+fixed coupon if the stock is above $100$ at expiry, and take a link that
+straddles the strike a week out. The two-point explain fails on sight: the
+reprice is the whole coupon, while the endpoint deltas, evaluated where the
+value has already flattened either side of the strike, read near zero, so
+the entire notional lands in the residual --- $O(1)$, not
+$O(\lVert\delta\rVert^4)$. The certificate does not hide this: the residual
+breaches its bound, the breach is booked as a named line (VM-6), and the
+chain is flagged broken until the position is re-marked (VM-7). The honest
+attribution here is a gap scenario with a probability attached, not a
+greek --- which is exactly what VM-4 warned the smooth explain could not
+see, made visible by the very residual it refuses to absorb.
+
+\textbf{Disputed.} A counterparty contests the collateral mark. It is not
+argued: replay exhibits the chain, its certificates, and its coordinates,
+and reproduces the mark bit for bit, the as-at pinned to the mark's own cut
+(VM-8, MD-14). Replay cannot decide whose surface or convention is right,
+but it localises the disagreement to a differing input, frame, model, or
+convention.
+
+\section{4. What This Manifesto Does Not Govern}
+
+This manifesto governs how valuation and profit-and-loss are recorded,
+proven, and projected. It does not govern \textbf{which model, surface,
+prior, or re-marking convention is correct} --- model choice, whose test is
+hedging performance, out of scope (C-Scope.11, MD-9, MD-15); nor
+\textbf{model governance, validation, and retention} --- a valuation
+reproduces from recorded prices unconditionally and from a model's number
+only if the model is kept (C-14.15); nor the \textbf{numerical methods} by
+which a model is solved --- regression, quadrature, surrogate pricing ---
+which are the reference implementation's, not the specification's (C-14.9);
+nor \textbf{price formation}, the \textbf{terms of a corporate action}
+(they arrive as recorded events, MD-13), or \textbf{settlement}. These lie
+outside the Ledger boundary and are reconciled against it only at its
+perimeter.
+
+\section{5. Subordination}
+
+This manifesto is subordinate to two parents --- the Architectural
+Constitution and the Market Data Manifesto --- and rated against both,
+never the other way round. Its vocabulary is theirs: one name per
+component, and no synonym for any fixed term (C-Auth.4). Where a principle
+here would conflict with either parent, the parent prevails and the
+conflict is parked with the exact amendment text and the exact clause it
+replaces --- never resolved by quiet narrowing, which for a guarantee of
+either parent is the worse failure. A genuine departure amends this
+document explicitly first; an article identifier VM-\emph{n} is never
+reused or renumbered.
+
+\section{Conclusion}
+
+Valuation has the same root cause of failure as everything else the Ledger
+touches: the same fact held in two places, marked by two logics, drifting
+apart. The Ledger removes it here as everywhere. A valuation is a
+projection of the one record; each model price it consumes is an
+observation; each mark it produces is proven from the last by a
+profit-and-loss explain whose residual it must keep below a declared
+bound, and an unexplained move is a broken chain, not a number to carry.
+Every mark carries its coordinates, is dispute-ready by replay, survives a
+corporate action as a frame re-coordination that is not profit-and-loss,
+and is re-run in a simulated world for risk by the very same recipe.
+Operate it any other way and the divergence the architecture exists to
+remove comes back; this way, a valuation is a fact, and there is nothing
+left to reconcile.
+
+\end{document}

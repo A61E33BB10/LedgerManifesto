@@ -24,6 +24,7 @@ rated against nothing, and every specification, test, and review is rated agains
 | next_step_v16 (v11.0 archaeology) | Advisory — gap register | `LedgerManifesto/next_step_v16.tex` / `.pdf` |
 | Ledger entropy note (5 pp) | Non-normative research (verdict: yes-but) | `LedgerManifesto/ledgerentropy.tex` / `.pdf` |
 | Market Data Manifesto 1.1 (8 pp) | Certified (CONCORDIA signed; GATHERAL/FORMALIS draft, THORP+KLEPPMANN+TALEB converged) — subordinate to the Constitution | `MarketData/MarketDataManifesto_1.1.tex` / `.pdf` |
+| Valuation Manifesto 1.0 (8 pp) | Certified (CONCORDIA signed; THORP/FORMALIS draft, JACOBI+GATHERAL memos, KLEPPMANN+TALEB converged) — subordinate to the Constitution and the Market Data Manifesto | `Valuation/ValuationManifesto_1.0.tex` / `.pdf` |
 | Market Data Manifesto 1.0 (7 pp) | Superseded by 1.1 (was certified) | `MarketData/MarketDataManifesto_1.0.tex` / `.pdf` |
 
 ## Layout
@@ -31,6 +32,7 @@ rated against nothing, and every specification, test, and review is rated agains
 ```
 LedgerManifesto/     The Constitution (all versions) and the standalone notes above.
 MarketData/          The Market Data Manifesto (1.0, 1.1) and its source prior art.
+Valuation/           The Valuation Manifesto and the two Valuation volumes it compresses.
 Ledger_Spec_v16.1/   The current specification, one self-contained file.
 Ledger_Spec_v16.0/   The superseded v16.0 specification.
 v16_workpapers/      Working papers of the v16 passes: deferred settlement (10 rounds
