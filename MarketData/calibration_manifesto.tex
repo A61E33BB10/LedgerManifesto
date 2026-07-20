@@ -1,0 +1,676 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+
+\title{Market Data Calibration Manifesto}
+\date{March 4, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\textit{``The only source of truth is the observed price. Everything else is a model.''}
+\end{center}
+
+\section{Introduction}
+
+This document sets out principles and axioms for calibrating market data in a trading or DeFi system that uses an \textit{Oracle} to collect prices and other market observables.
+
+The focus is on the mathematical and statistical structure of calibration:
+\begin{itemize}
+    \item Raw market prices and quotes (``attestations'') from multiple, asynchronous sources are turned into calibrated parameters: curves, surfaces, correlations, volatilities.
+    \item Calibration quality is expressed in price units.
+    \item No-arbitrage and smoothness are enforced as hard constraints.
+    \item The Oracle and its attestations are treated explicitly as stochastic inputs.
+\end{itemize}
+
+The ultimate goal is to identify the signal in market data and filter out noise.
+
+\section{Objects and Notation}
+
+\subsection{Instrument universe}
+
+We fix a finite set of instruments
+\[
+    \mathcal{I} = \{1, \ldots, N\}.
+\]
+Examples: swap tenors, option strikes and maturities, equity underlyings, indices, credit names.
+
+\subsection{Oracle, attestations, and asynchronous sources}
+
+An \textit{Oracle} is any external, independently observable source of market truth. Typical examples include:
+\begin{itemize}
+    \item Listed markets and exchanges (order books, trades, official closes).
+    \item Broker quotes and dealer runs.
+    \item Consensus or polling services (e.g.\ Totem, Vamos).
+    \item Reference data and fixing providers.
+    \item On-chain price feeds for tokenised assets.
+\end{itemize}
+
+An \textit{attestation} is a signed message from an Oracle containing
+\[
+    o = (i, v, t_{\text{event}}, t_{\text{seen}}, m),
+\]
+where
+\begin{itemize}
+    \item $i \in \mathcal{I}$ is the instrument identifier,
+    \item $v$ is the observed value (price, rate, spread),
+    \item $t_{\text{event}}$ is the time the market event occurred (if known),
+    \item $t_{\text{seen}}$ is the time the Oracle delivered it,
+    \item $m$ denotes any auxiliary metadata (source ID, quote side, bid/ask, size, venue, etc.).
+\end{itemize}
+
+Attestations arrive as asynchronous streams from many Oracles:
+\begin{itemize}
+    \item The same instrument may be quoted on several venues with different latencies.
+    \item Different instruments update at different times of day and with different frequencies.
+    \item On-chain feeds may lag or aggregate off-chain markets.
+\end{itemize}
+
+At any wall-clock time $T$, the system's internal view of the market is therefore a collection of latest-known attestations with heterogeneous event times and sources. This asynchrony is a basic feature, not an exception.
+
+\subsection{Parameter space and pricing map}
+
+All calibrated quantities are represented by a finite-dimensional parameter vector
+\[
+    \theta \in \Theta \subseteq \mathbb{R}^d.
+\]
+
+Examples:
+\begin{itemize}
+    \item Discount factors or zero rates at selected tenors.
+    \item Volatility surface parameters (e.g.\ SSVI, SVI, spline coefficients).
+    \item Credit hazards or survival probabilities.
+    \item Correlation parameters between underlyings.
+\end{itemize}
+
+The \textit{pricing map}
+\[
+    \pi : \Theta \to \mathbb{R}^{\mathcal{I}}
+\]
+takes parameters to model prices: for each instrument $i \in \mathcal{I}$,
+\[
+    \pi_i(\theta)
+\]
+is the model-implied price or rate.
+
+\subsection{Posterior over parameters and model configuration}
+
+Calibration is viewed as inference about $\theta$.
+\begin{itemize}
+    \item A \textit{posterior} is a probability distribution $P$ on $\Theta$ that encodes what the system knows about $\theta$ given all attestations seen so far.
+    \item In practice, $P$ is represented by its mean vector, standard deviations, selected quantiles, and, where needed, a covariance matrix $\Sigma_\theta$.
+\end{itemize}
+
+\textbf{Naive example (single listed option).}\quad Consider a single listed 1-month at-the-money call on an equity index. Fix a simple model: Black--Scholes with known interest rate and continuous dividend yield. The index spot $S$ and strike $K$ are known.
+\begin{itemize}
+    \item The unknown parameter vector is 1-dimensional: $\theta = (\sigma)$, the implied volatility.
+    \item Each attestation is a mid-price $v$ for this call, at some knowledge time.
+    \item The pricing map is the Black--Scholes formula: $\pi(\sigma)$ is the model call price.
+    \item A naive noise model might say $v = \pi(\sigma) + \varepsilon$ where $\varepsilon$ is Gaussian with variance proportional to the bid--ask spread.
+\end{itemize}
+
+To turn this into a dynamic calibration problem, we add a prior on how $\sigma$ moves over time. Let $\sigma_t$ denote the implied vol at day $t$ and $\sigma_{t-1}$ yesterday's implied vol. A simple prior is:
+\[
+    \sigma_t = \sigma_{t-1} + \eta_t,
+\]
+where
+\[
+    \eta_t \sim N\bigl(0, (1\%\text{ absolute})^2\bigr)
+\]
+is a Gaussian daily vol shock with standard deviation equal to 1 percentage point in absolute terms. In words:
+\begin{itemize}
+    \item Before seeing today's option price, we expect implied vol to be roughly equal to yesterday's value.
+    \item Day-on-day changes in implied vol are typically of order $\pm 1\%$ (absolute), with larger moves being increasingly unlikely under the prior.
+\end{itemize}
+
+Given yesterday's posterior for $\sigma_{t-1}$ and this prior on daily changes, we obtain a predictive distribution for $\sigma_t$ before seeing today's price. When a new attestation $v_t$ arrives, the likelihood $P(v_t \mid \sigma_t)$ and the prior for $\sigma_t$ combine to produce the posterior $P(\sigma_t \mid I_t)$, where $I_t$ is the information set up to day $t$. This is the simplest non-trivial example of the general calibration machinery described in this manifesto.
+
+\textbf{Naive example of an MCA.}\quad For the same single-option example, a simple Model Configuration Attestation might say:
+\begin{itemize}
+    \item Underlying: equity index $X$.
+    \item Pricing model: Black--Scholes with lognormal underlying.
+    \item Interest rate curve: flat at 3\% (or a named yield curve).
+    \item Dividend yield: flat at 1\%.
+    \item Calibration window: use all option price attestations for this contract over the last trading day.
+    \item Noise model: Gaussian noise with standard deviation equal to half the bid--ask spread.
+    \item Prior on daily vol changes: if $\sigma_{t-1}$ is yesterday's implied vol, today's prior is
+    \[
+        \sigma_t = \sigma_{t-1} + \eta_t,
+    \]
+    with
+    \[
+        \eta_t \sim N\bigl(0, (1\%\text{ absolute})^2\bigr),
+    \]
+    truncated if necessary to keep $\sigma_t$ in a reasonable range (for example between 1\% and 200\% absolute).
+    \item Objective: update $\sigma_t$ each day to minimise squared price error in currency units while respecting the prior on daily moves.
+\end{itemize}
+
+In production, an MCA for, say, an equity vol surface would be richer, but the structure is the same: it records which instruments are in scope, which model is used, which data are considered, how errors are measured, what prior on parameter dynamics is assumed (here, daily vol changes), and which constraints apply.
+
+\section{Axioms}
+
+This section lists the basic axioms. Later sections derive constraints and invariants from them.
+
+\subsection{A1: Observations are noisy samples}
+
+For each instrument $i$ and event time $t_{\text{event}}$ there exists a latent ``true'' price $p_i(t_{\text{event}})$. An attested value $v_i$ is related to $p_i$ by
+\[
+    v_i = p_i + \varepsilon_i,
+\]
+where $\varepsilon_i$ is observation noise.
+
+We explicitly allow:
+\begin{itemize}
+    \item Heteroscedastic noise: $\text{Var}[\varepsilon_i]$ depends on $i$, time, liquidity, and source.
+    \item Non-Gaussian noise (fat tails, skewness).
+    \item Cross-instrument and cross-source correlation in observation noise.
+\end{itemize}
+
+Noise models may use metadata $m$ (such as spreads, sizes, or source identities), but no discrete ``class'' structure is assumed.
+
+\subsection{A2: Finite-dimensional parameter space}
+
+There exists a finite-dimensional parameter space $\Theta \subseteq \mathbb{R}^d$ and a pricing map $\pi$ such that, for each instrument $i$ in scope,
+\[
+    p_i(t) = \pi_i(\theta(t)),
+\]
+for some latent parameter process $t \mapsto \theta(t)$.
+
+This expresses the modelling commitment that the instruments in scope can be described by a finite number of parameters.
+
+\subsection{A3: Arbitrage-free and smooth}
+
+There is an \textit{admissible region}
+\[
+    \Theta_{\text{AF}} \subseteq \Theta
+\]
+such that:
+\begin{itemize}
+    \item Every acceptable parameter set satisfies $\theta \in \Theta_{\text{AF}}$.
+    \item $\Theta_{\text{AF}}$ encodes all structural no-arbitrage constraints relevant for the parameter type (see Section~\ref{sec:noarb}).
+\end{itemize}
+
+Within $\Theta_{\text{AF}}$ we assume:
+\begin{itemize}
+    \item $\pi$ is continuously differentiable; small parameter changes yield small price changes.
+    \item The parameter path $t \mapsto \theta(t)$ has bounded variation over finite intervals within a regime; parameters do not jitter without cause.
+\end{itemize}
+
+\textbf{Regime changes.}\quad At declared regime changes (e.g.\ large policy shifts, structural market events), bounded variation may be violated, but the regime boundary and change in prior must be explicitly recorded.
+
+\subsection{A4: Price-space primacy}
+
+Calibration quality is judged in \textit{price space}.
+
+For each observed instrument $i$ with attested value $v_i$, and any candidate parameter $\theta$, define the residual
+\[
+    r_i(\theta) = \pi_i(\theta) - v_i.
+\]
+
+Let $w_i > 0$ be per-instrument weights (for example $w_i = 1/\text{Var}[\varepsilon_i]$ under a chosen noise model). The weighted root-mean-square error (WRMSE) is
+\[
+    \text{WRMSE}(\theta) = \sqrt{\frac{\sum_i w_i \, r_i(\theta)^2}{\sum_i w_i}}.
+\]
+
+A calibration to $\theta^\star$ is \textit{certified} only if:
+\begin{enumerate}
+    \item $\theta^\star \in \Theta_{\text{AF}}$ (arbitrage-free parameters).
+    \item $|r_i(\theta^\star)| \leq \tau_i$ for all observed $i$ (per-instrument tolerances).
+    \item $\text{WRMSE}(\theta^\star) \leq \tau_{\text{agg}}$ (aggregate tolerance).
+\end{enumerate}
+
+All tolerances $\tau_i$ and $\tau_{\text{agg}}$ are specified in the MCA.
+
+\textbf{Failure protocol.}\quad If any condition fails:
+\begin{itemize}
+    \item The candidate calibration is rejected and a rejection record is emitted with diagnostics.
+    \item The system falls back to the last certified parameter set and marks its staleness.
+    \item Downstream consumers see either the last certified state or a clearly flagged degraded state; they never see uncertified parameters.
+\end{itemize}
+
+\subsection{A5: Posterior mean is a martingale}
+
+Let $P_n$ be the posterior distribution over $\Theta$ after processing all accepted attestations up to epoch $n$. Define its mean
+\[
+    \theta_n := \mathbb{E}_{P_n}[\theta].
+\]
+
+Let $I_n$ denote the information set consisting of all accepted attestations up to epoch $n$. Then Axiom A5 says:
+\[
+    \mathbb{E}[\theta_{n+1} \mid I_n] = \theta_n.
+\]
+
+Interpretation:
+\begin{itemize}
+    \item On average, parameters move only because new information arrives.
+    \item The posterior at epoch $n$ is the prior at epoch $n+1$.
+    \item Sequential Bayesian updating is the natural mechanism (Kalman filters, Gaussian-process conditioning, particle filters, \ldots), but the axiom itself does not mandate a specific implementation.
+\end{itemize}
+
+At structural breaks, the prior is explicitly widened (e.g.\ via increased process noise or broader kernels), then the martingale property resumes in the new regime.
+
+\subsection{A6: Reproducible, auditable, traceable}
+
+Given:
+\begin{itemize}
+    \item The ordered list of input attestations (values, metadata, and IDs).
+    \item The MCA (model, hyperparameters, constraints, algorithm).
+    \item The code version and numerical environment.
+\end{itemize}
+any conforming implementation must produce the same posterior distribution, up to the numerical tolerance declared in that environment.
+
+Every calibration step produces:
+\begin{itemize}
+    \item An audit record of inputs, innovations, residuals, gate decisions, and outputs.
+    \item A provenance chain linking each derived parameter set back to all input attestations and the MCA.
+\end{itemize}
+
+\subsection{A7: Attestations can be wrong}
+
+Some attestations are not just noisy but incorrect:
+\begin{itemize}
+    \item Stale quotes mislabelled as current.
+    \item Fat-finger trades.
+    \item Feed outages and corruption.
+\end{itemize}
+
+The calibration engine must classify each attestation (or batch of attestations) into:
+\begin{itemize}
+    \item Accepted and used normally.
+    \item Used with inflated observation noise (down-weighted).
+    \item Rejected and not used to update the posterior.
+\end{itemize}
+
+This classification is determined by innovation-based tests and other model-consistency checks (Section~\ref{sec:robustness}).
+
+\section{Oracle Model and Asynchrony}
+
+\subsection{Observation space}
+
+The observation space is
+\[
+    \mathcal{O} = \{(i, v, t_{\text{event}}, t_{\text{seen}}, m)\}.
+\]
+
+Multiple Oracle sources yield multiple streams $\{o_k^{(s)}\}$ indexed by source $s$. Streams differ in latency and reliability.
+
+\subsection{Knowledge time versus event time}
+
+Two time concepts are distinguished:
+\begin{itemize}
+    \item Event time $t_{\text{event}}$: when the underlying market event occurred (trade, quote, fix).
+    \item Knowledge time $t_{\text{seen}}$: when the system first learns about the event via the Oracle.
+\end{itemize}
+
+Calibration updates follow knowledge-time order, not event-time order. Event time is used inside models (e.g.\ time-to-maturity calculations), but the posterior evolution is a function of the information actually available at each knowledge time.
+
+\section{Bayesian Calibration Principles}
+
+\subsection{Prior, likelihood, posterior}
+
+Calibration is expressed in terms of:
+\begin{itemize}
+    \item A prior distribution over parameters $P(\theta)$.
+    \item A likelihood for observations $P(o \mid \theta)$, constructed from:
+    \begin{itemize}
+        \item the pricing map $v_i^{\text{model}} = \pi_i(\theta)$,
+        \item an observation-noise model for $\varepsilon_i = v_i - v_i^{\text{model}}$, which may depend on metadata $m$ and past behaviour.
+    \end{itemize}
+    \item A posterior $P(\theta \mid \text{attestations})$ obtained via Bayes' rule.
+\end{itemize}
+
+The axioms constrain this scheme:
+\begin{itemize}
+    \item A2 ensures a finite-dimensional parameter space.
+    \item A3 restricts support to $\Theta_{\text{AF}}$.
+    \item A4 demands that diagnostic and acceptance criteria be phrased in price space.
+    \item A5 constrains how posteriors at successive knowledge times can differ.
+\end{itemize}
+
+The framework allows both sequential and batch-style updates, provided the resulting posteriors satisfy these axioms.
+
+\subsection{Example: linear-Gaussian state-space model}
+
+A common special case is a linear-Gaussian state-space model for curves or surfaces.
+
+\textbf{Latent state.}\quad Let $x_t \in \mathbb{R}^d$ be a latent state representing a curve or surface at knowledge time $t$.
+
+\textbf{Dynamics.}\quad To be consistent with Axiom A5 when we identify $x_t$ with the parameter vector at time $t$, we take the \textit{driftless} case
+\[
+    x_t = x_{t-1} + w_t, \qquad w_t \sim \mathcal{N}(0, Q),
+\]
+i.e.\ the transition matrix is the identity:
+\[
+    A = I_d.
+\]
+Then
+\[
+    \mathbb{E}[x_t \mid I_{t-1}] = x_{t-1},
+\]
+so the conditional mean of $x_t$ is a martingale, in line with A5. The covariance matrix $Q$ controls how fast the state is allowed to move between updates.
+
+\textbf{Observation.}\quad At time $t$ we observe a vector $y_t \in \mathbb{R}^{m_t}$:
+\[
+    y_t = H_t x_t + \varepsilon_t, \qquad \varepsilon_t \sim \mathcal{N}(0, R_t),
+\]
+where $H_t$ maps state components to the observed instruments at that time and $R_t$ encodes observation noise.
+
+The Kalman filter then yields, for each step, a predictive distribution and an updated posterior distribution for $x_t$ given the new $y_t$. This gives a concrete realisation of the calibration axioms in a simple setting.
+
+Other Bayesian models (nonlinear filters, Gaussian-process regression, variational methods) are admissible so long as they respect the axioms and constraints in this manifesto.
+
+\section{No-Arbitrage Constraints}
+\label{sec:noarb}
+
+Arbitrage constraints define the admissible region $\Theta_{\text{AF}}$ and are treated as hard constraints.
+
+\subsection{Yield curves}
+
+Let $D(t)$ be a discount factor curve parameterised by $\theta$ for maturities $t \geq 0$.
+
+Required conditions:
+\begin{itemize}
+    \item $D(0) = 1$.
+    \item $D(t) > 0$ for all $t$.
+    \item $D(t)$ is non-increasing in $t$ (equivalently, non-negative forward rates).
+\end{itemize}
+
+Additional smoothness constraints, such as bounds on curvature of forward rates, may be included in $\Theta_{\text{AF}}$ via the MCA.
+
+\textbf{Example.}\quad If a calibrated discount curve implies that a 5-year zero-coupon bond is priced higher than a 4-year bond of the same issuer and seniority, this violates monotonicity and indicates that the calibration has left $\Theta_{\text{AF}}$.
+
+\subsection{Volatility surfaces}
+
+Let $w(x, T)$ denote the total implied variance as a function of log-moneyness $x$ and maturity $T$.
+
+Required conditions include:
+\begin{itemize}
+    \item $w(x, T) > 0$ for all $(x, T)$.
+    \item No calendar spread arbitrage: for each fixed $x$, $\partial w / \partial T \geq 0$.
+    \item No butterfly arbitrage: the risk-neutral density derived from call prices is non-negative for each $(x, T)$. In terms of $w$, this translates into a positivity condition on a known combination of $w$, $w_x$, and $w_{xx}$ (the exact expression depends on the chosen parameterisation but is standard).
+    \item ATM total variance $w(0, T)$ non-decreasing in $T$ and finite ATM skew $w_x(0, T)$.
+\end{itemize}
+
+Parametrisation-specific sufficient conditions (for SVI, SSVI, and related forms) must be part of the MCA.
+
+\textbf{Example.}\quad If the calibrated smile at a given maturity gives deep out-of-the-money calls that are cheaper than a vertical call spread covering the same region, a static arbitrage exists and the surface is outside $\Theta_{\text{AF}}$.
+
+\subsection{Dividend and repo curves}
+
+For equity and similar underlyings:
+\begin{itemize}
+    \item Continuous dividend yields $q(t)$ satisfy $q(t) \geq 0$.
+    \item The present value of declared discrete dividends does not exceed spot.
+    \item Forwards implied by $(r, q, \text{repo})$ are consistent, within tolerance, with listed futures.
+\end{itemize}
+
+Repo curves should be smooth, bounded below by modelled floors, and consistent with futures and financing markets.
+
+\textbf{Example.}\quad If the curve implies that the present value of all future dividends is larger than the spot price, the model effectively assumes shareholders are paid more than the asset is worth, which is economically impossible and reveals a calibration error.
+
+\subsection{Cross-asset constraints}
+
+At minimum:
+\begin{itemize}
+    \item FX triangular relationships hold within tolerance:
+    \[
+        \text{FX}(A/C) \approx \text{FX}(A/B)\,\text{FX}(B/C).
+    \]
+    \item Interest rate parity between FX forwards and discount curves holds within tolerance.
+    \item Put--call parity holds for each strike and maturity within tolerance:
+    \[
+        C - P \approx D(T)\,(F(T) - K).
+    \]
+\end{itemize}
+
+\textbf{Example.}\quad If the model prices calls and puts in a way that systematically violates put--call parity for liquid strikes on EURUSD, the calibration is wrong even if each option individually looks close to its mid price.
+
+\section{Robustness to Bad Data}
+\label{sec:robustness}
+
+\subsection{Innovation-based gating}
+
+In a state-space model, for a batch of observations $y_t$ we have predictive mean and covariance $(\mu_{t|t-1}, P_{t|t-1})$. The innovation is
+\[
+    \nu_t = y_t - H_t \mu_{t|t-1},
+\]
+and the innovation covariance is
+\[
+    S_t = H_t P_{t|t-1} H_t^\top + R_t.
+\]
+
+Define the squared Mahalanobis distance
+\[
+    D_t^2 = \nu_t^\top S_t^{-1} \nu_t.
+\]
+
+Under a correct linear-Gaussian model, $D_t^2$ has a $\chi^2$-like distribution with $m_t$ fixed by the number of observations. A threshold $u_{m_t}$ (e.g.\ a percentile of the $\chi^2_{m_t}$ distribution) is specified in the MCA.
+
+\textbf{Gating rule.}
+\begin{itemize}
+    \item If $D_t^2 \leq u_{m_t}$, the batch is accepted.
+    \item If $D_t^2$ is moderately above $u_{m_t}$, the batch can be down-weighted by inflating $R_t$.
+    \item If $D_t^2$ is far above $u_{m_t}$, the batch is rejected and does not update the posterior.
+\end{itemize}
+
+Component-wise z-scores $z_i = \nu_{t,i} / \sqrt{S_{t,ii}}$ can be used to pinpoint individual outliers.
+
+\subsection{Effect of rejection and monitoring}
+
+If a batch is rejected:
+\begin{itemize}
+    \item The posterior is left unchanged: $P_{t|t} = P_{t|t-1}$.
+    \item The rejection and its diagnostics are recorded.
+\end{itemize}
+
+Statistics of $D_t^2$ and $z_i$ are monitored over time. Persistent deviations from the modelled distribution indicate either model misspecification, feed problems, or a regime change.
+
+\textbf{Example.}\quad If a single SPX option quote appears at a price 20\% away from the mid of all other sources and drives $D_t^2$ beyond the gate threshold, the filter should reject it and avoid contaminating the volatility surface.
+
+\section{Temporal Coherence and Structural Breaks}
+
+\subsection{Sequential updating and forgetting}
+
+As attestations arrive in knowledge-time order, the posterior evolves via the chosen Bayesian update mechanism, respecting A5.
+
+Older attestations influence the posterior mainly through their cumulative effect. In many models, effective ``forgetting'' is controlled by:
+\begin{itemize}
+    \item Process noise in state-space models.
+    \item Kernel length scales and noise levels in Gaussian-process models.
+\end{itemize}
+
+Explicit sliding windows may be used in certain calibration schemes, but the resulting posteriors must still satisfy the axioms.
+
+\textbf{Example.}\quad If a yield curve calibration still reacts strongly to a rate shock that happened a year ago even though recent rates have been stable, the process noise is too small and the system is not forgetting old regimes fast enough.
+
+\subsection{Detecting structural breaks}
+
+Structural breaks are detected via deviations in innovation behaviour:
+\begin{itemize}
+    \item Rolling averages of innovations deviating significantly from zero.
+    \item Empirical innovation variances systematically larger or smaller than predicted.
+    \item Non-negligible autocorrelations in normalised innovations.
+\end{itemize}
+
+When a break is detected:
+\begin{itemize}
+    \item The prior is widened (e.g.\ increasing process noise or relaxing kernels) to allow faster adaptation.
+    \item A regime-change record is produced.
+    \item Optionally, a batch re-calibration on a recent window provides a new starting posterior.
+\end{itemize}
+
+In a Kalman filter implementation, this behaviour is tightly linked to the initial state covariance and, in particular, the correlation structure between parameters. For example, a term-structure model for volatility may encode correlation between short-dated and long-dated vol factors:
+\begin{itemize}
+    \item In a stable regime, short- and long-dated vols might move together with high correlation. The prior covariance matrix reflects this, and innovations remain well-behaved.
+    \item During a structural change (e.g.\ a regime where short-dated vols spike while long-dated vols stay anchored, or vice versa), the empirical correlation between short and long maturities changes. A prior covariance that still assumes the old correlation structure will generate persistent, structured innovations (bias and non-zero autocorrelation).
+\end{itemize}
+
+Detecting such structural breaks means identifying when the innovation behaviour no longer matches what the prior covariance assumes. At that point, the Kalman filter's process noise and correlation matrix must be updated so that the prior reflects the new volatility dynamics. Otherwise, the filter will either over-react (if process noise is too large in the wrong directions) or under-react and accumulate bias (if process noise is too small).
+
+\section{Price Smoothness and Broken States}
+
+\subsection{Broken states as inconsistent conditional expectations}
+
+Let $\theta_{\text{sys}}(T)$ denote the parameter vector stored in the system at knowledge time $T$, and let $I_T$ be the information set consisting of all accepted attestations up to $T$. The \textit{correct} parameter vector, in the sense of optimally summarising the information, is the conditional expectation
+\[
+    \theta^\star(T) := \mathbb{E}[\theta \mid I_T].
+\]
+
+We say the system is in a \textit{broken state} at time $T$ if there exists at least one parameter component $j$ such that
+\[
+    \theta_{\text{sys},j}(T) \neq \theta_j^\star(T),
+\]
+i.e.\ the parameter stored in the system is not equal to what is implied by the current information set. In other words, the system has learned something from the Oracle that is not fully reflected in its internal parameters.
+
+\textbf{Example.}\quad Let $\sigma_{\text{SPX}}$ and $\sigma_{\text{SX5E}}$ be volatility levels for SPX and SX5E, with a joint model that implies they tend to move together. Suppose new SPX option data pushes $\sigma_{\text{SPX}}$ up by one volatility point. Given this move and the correlation structure, the conditional expectation $\mathbb{E}[\sigma_{\text{SX5E}} \mid I_T]$ also shifts. If the system updates only $\sigma_{\text{SPX}}$ and leaves $\sigma_{\text{SX5E}}$ unchanged, then the stored pair $(\sigma_{\text{SPX,sys}}, \sigma_{\text{SX5E,sys}})$ no longer matches the conditional expectation. The system is in a broken state: it knows something about SX5E that is not reflected in its parameters.
+
+\subsection{Spread options and asynchronous volatility updates}
+
+The broken-state definition above becomes operationally important when pricing multi-underlying products that depend on \textit{differences} or \textit{ratios} of parameters. Consider a SPX--SX5E spread option. Its price depends sensitively on the spread between SPX and SX5E volatilities and on their correlation. If SPX and SX5E volatility surfaces are updated on different schedules and via different Oracle feeds, a common failure mode is:
+\begin{itemize}
+    \item SPX vol is updated immediately when new SPX option data arrives.
+    \item SX5E vol is left unchanged until its own data feed updates (for example, the Euro session is closed).
+\end{itemize}
+
+From the point of view of the joint model, new information about SPX options changes the conditional distribution of both $\sigma_{\text{SPX}}$ and $\sigma_{\text{SX5E}}$. If the system updates only $\sigma_{\text{SPX}}$ and not $\sigma_{\text{SX5E}}$, the stored pair $(\sigma_{\text{SPX,sys}}, \sigma_{\text{SX5E,sys}})$ is no longer equal to the conditional expectation given the information set. The spread option price then moves as if only one leg had reacted, making the spread option artificially volatile and inconsistent with the joint model. This is a concrete instance of a broken state: asynchronous updates have created a parameter vector that contradicts what the system knows about cross-asset correlations.
+
+The same pattern appears for any basket, correlation, or relative-value product whose payoff depends on multiple correlated parameters. Whenever new attestations change the conditional distribution of a subset of parameters, the system must either (i) update all affected parameters to their new conditional expectations, or (ii) explicitly flag that it has entered a broken state where internal prices cannot be trusted.
+
+\section{Invariant Properties}
+
+This section summarises key invariant properties implied by the axioms and illustrates each with a real-world example.
+
+\subsection{Core invariants with examples}
+
+\begin{itemize}
+    \item \textbf{INV-01 (Arbitrage-free).} Every certified parameter set satisfies $\theta \in \Theta_{\text{AF}}$.
+
+    \textit{Example.}\quad A calibrated equity vol surface that implies negative local volatility at some strike/maturity violates arbitrage-freedom. INV-01 means such a surface must never be labelled ``certified'' and served to pricing.
+
+    \item \textbf{INV-02 (Price-space residual bounds).} Every certified calibration satisfies the per-instrument and aggregate price-tolerance conditions of A4.
+
+    \textit{Example.} If, after calibration, some liquid 1y ATM SPX options are off by 2\% of spot while the tolerance is 0.5\%, INV-02 forces the calibration to be rejected or re-weighted instead of quietly pushing a bad surface into production.
+
+    \item \textbf{INV-03 (Sequential posterior consistency).} The posterior at each knowledge time is obtained from the previous posterior by applying the declared update rule to the new accepted attestations; no posterior is constructed independently of its predecessor.
+
+    \textit{Example.} The volatility surface at 10:01 should be today's 10:00 surface updated with trades and quotes between 10:00 and 10:01, not a completely fresh fit to all history that forgets what happened earlier in the day.
+
+    \item \textbf{INV-04 (Reproducibility).} Given the same ordered input attestations, MCA, code version, and numerical environment, the posterior is the same up to declared numerical tolerance.
+
+    \textit{Example.} If a regulator asks for the end-of-day USD yield curve as of last quarter's reporting date, replaying the same trades and quotes through the same code must produce the identical curve (within negligible rounding differences).
+
+    \item \textbf{INV-05 (Provenance completeness).} Every calibrated parameter set carries a complete provenance chain back to all input attestations and the MCA.
+
+    \textit{Example.} When a trader questions a CDS spread curve, it must be possible to list exactly which single-name quotes, index quotes, and configuration settings produced that curve, instead of ``the system says so''.
+
+    \item \textbf{INV-06 (Innovation gating).} No attestation influences the posterior without passing the innovation-based consistency checks.
+
+    \textit{Example.} A single mis-keyed swap rate at 50\% instead of 5\% should be excluded automatically when it fails the innovation test, rather than blowing up the entire yield curve for that day.
+
+    \item \textbf{INV-07 (Staleness monitoring).} When the age of a calibrated object or its inputs exceeds thresholds in the MCA, staleness is signalled.
+
+    \textit{Example.} If the equity vol surface has not been updated for two hours in a fast market, downstream risk reports depending on that surface should show a ``stale vol'' warning instead of pretending the surface is current.
+
+    \item \textbf{INV-08 (Dependency ordering).} Calibrations that depend on other calibrated objects (e.g.\ volatility on yield curves) use only certified, internally consistent versions of those objects.
+
+    \textit{Example.} A USD swaption vol surface that depends on the USD discount curve should not be recalibrated using a yield curve snapshot that is mid-way through being updated, which would produce vol quotes consistent with no actual curve.
+
+    \item \textbf{INV-09 (Joint coherence).} Jointly-modelled parameter sets remain consistent with both single-name calibrations and any available multi-asset prices within tolerances.
+
+    \textit{Example.} If the system jointly calibrates SPX and SX5E vols and a simple SPX--SX5E spread option, INV-09 means the spread option price implied by the joint vol/correlation model stays aligned with any traded or quoted spread option levels, and does not wander off while single-index surfaces look fine.
+
+    \item \textbf{INV-10 (Smoothness bounds).} Parameter and price paths respect smoothness properties implied by the chosen priors and process noise; persistent violations are treated as anomalies.
+
+    \textit{Example.} A forward variance swap term structure that flips up and down by hundreds of basis points of variance from one day to the next while underlying ATM vols move smoothly is a sign that the calibration is over-reacting to noise. INV-10 forces such behaviour to be treated as a model issue, not as genuine market information.
+\end{itemize}
+
+\section{Reference Products and Monitoring}
+
+The ultimate purpose of calibration is to extract signal and suppress noise. In practice, this means that internal prices for economically important products should be stable and smooth, except when the market itself is discontinuous. To enforce this, the system must maintain and monitor a carefully chosen list of \textit{reference products} across calibration updates.
+
+\subsection{Purpose}
+
+Reference products are simple, liquid, or otherwise representative payoffs whose prices:
+\begin{itemize}
+    \item Depend directly on the calibrated objects (curves, surfaces, correlations).
+    \item Should be relatively smooth functions of maturity and strike, and reasonably stable over time except when real market events occur.
+\end{itemize}
+
+They provide a concrete, price-based view of calibration quality. If reference products behave wildly, the calibration is injecting noise; if they behave smoothly while underlying marks are moving, the calibration is filtering noise correctly.
+
+\subsection{What to monitor}
+
+The reference list should be small enough to understand, but rich enough to catch pathologies. It should include, at minimum:
+\begin{itemize}
+    \item \textbf{Forward rates} implied by yield curves, across standard tenors.
+    \item \textbf{Forward dividend yields} implied by equity and futures curves.
+    \item \textbf{Forward variance swaps}, both spot and forward-start, along the term structure.
+    \item \textbf{Barrier options} at standard barrier levels for key underlyings.
+    \item \textbf{Spread options} and simple basket payoffs that depend on volatility spreads and correlations (e.g.\ SPX--SX5E spread calls).
+    \item \textbf{Call vs.\ call structures}, such as call-on-index A versus call-on-index B, or call spreads, to monitor relative levels across underlyings.
+    \item \textbf{Local volatility slices} or equivalent diagnostics, to verify that local vol changes across strikes and maturities are smooth and not dominated by calibration noise.
+    \item \textbf{Variance swap / ATM vol ratios} as functions of maturity, i.e.\ the ratio
+    \[
+        R_{\text{var/ATM}}(T) := \frac{\text{VarSwapFairStrike}(T)}{\text{ATMVol}(T)},
+    \]
+    which should be a smooth function of maturity and evolve smoothly over time.
+\end{itemize}
+
+The set of monitored products should be chosen carefully:
+\begin{itemize}
+    \item The most traded and most risk-relevant products should be on the list, as they are where noise hurts most.
+    \item For each major underlying or asset class, there should be at least one simple reference per key part of the curve or surface.
+    \item The list should be explicit and versioned, not implicit or ad hoc.
+\end{itemize}
+
+\subsection{Smoothness criteria and ratios}
+
+For these reference products, the system should track both levels and ratios:
+\begin{itemize}
+    \item Changes over time at fixed maturity and strike.
+    \item Cross-sectional smoothness across maturity and strike at a given knowledge time.
+    \item Smoothness of key ratios, such as:
+    \begin{itemize}
+        \item variance-swap fair strike divided by ATM vol, $R_{\text{var/ATM}}(T)$,
+        \item barrier option price divided by the corresponding vanilla price,
+        \item spread option price divided by a suitable combination of single-name options.
+    \end{itemize}
+\end{itemize}
+
+Forward variance swaps, in particular, are expected to be smooth functions of maturity and to move in a temporally coherent way. The ratio $R_{\text{var/ATM}}(T)$ should be a smooth function of maturity and should not exhibit artificial kinks or oscillations introduced by the calibration. Large, unexplained jumps in this ratio are a sign that the variance swap leg or the ATM vol leg (or both) are contaminated by noise.
+
+Similarly, local volatilities inferred from the surface should change smoothly with strike and maturity. Sudden spikes in local vol at isolated strikes or maturities, unbacked by any structural change in the options market, are symptoms of overfitting or numerical instability.
+
+Any calibration step that produces artificial jumps, oscillations, or excess volatility in these reference products or their ratios---beyond what is justified by the underlying attestations---must be treated as a sign that the calibration is amplifying noise rather than extracting signal.
+
+\section{Scope and Extensions}
+
+\subsection{Scope}
+
+The principles apply to calibration of:
+\begin{itemize}
+    \item Yield curves and discount factors.
+    \item Volatility surfaces and smiles (equity, FX, rates, crypto).
+    \item Credit curves.
+    \item Correlation and covariance structures.
+    \item Joint calibrations of related instruments and indices.
+\end{itemize}
+
+\subsection{Extension requirements}
+
+To bring a new parameter type into scope, the following must be specified:
+\begin{itemize}
+    \item Its parameter space $\Theta$ and admissible region $\Theta_{\text{AF}}$.
+    \item The pricing map $\pi$ from parameters to instrument prices.
+    \item No-arbitrage constraints characterising $\Theta_{\text{AF}}$.
+    \item Prior structure and smoothness properties.
+    \item Tolerances in price space for calibration quality.
+    \item Any joint products or reference payoffs to be used as consistency checks.
+    \item Dependencies on existing calibrated objects.
+\end{itemize}
+
+Each extension is recorded as an MCA and an update to the invariant and monitoring definitions.
+
+\end{document}

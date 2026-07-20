@@ -1,0 +1,509 @@
+% =====================================================================
+%  THE LEDGER FRAMEWORK — Market Data Manifesto, Version 1.0
+%  Governing principles for market data. Subordinate to the
+%  Architectural Constitution (ledger_manifesto_v1_4.tex).
+%  Drafting lead: GATHERAL. Rigor-check: FORMALIS. Review: KLEPPMANN,
+%  TALEB. Certification: CONCORDIA.
+%  Prior art (source material, not a constraint): the Market Data
+%  Calibration Manifesto (calibration_manifesto.tex).
+%  Build: pdflatex (twice). Standard TeX Live; lmodern and microtype
+%  used when available and skipped otherwise.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\IfFileExists{lmodern.sty}{%
+  \usepackage[T1]{fontenc}\usepackage{lmodern}%
+  \IfFileExists{microtype.sty}{\usepackage{microtype}}{}%
+}{}
+\usepackage[margin=2.5cm,marginparwidth=2.0cm,marginparsep=2mm]{geometry}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+% --- article addressing: margin identifiers, mirroring the Constitution ---
+\IfFileExists{xcolor.sty}{\usepackage{xcolor}}{}
+\ifdefined\textcolor\else\def\textcolor#1#2{#2}\fi
+\newcommand{\mlabel}[1]{\leavevmode\hypertarget{md-#1}{}%
+  \marginpar{\raggedright\scriptsize\ttfamily\textcolor{gray}{#1}}}
+
+\setcounter{secnumdepth}{0}
+\providecommand{\tightlist}{\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}}
+
+% traceability tag at the close of each article
+\newcommand{\trace}[1]{\par\smallskip{\small\itshape (#1)}}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries THE LEDGER FRAMEWORK}\\[0.9em]
+  {\large\bfseries Market Data Manifesto}\\[0.6em]
+  {\normalsize Governing Principles for Market Data ---
+   Subordinate to the Architectural Constitution}\\[1.4em]
+  Version 1.0 \quad---\quad drafted July 2026 \quad---\quad certification pending
+\end{center}
+
+\vspace{0.6em}
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+
+\begin{center}\itshape
+The record holds observations; every price beyond them is derived from them.
+\end{center}
+
+\vspace{0.4em}
+
+\begin{center}\textbf{Abstract}\end{center}
+\begin{quote}
+The Ledger records observations, not prices. A market data fact enters
+the record exactly once, as a moveless observation admitted through the
+one door; every curve, surface, correlation, and calibration is a
+deterministic function of recorded inputs, of two kinds the document
+keeps apart. A \emph{projection} computes over the record and rebuilds
+from it alone; a model's output \emph{re-enters as a recorded
+observation} (C-14.9, C-14.15). Reading back any recorded value is
+unconditional; re-deriving a model's output is what needs the model. This
+manifesto states the principles that make
+append-only, event-driven, projected market data the only sensible way
+to hold market data inside the Ledger.
+Each principle is an \emph{article}, derived from six of the
+Constitution's eight commitments --- auditability, reproducibility, time
+travel, correctness, order, and simulability --- and resting on the
+clause of the Constitution that carries it. The document is rated
+against the Constitution, never the other way round; where the two
+conflict, the Constitution prevails.
+\end{quote}
+
+\vspace{0.4em}
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+
+\section{1. Market Data in the Ledger's Terms}
+
+A market data fact is an \textbf{observation}: a recorded statement,
+attributed to a source, that a named observable --- a price, a rate, a
+fixing, an index level --- took a value with respect to a world-moment.
+The observation is a fact about what a source said; it is not the truth
+about what a thing is worth. Any ``true'' price behind the observation is
+a modelling posit that lives in a model, never a claim the record makes.
+
+The boundary is sharp. The source of an observation sits outside the
+trust boundary, and the Events Executor captures the arrival and records
+it (C-5.4). An observation enters the immutable log only as a moveless
+\emph{observation-recording transaction} --- moveless because it records
+data and moves no balances --- admitted through the single Transaction
+Executor and folded into a \emph{home}, its resting place in the record
+from which the contracts that need it read (C-4.8). (Throughout, to
+\emph{fold} the log is to replay it in order, accumulating state; the
+current state is the initial state plus the fold of all observations.)
+There is no second door for market data: the one canonical record and the
+single writer extend, without exception, to every observation. A kind of
+market data is declared before any observation of it crosses --- its
+fields, the market data operators that adjust it across events (C-9.2),
+and the grain of the cause-derived identifier --- an identifier computed
+from what caused an arrival, so a redelivery of the same cause collides
+with it --- that decides when two arrivals are the same fact, all
+registered on the record first, so an arrival of an undeclared kind is
+quarantined, never guessed (C-4.12).
+
+\textbf{Vocabulary, mapped once.} This manifesto uses the Constitution's
+fixed names and coins no synonym. Its prior art, the Market Data
+Calibration Manifesto, speaks a different dialect, mapped onto the
+Constitution's vocabulary here once and not carried further:
+\begin{itemize}
+\tightlist
+\item an \emph{Oracle} is an external source; the framework has no
+  ``oracle'' primitive and introduces none (Article MD-3);
+\item an \emph{attestation} is an observation, recorded by an
+  observation-recording transaction (C-4.8);
+\item \emph{event time} is execution time; \emph{knowledge time} splits
+  into monitor time and door time (C-2.7);
+\item a \emph{posterior} over parameters is a derived object (a value
+  computed from recorded inputs; MD-6): a projection where its recipe
+  computes over the record, a re-entered observation where it runs a
+  model (C-14.15);
+\item a \emph{model configuration} is the recorded, versioned terms of a
+  derived object (C-4.4, C-7.2).
+\end{itemize}
+The Constitution's own term \emph{the market data operator} names one
+thing only --- the corporate-action transform of C-9.2 that carries
+pre-event data into the post-event frame --- and is never used for a
+source.
+
+\section{2. The Articles}
+
+Each article derives from one or more of the six commitments and rests
+on a clause of the Constitution. The identifiers MD-\emph{n} are
+append-only: never reused, never renumbered, so later documents may cite
+them.
+
+\mlabel{MD-1}\textbf{MD-1. The observation is the atom of market data.}
+A market data fact is an observation, and an observation is recorded
+exactly once. It enters the immutable log as a moveless
+observation-recording transaction, admitted through the single writer,
+and folded into a home. ``Exactly once'' is a mechanism, not a wish: each
+arrival carries its cause-derived identifier, and an arrival identical
+under it is \emph{absorbed} as a duplicate, not recorded again (C-2.7,
+C-12.3, C-14.3). Absorption is not a silent drop: no new value is
+recorded, but the fact of the redelivery --- its arrival provenance and
+monitor time --- is retained, so a healthy absorb is distinguishable from
+a feed that has gone quiet. Three arrivals that look alike must be told
+apart, and the identifier's grain --- a registered property of the data
+kind (\S1) --- is what tells them: the same print \emph{redelivered} is
+absorbed; a vendor \emph{correction} is a distinct, later observation
+that names the value it corrects (MD-10); a genuinely \emph{new} print at
+the same instant is a second observation, recorded in its own right. A
+grain too \emph{fine} records a mere redelivery twice and double-counts;
+a grain too \emph{coarse} absorbs a genuine second print and loses it.
+
+That the registered grain is correct is a trust assumption, named beside
+TA-ARRIVAL. The double-count is loud --- the extra observation is on the
+record to be found --- but the over-coarse loss is \emph{silent}: the
+second print is treated as a duplicate and never recorded, and where a
+feed delivers two distinct prints identical under every field it sends,
+no grain can separate them. This is the one residual case of silent loss,
+and the manifesto does not pretend a grain always exists to prevent it;
+it is caught where TA-ARRIVAL's gaps are caught --- at the perimeter, by
+reconciling arrival counts against recorded observations. Subject to
+that, nothing about market data is written twice: the value a source
+stated is its sole canonical copy, and every price, curve, and surface
+that mentions it is computed from it, never stored beside it.
+\trace{Auditability, Correctness; C-1.4, C-4.8, C-2.7, C-12.3, C-14.3.}
+
+\mlabel{MD-2}\textbf{MD-2. Capture precedes judgement.} The record
+admits an observation before anything decides whether to believe it. A
+stale, fat-fingered, or off-consensus quote is well-formed: it enters
+through the normal door as an observation-recording transaction (C-4.8),
+and judgement is deferred because economic correctness is never gated at
+admission --- it is detected after the fact by recomputation (C-13.2,
+C-13.3). A quote that is not even processable --- a corrupted payload,
+an unresolvable reference --- is still not lost: it is captured with the
+provenance of its arrival and stands as a visible open item (C-4.12).
+Either way the Ledger captures, then classifies; it never refuses to
+record in order to reject. Whether an observation is used, down-weighted,
+or ignored is a separate and later question, answered by a derived
+object over the record, never by the door. A ``rejected'' observation is
+one a calibration assigned no weight --- present, inspectable, and open
+to a different classification by a later derivation --- not one the
+record never held. Capture-then-classify is a \emph{principle}, and its
+guarantee runs \emph{from arrival}: whether an implementation's pipe can
+hold the full firehose at the open is a capacity question outside this
+document (trust assumption TA-ARRIVAL) --- but the principle forbids
+using capacity as a licence to drop silently. What the boundary cannot
+admit is a named, visible residual; what never reaches the boundary is
+the perimeter's concern, reconciled there, never a fact the record can
+claim (C-4.12).
+\trace{Auditability, Order, Correctness; C-4.8, C-13.2, C-13.3, C-4.12.}
+
+\mlabel{MD-3}\textbf{MD-3. The source is untrusted; its delivery is a
+trust assumption.} The origin of an observation --- an exchange, a
+broker, a polling service, a fixing provider, an on-chain feed --- is
+machinery beyond the system's trust boundary: an external source, not one
+of the system's own machines (C-5.1, C-5.8), and the framework grants no
+source the standing of truth. That an observation
+reaches the boundary at all is named as a trust assumption and
+reconciled against external authorities at the perimeter; it is never a
+fact the fold may assume (C-4.12). The framework therefore has no
+privileged ``oracle'' component and introduces none: a source is where
+an observation came from, recorded as provenance, and nothing more.
+\trace{Auditability, Correctness; C-5.1, C-5.4, C-5.8, C-4.12.}
+
+\mlabel{MD-4}\textbf{MD-4. Every observation bears three times, and as-of
+and as-at are two of them.} By the Constitution an event carries an
+execution time --- the world-moment its source asserts it happened, the
+time a court would enforce, contestable only in the world and corrected
+only by a later event; a monitor time --- when the boundary observed it;
+and a door time --- when the single writer admitted it (C-2.7). Bitemporality is
+not a feature bolted onto market data; it is these three times, already
+present. The \emph{as-of} coordinate of an observation --- the
+world-moment its value concerns --- is its execution time; the
+\emph{as-at} coordinate --- when the record came to hold it --- is its
+door time; monitor time is the further provenance that splits an
+observation's lateness into the world's delay and ours. Because both
+coordinates are recorded, the system computes both honest answers at any
+moment: what was known as of a past date, and what is known now about
+that date (C-12.1).
+\trace{Time travel, Order; C-2.7, C-12.1.}
+
+\mlabel{MD-5}\textbf{MD-5. Order is meaning, and the authoritative fold
+is execution-ordered.} Observations are events, and their sequence is
+load-bearing: a derived object depends on which observations preceded
+it --- a surface fitted before a shock is not the surface fitted after
+it. Meaning lives in execution order. An observation that arrives late,
+whose execution time precedes observations already folded, takes its
+place among them; every \textbf{projection} downstream refolds to include
+it (C-2.7), while a \textbf{re-entered observation} whose input window it
+lands in cannot re-fold itself --- the ledger runs no model (C-14.9) ---
+and is instead flagged stale for re-derivation (MD-8). Neither is silent:
+the insertion is flagged, every changed or staled value is flagged, and
+the difference is published as a named explain item --- a line in the
+profit-and-loss explain attributing the change to its cause (C-12.6). The
+as-known view --- what the book showed with only the observations it then
+held --- survives unrewritten beside the corrected one.
+\trace{Order, Time travel; C-2.7, C-12.6, C-14.9.}
+
+\mlabel{MD-6}\textbf{MD-6. Every derived object is a deterministic
+function of recorded inputs.} A curve, a surface, a correlation, a
+calibration is a function of what the record holds --- the observations
+it consumes, any derived objects it consumes, each pinned to its own
+version and \emph{cut} (the exact as-at boundary that fixes which
+observations were in force; MD-12), the recipe that defines it, and,
+where the recipe draws on randomness, a recorded seed. Two kinds of
+derived object must be told apart, and the Constitution names both.
+
+Where the recipe computes \emph{over the record} --- a discount factor
+read off recorded quotes, an adjusted value from the market data operator
+--- the object is a \textbf{projection}: it stores nothing and rebuilds
+from the record alone, by any party, today or at a past date (C-2.2,
+C-3.2, C-14.11). Where the recipe \emph{runs a model} --- a filter, an
+optimiser, a fitted surface --- the ledger does not run it (C-14.9); the
+model is evaluated outside the fold and its output re-enters through the
+one door as a new \textbf{observation} (C-14.15). That number is then
+stored, like any observation, and two senses of getting it back must not
+be confused: \emph{reading it back} is always possible from the record
+alone, because the value is on the record; \emph{re-deriving} it ---
+showing the number follows from its inputs --- additionally needs the
+retained model and the numerical environment it ran in, a governance
+matter outside this scope. So a re-entered observation is read back
+unconditionally and re-derived only with the model.
+
+Either kind carries, as recorded provenance, a \textbf{complete lineage}:
+the resolved input cut --- every observation and every derived object it
+consumed, each pinned to version and cut --- and, for a model output, the
+model version. Lineage reaches through the whole chain to the
+observations at its leaves, so what an object depends on is always
+legible from the record. A derivation that \emph{fails} is not an absence
+either, but which kind of fact it is follows the same split. A
+\textbf{projection} that fails --- a bootstrap with too few quotes at
+this cut --- is itself a projection: its failure is legible by
+recomputation, never stored as a standing fact, and refreshes to success
+if a late arrival fills the gap (MD-5). A \textbf{model run} that
+fails --- a fit that does not converge --- re-enters as a recorded
+observation carrying its diagnostics and lineage, and is itself subject
+to staleness if its inputs are later corrected. A failed \emph{capture}
+(MD-2) is stored for a different reason: it is an input-side arrival, not
+an output-side derivation. In every case an absent object never passes
+for one never attempted. The demand is on the inputs, not the engine:
+record enough ---
+observations, derived inputs, recipe, seed, and the lineage that ties
+them --- that the object is a deterministic function of the record.
+\trace{Reproducibility, Simulability, Correctness; C-2.2, C-3.2, C-14.9,
+  C-14.11, C-14.15.}
+
+\mlabel{MD-7}\textbf{MD-7. The prior is a term; the posterior is a
+derived object.} A Bayesian calibration is not banned; it is placed. The
+prior --- including any assumed dynamics for how a parameter moves
+between observations --- is a declared, recorded term. The posterior is
+a derived object of that prior-term, the recorded observations, and the
+recorded seed (MD-6): a projection where it is a closed computation over
+the record, a re-entered observation where a filter or sampler evaluates
+a model. Either way it is \emph{not} stored state --- no ``current
+posterior'' sits beside the record and updates in place; the maxim that
+today's posterior is tomorrow's prior names a recomputation over the
+log, not a mutable variable. The framework mandates no dynamics --- a
+random walk, a martingale, a mean reversion are modelling choices a
+recipe may declare, never axioms the framework asserts --- and whatever
+is declared is recorded, so the posterior is reproducible on MD-6's
+terms.
+\trace{Correctness, Reproducibility; C-2.8, C-4.11, C-14.15.}
+
+\mlabel{MD-8}\textbf{MD-8. A broken state cannot hide.} A recurring
+pathology of calibrated systems is the stored parameter that has drifted
+from what the information implies: the system knows something it has not
+yet written into its numbers. The Ledger defeats it, but the mechanism
+differs by kind of derived object, and honesty requires naming both. A
+\textbf{projection} stores nothing --- recomputed from the record on
+every read (C-4.11) --- so it cannot lag the record at all: the
+drifted-parameter state is unrepresentable, and under a joint recipe an
+on-demand read is the correct joint conditional expectation, so even two
+correlated legs cannot hold a divergent pair. A \textbf{re-entered
+observation} does store a number: a fitted surface, or a joint
+vol-and-correlation fit for a spread, sits on the record because the
+ledger runs no model (C-14.9). It cannot drift in place --- a new fit is
+a new observation, forward, naming the inputs it consumed (MD-6), never
+an edit of the old --- so the system never quietly overwrites what it
+knew. But it can fall out of date when an input it consumed is later
+corrected or superseded (MD-10, MD-5), and there the ledger does not
+silently recompute it. Instead its staleness is a recorded fact: the
+recorded lineage shows the input moved under it, and the stale fit stands
+as a flagged open item awaiting re-derivation. So the joint spread
+surface cannot silently disagree with a corrected leg --- not because it
+re-fits itself, but because its disagreement is visible. So this
+visibility is reached by default: a consumer reads a re-entered
+observation through a projection --- ``the current fit for X'', which
+selects the latest non-superseded observation and carries its staleness
+flag --- never the raw stored value, so an ordinary read inherits the
+check. What the
+framework forbids everywhere is the \emph{silent} divergence: for a
+projection it cannot arise; for a re-entered observation it cannot hide.
+\trace{Correctness; C-1.5, C-4.11, C-11.5, C-14.9.}
+
+\mlabel{MD-9}\textbf{MD-9. Constraints live in the derived object;
+no-arbitrage is declared, not assumed.} A recorded observation carries
+no promise of mutual consistency --- a stale quote and a fresh one may
+cross, and two sources may disagree; the record holds both. No-arbitrage,
+smoothness, and monotonicity are constraints a derived object imposes on
+its own output, not properties the record must have. A derived object
+that cannot meet the constraints it declares records that it cannot ---
+a visible diagnostic --- rather than failing to exist or, worse, serving
+an inadmissible object as though it were sound. No-arbitrage is not
+negotiable for the object that claims it, but it is enforced by
+detection, not by admission: an arbitrageable surface served as
+arbitrage-free is an economic error, caught after the fact by
+recomputation, not prevented at a door (C-13.2, C-13.3). The discipline
+is that the claim and its test are both on the record. Which
+no-arbitrage conditions are correct, and whether a fitted object hedges,
+are matters of model choice and lie outside this scope (C-Scope.11): the
+manifesto mandates that a derived object's constraints be recorded and
+their satisfaction be a recorded diagnostic, not which constraints a
+modeller should choose.
+\trace{Auditability, Correctness; C-13.2, C-13.3, C-Scope.11.}
+
+\mlabel{MD-10}\textbf{MD-10. Corrections repair forward; the original is
+never overwritten.} A market data fact found wrong is not edited. The
+discovery is a new recorded observation that names the wrong one, and the
+discrepancy stands as a visible open item. What happens downstream splits
+by kind: every \textbf{projection} over the corrected fact recomputes
+automatically on the next read; a \textbf{re-entered observation} that
+consumed the wrong fact cannot re-run itself (C-14.9), so its recorded
+lineage marks it stale and it stands as a flagged open item until a fresh
+fit supersedes it forward (MD-8). A bulk retraction --- a vendor voiding
+a whole day --- is many corrections at once; the explain may summarise
+them as one named item rather than flood the book, so the signal is not
+lost in the flags. Where money already moved on the strength of the wrong
+fact, it moves back only as an authorised compensating transaction
+(C-12.4). The observed value stays on the record exactly as observed.
+Adjustments a later event forces on earlier data --- a split rescaling a
+price, a dividend rescaling a cash-per-share figure --- are computed at
+each read by the market data operator (C-9.2, C-9.3), which is intrinsic
+to the pairing of the kind of data and the kind of event, declared once
+and never improvised. The original observation is preserved; the adjusted
+value is derived; projections are recomputed from operator-adjusted
+inputs.
+\trace{Auditability, Time travel, Correctness; C-9.3, C-12.4, C-12.6, C-14.9.}
+
+\mlabel{MD-11}\textbf{MD-11. Simulated market data is real market data
+under a different seed.} The state of the market data universe is the
+initial state plus the fold of all recorded observations (C-2.8). A
+stress scenario, a backtest, a Monte-Carlo path is not a separate system
+but the same machine folding a generated stream of observations from a
+recorded seed; production is simply the one path whose observations
+happened to be real. Because the seed is the single non-record input and
+it too is recorded, every simulated path replays exactly, and a
+calibration run over simulated observations is reproducible on the same
+terms as one run over real ones. The seed suffices as the sole non-record
+input only because every model output along the path is itself captured
+as a re-entered observation (MD-6); a path that ran a model but recorded
+only the seed could not replay without that model.
+\trace{Simulability, Reproducibility; C-2.8, C-10.1.}
+
+\mlabel{MD-12}\textbf{MD-12. Derivation composes.} A derived object may
+consume another derived object --- a volatility calibration reads a
+discount curve, a spread model reads two surfaces. When it does, the
+dependency --- which object, at which version and cut --- is itself part
+of the recorded recipe (MD-6), so the composite is again a deterministic
+function of the record, and the split of MD-6 composes with it. Along a
+chain of \textbf{projections}, reconstruction runs the whole chain from
+the record, bit-for-bit. Where the chain passes through a \textbf{re-entered
+observation}, that node enters as a \emph{leaf}: its recorded value is
+read back from the record, and re-deriving it needs its retained model
+and numerical environment (MD-6) --- so reconstruction of the composite
+is bit-for-bit given those, and read-back always. Either way, because
+each input is fixed at its own recorded cut, never read from a mutable
+store, the ``mid-update input'' cannot arise (MD-8): a curve feeding a
+calibration is consistent with that calibration by construction, not by
+scheduling.
+\trace{Reproducibility, Correctness; C-2.2, C-14.11.}
+
+\section{3. The Life of an Observation}
+
+One observation can walk the whole picture, and the articles are easier
+to hold once it has. Follow AAPL's official close on a Tuesday, needed by
+an equity volatility surface.
+
+\begin{itemize}
+\item \textbf{Recorded once.} The exchange, an external source, publishes
+  AAPL's Tuesday close of 150.20; the Events Executor captures it and the
+  Transaction Executor admits a moveless observation-recording
+  transaction. The value 150.20 is now on the record, once; a redelivery
+  of the same print is absorbed, not recorded again (MD-1, MD-3).
+\item \textbf{Three times.} The observation carries its execution time
+  (Tue 16:00, the world-moment the close concerns --- its as-of
+  coordinate), its monitor time (when the boundary saw it), and its door
+  time (Tue 18:30, when it was admitted --- its as-at coordinate) (MD-4).
+\item \textbf{Read back, not drifting.} Tuesday's surface consumes
+  150.20. If it is a projection it rebuilds from the record on read; if
+  it is a fitted model it re-enters as a recorded observation pinned to
+  the closes it consumed (MD-6). Either way its value is always readable
+  back from the record; re-deriving a fitted surface needs its retained
+  model. No surface is kept as a mutable copy that drifts (MD-8).
+\item \textbf{Corrected forward.} On Thursday the exchange restates the
+  Tuesday close to 150.50. This is a correction, not a late arrival: a
+  new observation naming the old one, sharing Tuesday's execution time,
+  separated only by door time (Thu) (MD-10). The original 150.20 stays on
+  the record exactly as observed.
+\item \textbf{Two honest answers, two numbers.} Now the daily question.
+  \emph{Tuesday's surface as published on Tuesday} was built at the cut
+  as-at Tue 18:30 --- it used 150.20, and that view survives unrewritten.
+  \emph{Tuesday's surface as recomputed now} is built at the cut as-at
+  today --- it uses the corrected 150.50. Same as-of date, two as-at
+  cuts, two different surfaces; the cut is the coordinate that selects
+  which (MD-4). A projection yields both by recomputation; a fitted
+  surface yields the first as the observation recorded then and the
+  second only once re-fitted, its staleness flagged until it is (MD-8).
+\item \textbf{Late arrival.} Suppose instead a Tuesday-stamped trade
+  print arrives only Thursday. Its execution time places it among
+  Tuesday's data, so every projection over that window refolds to include
+  it and publishes a named explain item, while a fitted surface for that
+  window is flagged stale for re-derivation (MD-5). A value learned
+  Thursday changes what Tuesday's book should have said.
+\item \textbf{Simulated the same way.} Replace Tuesday's real close with
+  a generated one from a recorded seed and the same machine runs
+  unchanged; the surface reproduces on identical terms (MD-11).
+\end{itemize}
+
+\section{4. What This Manifesto Does Not Govern}
+
+This manifesto governs how market data is recorded, ordered, corrected,
+and projected. It does not govern:
+\begin{itemize}
+\item \textbf{price formation and price discovery} --- where a price
+  comes from in the market is not a question the record answers;
+\item \textbf{which model, prior, or no-arbitrage condition is correct}
+  --- that is model choice, and its test is hedging performance, outside
+  this document;
+\item \textbf{model governance, validation, and the retention of
+  models} --- a value reproduces from recorded prices unconditionally, a
+  model's number only if the model is kept, and keeping it is
+  governance;
+\item \textbf{settlement} --- the record projects committed activity
+  toward it but does not perform it.
+\end{itemize}
+These lie outside the Ledger boundary and are reconciled against it only
+at its perimeter (C-Scope.11).
+
+\section{5. Subordination}
+
+This manifesto is subordinate to the Architectural Constitution and is
+rated against it, never the other way round. Its vocabulary is the
+Constitution's, one name per component, and it introduces no synonym for
+any fixed term. Where a principle here would conflict with the
+Constitution, the Constitution prevails, and the conflict is parked with
+the exact text of the proposed amendment and the exact clause it would
+replace --- never resolved by quiet narrowing. A departure from this
+document, once genuine, is made by amending it explicitly first; an
+article identifier is never reused and never renumbered.
+
+\section{Conclusion}
+
+Reconciliation of market data --- one desk's surface disagreeing with
+another's, today's mark disagreeing with the mark reproduced tomorrow ---
+has the same root cause as every other reconciliation: the same fact
+stored more than once. The Ledger removes it here as everywhere. An
+observation is recorded once; every curve, surface, and calibration is a
+deterministic function of what the record holds; corrections repair
+forward and originals survive; and the whole market data universe is the
+initial state folded over its recorded observations. Operate market data any
+other way inside the Ledger and you reintroduce the divergence the
+architecture exists to remove. Operate it this way and there is nothing
+left to reconcile.
+
+\end{document}
