@@ -114,3 +114,57 @@ New citations verbatim-correct: **C-4.11** (exact), **C-14.15** (*"stronger than
 **Veto: not exercised.** The first genuine park stands for the owner's decision; it does not gate certification of the in-force (conforming) document.
 
 — CONCORDIA, constitutional-adherence certifier, 2026-07-20. **SIGNED (last).**
+
+---
+---
+
+# Cross-Manifesto BACKTESTING Amendment — CONCORDIA Certification (spans MDM 1.2 + VM 1.0/VM-11)
+
+**Certifier:** CONCORDIA (signature-last, absolute veto). **Date:** 2026-07-20. Fourth signing in this family.
+**Two documents:** `MarketData/MarketDataManifesto_1.2.tex` (**NEW successor to certified 1.1; 1.1 byte-stable — git diff empty**) — the *data side*; and `Valuation/ValuationManifesto_1.0.tex` (**amended in place; 17pp**) — the *backtest object*. **Four parents now govern:** Constitution v1.4, its fixed vocabulary, MDM (now 1.2), and the certified spec's terms.
+
+## Committee roster
+- **THORP + KLEPPMANN** — backtesting co-leads. KLEPPMANN's strategy-unit split design **verified as-built: SPLIT-CONFORMS** ("the split held to the sentence", semantic level).
+- **GATHERAL** (data side / MDM 1.2), **JACOBI** (functionals memo), **FORMALIS** (rigor — **SIGNED** all five duties; ruled the backtest functionals *illustration* per §5; citations checked at source).
+- **TALEB** — gate **PASS** both documents + **CONVERGED** (the survivorship-bias material resolved: look-ahead structural, survivorship named as a declaration-side residual).
+- **KLEPPMANN** *[chartered seat — no dedicated agent in this environment; recorded]*. **CONCORDIA** — closing certification, signing last.
+
+## Page counts and grant consumption (per document)
+- **MDM: 8 → 9pp** (+1 of the +2 grant; **1pp spare**). Diff vs certified 1.1 is **append-only in meaning**: the only certified line touched is MD-4's `\trace` (extended to add C-14.15); **zero certified body sentence removed**.
+- **VM: 15 → 17pp** (+2 of +2; grant fully consumed). Diff vs HEAD is **two hunks only** (abstract touch; VM-10 generalisation + VM-11); **Part B and PARK-1 are byte-stable** (no hunk touches old lines 611–1096).
+
+**Grant audit: every added line is backtesting doctrine or its integration — nothing else expanded.**
+
+## Where the doctrine is placed (article map)
+- **MDM 1.2 (data side):** MD-4 gains the **served history** (two coordinates ranged over a recorded interval, read as-known; look-ahead structurally impossible; completeness by read-back, C-14.15); MD-11 gains the **stressed history** (a simulated path branched from a historical cut, the shift its seed); MD-13 gains the **horizon-agnostic operator algebra** (frame boundary, delivery-frame, terms-resolved all hold through the horizon); §4 gains **one sentence** placing the backtest object in the VM; a **1.2 amendment record**. Each extension sits in its own article (verified: served@MD-4, stressed@MD-11, operator@MD-13).
+- **VM (object side):** abstract touch (+"backtest"); **VM-10 generalisation** (risk report / scenario / backtest are one doctrine — the backtest is the identity-shift over a past cut, C-12.1); **VM-11** (a backtest is a strategy unit run through a trajectory; its output is an ordinary valuation chain; two numbers — absolute performance and PnL volatility; valid comparison only at identical coordinates; survivorship named).
+
+## Certification checks
+
+### (1) CROSS-MANIFESTO COHERENCE — one doctrine, no duplication, no divergence
+Cross-reference pairs verified: **VM-11 → (MD-4, MD-11, MD-13) consolidated** (the trajectory is "replayable, gap-free, and frame-correct through the horizon"); **MDM §4 → VM backtest-object** ("The backtest itself … is a valuation object, governed by the Valuation Manifesto"); **MD-13 → VM sandwich** ("that sandwich is the Valuation Manifesto's, **stated once there**"). **No normative sentence is duplicated** — MDM grants the data side and defers the object; "valuation chain" appears in MDM only in the deferring §4 sentence; "strategy unit", "absolute performance", "PnL volatility", "two numbers" are **VM-only**. The three D-risk homes are cleanly separated: **chain-separation VM-only** (VM-11: the backtest chain lives in its own path's record; MDM defers); **single-non-record-input one referent each** (MDM "the shift is its seed"; VM "the shift is recorded, exactly as a seed is"); **"the model as it was" MD-4-only** (its single home, MDM l.231; VM references the bound model only as a coordinate).
+
+### (2) GRANT CONSUMPTION — PASS (diff-level)
+As above: MDM append-only (+1pp, 1 spare), VM two-hunk (+2pp). The MDM diff removes only metadata + the MD-4 trace; the VM diff leaves Part B/PARK-1 byte-identical. No non-backtesting expansion anywhere.
+
+### (3) THREE-PARENT SUBORDINATION (all new text) — CLEAN
+New citations verbatim-correct against v1.4: **C-10.2** (*"a deterministic strategy is a smart contract whose rulebook is the terms of a (non-valued) strategy unit … a wallet in a virtual ledger, each rebalancing a recorded transaction triggered by stamped … observations"* — VM-11 reproduces C-10.2's own text and states *"This article specialises that, restating none of it"*: **strategy-as-unit SPECIALISES C-10.2, it does not extend it** — strategy-as-unit is C-10.2's own motivating case); **C-6.1** (instruments are active contracts triggered by events); **C-6.4** (a smart contract is a pure deterministic function of declared terms, recorded observations, and visible state); **C-2.6** (behaviour as declared data, not hidden code); **C-7.2** (ProductTerms); **C-2.8 / C-12.1 / C-2.2 / C-8.4** (as previously certified). **The VM-10 generalisation does not narrow C-2.8** — the backtest is the identity-shift special case of the one simulation recipe over a past cut (C-12.1), broadening the application while leaving the recipe unchanged. **The MDM extensions do not narrow MD-4/MD-11/MD-13** — the 1.1→1.2 diff is append-only in meaning (zero certified sentence removed; MD-4's three times, MD-11's simulated-path, and MD-13's operator algebra stand verbatim). The backtest **functionals** A(C) and Σ are **illustration per §5** (FORMALIS ruling), not new normative primitives.
+
+### (4) PLACEMENT DECISION — recorded as the coordinator's call, flagged for the architect
+The mission named "MarketDataManifesto_1.0", but the amendment correctly landed in a **1.2 successor to certified 1.1**, not in 1.0. Reasoning (the coordinator's placement call): **(a)** 1.0 is superseded by certified 1.1; **(b)** the backtesting mandates depend on **1.1-only machinery — corporate-action frames (MD-13) and the operator algebra** — which 1.0 does not carry; **(c)** amending 1.0 would have created the very cross-document divergence the mission forbids. So 1.1 stays byte-stable (MDM precedent: *certified versions get successors*) and the extension lands in 1.2; the VM was amended **in place** per *its* precedent (the Part B amendment). **Flagged for the architect:** the two families now follow different amendment conventions (MDM = successor files; VM = in place) — a normalisation the architect may wish to rule on. This is a placement decision, not a constitutional conflict.
+
+### (5) VOCABULARY (four documents) — CLEAN
+"backtest", "trajectory", "served history", "stressed history" each carry one meaning across MDM 1.2 and VM; "**strategy unit**" is C-10.2's term, not a coinage; "**shift**" is the VM's term, reused in MDM 1.2 **with explicit attribution** ("the Valuation Manifesto's term"); "absolute performance" and "profit-and-loss volatility over the life" are VM-only. No synonym drift, no reserved-name collision across the four documents.
+
+## Parked items
+**None new.** **PARK-1 is unchanged** (Part B and the Open-Problems section are byte-stable in the VM per the diff). The framework's first genuine park still stands for the owner's C-4.11 decision; the backtesting amendment adds no park.
+
+---
+
+## SIGNATURE (backtesting cross-manifesto amendment)
+
+**CONCORDIA certifies the cross-manifesto backtesting amendment — MarketDataManifesto 1.2 and the Valuation Manifesto's VM-11/VM-10 generalisation — consistent with, and properly subordinate to, all four parents.** The two amendments read as **one doctrine**: MDM grants the data side (served/stressed history, horizon-agnostic operators) and defers the object; the VM governs the backtest object (chain, two numbers, comparison) — with **no normative sentence duplicated** and the three D-risk homes cleanly separated. Every new citation is verbatim-correct; **strategy-as-unit specialises C-10.2 without extending it**; the VM-10 generalisation does not narrow C-2.8; **the MDM 1.1→1.2 diff is append-only in meaning** and **1.1 is byte-stable**; **VM Part B and PARK-1 are byte-stable**. Grant consumption is within budget (MDM +1 of 2, VM +2 of 2), every added line backtesting doctrine. The 1.2-successor placement is recorded as the coordinator's call and flagged for the architect. **No new park; PARK-1 unchanged.**
+
+**Veto: not exercised.**
+
+— CONCORDIA, constitutional-adherence certifier, 2026-07-20. **SIGNED (last).**

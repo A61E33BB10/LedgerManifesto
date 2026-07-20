@@ -99,11 +99,13 @@ Market Data Manifesto's exhibit list. A corporate action is a valuation
 sandwich, its frame re-coordination a zero-profit identity and its
 near-zero residual the proof it went well. A risk report is the same
 valuation on shifted market data --- no second system, no second code
-path. Each principle is an \emph{article} derived from the seven governing
+path --- and a backtest is that same valuation read across a trajectory of
+historical or stressed world states, two strategies comparable only at
+identical coordinates. Each principle is an \emph{article} derived from the seven governing
 principles the two parents already fixed --- auditability, reproducibility,
 time travel, correctness, order, simulability, and the derived
 dispute-readiness --- and rests on the clause of a parent that carries it.
-The manifesto is in two parts. Part~A is the doctrine above --- the ten
+The manifesto is in two parts. Part~A is the doctrine above --- the eleven
 articles that govern the record and its chain. Part~B, deliberately
 distinct, steps beneath the doctrine to state and derive one mathematical
 fact about the pricing function the chain stores: the price and the
@@ -487,8 +489,98 @@ full lineage, dispute-ready on the same terms as production (VM-8). And
 because risk and the books run the one recipe, the risk report and the
 official profit-and-loss cannot disagree by construction: the classic
 risk-versus-books reconciliation break --- two systems, two code paths, two
-numbers --- has no way to arise.
-\trace{Simulability, Reproducibility; C-2.8, MD-11, C-14.11.}
+numbers --- has no way to arise. The doctrine reaches one step further, and
+time travel, reproducibility, and simulability already imply it: let the
+recorded shift be the identity --- what actually happened --- over a base taken
+from a past cut (C-12.1), and the simulated path is a stretch of the real
+history; a valuation run across a trajectory of such cuts is a \emph{backtest}.
+One doctrine then covers the risk report, the scenario, and the backtest --- a
+valuation on a derived world, whose shifts in the backtest are what actually
+happened --- and VM-11 develops it.
+\trace{Simulability, Reproducibility, Time travel; C-2.8, C-12.1, MD-11, C-14.11.}
+
+\vlabel{VM-11}\textbf{VM-11. A backtest is a strategy unit run through a
+trajectory; its output is an ordinary valuation chain.} A strategy is already a
+unit, and the Constitution says so (C-10.2): a deterministic strategy is a smart
+contract whose rulebook is the terms of a (non-valued) strategy unit --- the
+rulebook holds no value, its portfolio does --- carried in a wallet in a virtual
+ledger, each rebalancing a recorded transaction triggered by stamped
+observations. This article specialises that, restating none of it. The strategy's
+ProductTerms declare the hedge instruments, the rebalancing rules, and the
+triggers (C-7.2); its behaviour is declared terms, not hidden code (C-2.6), and
+its contract a pure function of those terms, the recorded observations, and the
+visible state (C-6.4) --- so the same rulebook, run twice on the same record,
+emits the same transactions, its contract firing on the trajectory's events as a
+listed option's fires on a settlement print (C-6.1).
+
+A \textbf{backtest} is that strategy unit run through a \emph{trajectory} of world
+states --- each the market-data state at one historical cut, the observations then
+in force in their frame --- the served or stressed history the Market Data
+Manifesto makes replayable, gap-free, and frame-correct through the horizon
+(MD-4, MD-11, MD-13).
+Its output is an \emph{ordinary} valuation chain (VM-3): a valuation at every step
+(VM-1), each proven from the last by a profit-and-loss explain certificate with
+entry and exit greeks (VM-4), transitively repaired on a corrected input (VM-7),
+sandwiched across every corporate action in the span (VM-9). It is the same pure
+function of ledger state, the same certificates, and the same proofs as a
+production chain --- nothing about a backtest is a second kind of valuation. The
+backtest chain lives in its own path's record, never the real unit's chain
+(VM-10); where its coordinates coincide with production --- the same strategy over
+the real history --- its chain \emph{equals} the production chain by determinism
+(C-2.2), reached by recomputation, never a second stored copy that could drift.
+
+A backtest reports two numbers, each a function of the chain and its declared
+terms. \textbf{Absolute performance} is
+$A(C) = (V_N - V_0) + \sum_{k} F_k$, over the chain's marks $V_k$ and its recorded
+flow lines $F_k$ (dividends and coupons in, financing out): by the certificate's
+reconciliation to $\Delta$NAV (VM-4, C-8.4) it telescopes to the endpoints and the
+flows, touches no attribution split, and is therefore \emph{convention-independent}
+--- the path-independent total the certificate exists to reconcile to.
+\textbf{Profit-and-loss volatility over the life} is
+$\Sigma(C;\pi,D,\nu) = \nu\,D(\Delta V_1,\dots,\Delta V_N)$, the dispersion of the
+recorded per-step increments $\Delta V_k$ under a declared dispersion rule $D$
+(say the standard deviation of the increments --- the manifesto fixing none) and
+a declared normalisation $\nu$ (the annualisation), over the trajectory's own
+partition $\pi$. At
+principle level $\Sigma$ is deterministic given the chain and $(\pi,D,\nu)$ --- a
+value read off the record, not a statistical estimate --- and $\pi$, $D$, $\nu$ are
+\emph{declared, recorded terms} carrying the same auditable-change discipline as
+the attribution convention (VM-5) and the certification bound (VM-6); the partition
+is a coordinate, not a free choice, since resampling changes the increments and
+hence $\Sigma$.
+
+Two strategies compare \emph{validly} only at identical coordinates: the same
+observations at the same cuts, in the same frames, with the same bound models, over
+the same trajectory, and the same declared terms --- differing in nothing but the
+strategy unit under test. That identity is a decidable check on the record: each
+chain carries complete lineage (VM-3, MD-6), and the two lineage sets are compared.
+Differ in anything but the strategy unit and the comparison measures two worlds,
+not two strategies; it is \emph{invalid by definition} --- the record yields no
+valid comparison, the exact analogue of VM-2, a comparison without shared
+coordinates being no comparison at all. Where validity holds, the comparison is a
+projection over the two chains, dispute-ready by replay (VM-8): recompute both
+chains and both functionals from the record, reproduce each bit for bit, and
+localise any divergence to a differing coordinate or term --- never adjudicating
+which strategy is better, which is model choice and out of scope.
+
+One bias the structure cannot refuse: look-ahead is impossible by construction
+(MD-4), but \emph{survivorship} is not. The instrument universe the strategy
+ranges over is a declared term of the strategy unit --- resolved as-known (the
+units in force at each historical cut, delisted names included, all on the
+append-only record) it is unbiased; declared as today's survivors it runs a
+biased backtest the structure cannot detect. The record makes that declaration
+auditable, on the chain's coordinates, but cannot police its wisdom:
+``look-ahead cannot arise'' is not ``bias cannot arise.''
+
+That a backtest is no harder \emph{to specify} for a sophisticated exotic than
+for a vanilla is not asserted but forced: both the exotic's contracts and the
+strategy's already run on simulated paths, by the same fold as production
+(C-2.8, C-6.1); the marginal cost is only declaring the strategy unit's terms and
+naming the trajectory. The compute is not thereby cheap --- it is one production
+valuation per step, the exotic's per-step pricing cost unchanged (VM-10); the
+ledger makes the \emph{specification} easy, never the pricing.
+\trace{Simulability, Reproducibility, Auditability; C-2.8, C-6.4, C-7.2, C-10.2,
+  C-12.1, MD-4, MD-11, MD-13.}
 
 \section{3. The Life of a Valuation}
 

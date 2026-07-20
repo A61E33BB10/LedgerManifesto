@@ -23,8 +23,9 @@ rated against nothing, and every specification, test, and review is rated agains
 | TuringAward advisory review | Advisory | `LedgerManifesto/TuringReview.tex` / `.pdf` |
 | next_step_v16 (v11.0 archaeology) | Advisory — gap register | `LedgerManifesto/next_step_v16.tex` / `.pdf` |
 | Ledger entropy note (5 pp) | Non-normative research (verdict: yes-but) | `LedgerManifesto/ledgerentropy.tex` / `.pdf` |
-| Market Data Manifesto 1.1 (8 pp) | Certified (CONCORDIA signed; GATHERAL/FORMALIS draft, THORP+KLEPPMANN+TALEB converged) — subordinate to the Constitution | `MarketData/MarketDataManifesto_1.1.tex` / `.pdf` |
-| Valuation Manifesto 1.0, two parts (15 pp) | Certified (CONCORDIA signed; Part A doctrine THORP/FORMALIS; Part B pricing engine JACOBI-led). Carries PARK-1 — the corpus's first genuine park: the architect's mandate to store the product instantaneous volatility vs C-4.11's "never stored"; amendment text ready, the architect decides | `Valuation/ValuationManifesto_1.0.tex` / `.pdf` |
+| Market Data Manifesto 1.2 (9 pp) | Certified (CONCORDIA signed) — adds the backtesting data-side mandates (served history, stressed histories, operators through the horizon) as extensions to MD-4/11/13 | `MarketData/MarketDataManifesto_1.2.tex` / `.pdf` |
+| Market Data Manifesto 1.1 (8 pp) | Superseded by 1.2 (was certified) | `MarketData/MarketDataManifesto_1.1.tex` / `.pdf` |
+| Valuation Manifesto 1.0, two parts (17 pp) | Certified (CONCORDIA signed ×3: two-part + backtesting). Part A doctrine incl. VM-11 backtesting (strategy-as-unit per C-10.2, chain-as-output, the two comparison functionals, survivorship honesty); Part B pricing engine. Carries PARK-1 — the corpus's first genuine park: the mandate to store the product instantaneous volatility vs C-4.11's "never stored"; amendment text ready, the architect decides | `Valuation/ValuationManifesto_1.0.tex` / `.pdf` |
 | Market Data Manifesto 1.0 (7 pp) | Superseded by 1.1 (was certified) | `MarketData/MarketDataManifesto_1.0.tex` / `.pdf` |
 
 ## Layout
