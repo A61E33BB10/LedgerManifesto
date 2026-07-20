@@ -1,8 +1,172 @@
-# Market Data Manifesto 1.0 — Handoff Note
+# Market Data Manifesto — Handoff Note (1.0 certified; 1.1 amendment below)
 
 **From:** GATHERAL (drafting lead)
-**To:** FORMALIS (rigor-check, next), then KLEPPMANN + TALEB (review), CONCORDIA (certify last)
-**Deliverable:** `/home/renaud/Ledger/MarketData/MarketDataManifesto_1.0.tex` (+ `.pdf`)
+**To:** FORMALIS (rigor-check the 1.1 operator algebra, next), then THORP + KLEPPMANN + TALEB
+(review), CONCORDIA (certify last)
+**Deliverable (1.1):** `/home/renaud/Ledger/MarketData/MarketDataManifesto_1.1.tex` (+ `.pdf`) —
+copy of the certified 1.0, then amended. **1.0 is untouched.**
+
+---
+
+## 1.1 AMENDMENT — three embedded mandates (this section is the 1.1 review target)
+
+**Status (1.1):** Through FORMALIS (E1–E7 carried) and **Review Round 1** — KLEPPMANN 2M+2m
+(`kleppmann_11_r1.md`), TALEB 3M+minors gate-PASS (`taleb_11_r1.md`), THORP 5M+2m
+(`thorp_11_r1.md`) — fixed as four clusters below. Compiles clean (pdflatex ×2, exit 0), **8 pages
+(cap held)**, 15 articles, no over/underfull boxes, no undefined refs. 1.0 untouched.
+
+**Review Round 1 — four clusters (all carried):**
+- **CLUSTER A — the frame is a recorded fact** (KLEPPMANN M2, THORP M2/M3). A value's delivery
+  frame is an *asserted, recorded fact*, registered per data kind (§1) — never inferred from
+  execution time — so the vendor-adjusted-series double-adjustment (75.10→37.55) is unconstructible;
+  a frame is fixed by the CA terms *and* the adjustment convention (price-/total-return, rounding);
+  the frame boundary is the **ex-date** (a CA's as-of), so an announcement is information (refolds
+  projections, MD-5), a cancelled-before-ex action is the identity, and no un-adjust is ever forced
+  (MD-13, §1).
+- **CLUSTER B — the CA event is lineage** (KLEPPMANN M1). Corporate-action events are now an
+  explicit MD-6 lineage input; a corrected CA ratio flags stale every fitted (re-entered) object
+  whose lineage reaches it, exactly as a corrected price does — stated in MD-13 and MD-8; the
+  projection side recomputes, the re-entered side flags. (KLEPPMANN m1: the MD-15 validation
+  residual is itself a re-entered observation, stale if its inputs move — now stated.)
+- **CLUSTER C — replay's honest bounds** (TALEB F2, THORP M5). MD-14's exhibit list gains the
+  **cut** and **frame**, the as-at **pinned to the mark's own cut**; replay settles faithful
+  *reconstruction* only, not a two-sided economic / model-choice dispute (both marks replay
+  bit-for-bit) — it *localises* the disagreement (which the doc now says plainly), excluding the
+  off-market-but-tidy-mark reading.
+- **CLUSTER D — algebra honesty** (TALEB F1/F3, THORP M1/M4). **(M4, restored constitutional
+  guarantee — CONCORDIA should check verbatim against C-9.3):** MD-13 and MD-10 reinstate C-9.3's
+  *"derived quantities are recomputed from operator-adjusted inputs"* — the operator acts on
+  **leaf** observations (not in general proportional: additive dividend shift, OCC strike/multiplier
+  re-coordination), derived objects are re-derived, never scalar-transported. **(F3)** operators
+  compose at **full precision**, minor-unit rounding (C-4.6) applied **once at read**, so
+  associativity and cross-party reconstruction hold. **(M1)** the operator is determined once terms
+  are **resolved**, not merely announced (fixings, proration, elections → the operator exists from
+  the *resolution* observation; before it the frame is provisional, MD-6). **(F1)** each law now
+  lands with a one-line instance (compose: two splits; identity: no-action; commutation: the
+  fixed-cut query).
+- **Minors:** conclusion's read-back/re-derive clause restored (1.0 regression); worked example
+  isolates correction (150.20→150.50) from frame change (150.20→75.10); MD-15 "valid" scoped to the
+  calibration set; abstract "adds a seventh" → "*derives* a seventh" (TALEB certifier note).
+- **Compression to hold 8pp:** the four clusters net-added ~24 lines; recovered by tightening
+  §1/MD-2/3/4/6/7/8/9/11/12/13/14/15, the abstract, the worked example, §4 (bullets→prose earlier),
+  the conclusion, and the amendment record (now a run-in), plus `\tightlist` on the §3 itemize. No
+  substance dropped; every prior finding's fix preserved.
+
+The earlier FORMALIS status: naming resolution CONFIRMED (C-9.2
+literally defines the operator as the change-of-frame map), Mandate 2/3 RESOLVED-AS-DRAFTED; the 7
+findings (E1–E7) are carried. Compiles clean (pdflatex ×2, exit 0), **8 pages** (cap 8; 1.0
+was 7 — the three mandates cost ~2pp of new content, recovered by compressing 1.0 material, never
+diluting), **15 articles** (MD-1…MD-15; MD-1…MD-12 keep their numbers), no over/underfull boxes,
+no undefined refs. Page 8 full at 41 lines, not a fragile overflow.
+
+**FORMALIS round (E1–E7, all carried):**
+- **E1 (HIGH) — inverse story corrected.** MD-13 no longer claims splits are invertible: under
+  minor-unit rounding (C-4.6) most operators are not injective and have no exact inverse. The
+  honest architectural point is now stated — the framework **never needs an inverse**: originals
+  are preserved (C-9.3), so every frame is reached by composing operators **forward** from the
+  execution-time frame; reversibility-where-an-inverse-exists is the exceptional case, not the
+  design reliance.
+- **E2 (HIGH) — §3 math error fixed.** "halving inverts the first" was wrong (the halving *is* the
+  operator; its inverse is doubling). The bullet now states forward composition and forward
+  recovery from the preserved original.
+- **E3 (MED) — commutation justification fixed.** "orthogonal" replaced by the real reason: the
+  operator changes a value's frame and **leaves its as-of and as-at unchanged**, so selection by
+  as-of commutes with it; the necessity of fixing the as-at cut is now stated with its
+  counterexample (a corporate action known only at the later cut changes the composite operator).
+- **E4 (MED) — associativity stated as function composition; the no-action identity and the
+  identity-for-a-data-kind (proportional figures stand, C-9.2) are now two separate examples.**
+- **E5/E6/E7 (LOW) — carried:** "frame" reworded to build on C-9.2's own "post-event frame"
+  (promoted to a defined coordinate system), not "a term the Constitution does not name"; "across
+  events" → "across corporate actions"; MD-14 opening tightened to "a dispute about a recorded
+  value"; MD-15 retitled "A datum used in valuation is bound to a model"; the wrong-direction
+  "scales by r" phrasing was dissolved by the E1 rewrite.
+- **Compression to hold 8pp** (these were corrections, and the honest inverse story plus the E3
+  counterexample net-added lines): tightened MD-6/7/10/11/14/15, the §3 example (folded the
+  "bound to a model" bullet into "Disputed"), the Amendment Record, and the Conclusion. No
+  substance dropped.
+
+**Where each mandate lives, and how it is embedded (not appended):**
+
+- **MANDATE 1 — corporate actions fully embedded → MD-13** (+ MD-4 gains the frame as a further
+  coordinate; MD-10 recast: a corporate-action adjustment is a *change of frame*, not a
+  correction). A corporate action is first-class (C-9.1), never an outside-the-ledger adjustment.
+  A value lives in a **frame** (unadjusted = as observed; adjusted = re-expressed under later
+  terms). The change-of-frame map **is the Constitution's market data operator (C-9.2)** — see the
+  naming resolution below. The **algebra** is stated plainly (no category-theory, per CLAUDE.md
+  §4): operators **compose** (associative because it is function composition, in execution order,
+  MD-5); an **identity** over any action-free span (and some actions are the identity for a data
+  kind — proportional figures stand, C-9.2); an **inverse only where the transform preserves
+  information** — under minor-unit rounding (C-4.6) most operators have none, and the framework
+  **needs none** because originals are preserved (C-9.3) and every frame is reached forward from
+  the execution-time frame (E1). **Composition with time travel:** the operator changes a value's
+  frame and leaves its as-of/as-at unchanged, so it *commutes* with as-of selection under a fixed
+  as-at cut (E3 — not "orthogonal"). Punchline derived: **a quote is meaningful only given a time
+  coordinate and a frame.**
+
+- **MANDATE 2 — dispute-readiness (new governing principle) → MD-14** (added to the six in the
+  abstract as a *seventh*, derived not constitutional). Derived as auditability + reproducibility
+  pressed to their adversarial conclusion: a dispute is settled by **replay** — exhibit the datum,
+  its provenance/attestation, its bound model, its frame, and reproduce the valuation bit-for-bit
+  (MD-6). Its reach is exactly MD-6's reach (read-back unconditional; re-derive needs the model),
+  so it promises nothing wider than reproduction.
+
+- **MANDATE 3 — model association & price-space validation → MD-15** (+ MD-6 lineage now carries
+  the bound model; MD-9 bridges internal-consistency to external validity). Rationale stated
+  explicitly: disputes are never on market data but on the **valuation of units**, so validity
+  lives in **price space** — a datum is valid when, through its bound model, it reprices its
+  source instruments within tolerance; **calibration and validation are one act from opposite
+  directions**; round-trip repricing is the acceptance test. **Reconciliation with 1.0's A5/A1
+  exclusion (Conflict C-6):** "bound to a model" is **recorded lineage** (which model, which
+  version), *not* a truth-claim — the model remains a declared, recorded term, never an axiom.
+  **Reconciliation with the split:** validation is a derived object over recorded inputs + the
+  declared model term (projection or re-entered observation, MD-6); binding never re-classifies a
+  raw observation as a model output, so the split holds and the residual is a recorded diagnostic
+  (MD-9).
+
+**NAMING RESOLUTION (flag for FORMALIS / the architect).** The mandate warned that the new
+frame-change operators need a name that cannot collide with the Constitution's reserved *the
+market data operator* (C-9.2), suggesting e.g. "frame operators." I did **not** coin a new
+operator name, because the C-9.2 market data operator *is* the change-of-frame map, and C-Auth.4
+forbids introducing a synonym for a fixed term. So: the operator keeps its Constitutional name
+(used throughout, singular), and the **one new term 1.1 coins is `frame`** — the coordinate
+system (a genuinely new concept the Constitution does not name), the algebra's *objects*, not its
+morphisms. `grep "frame operator"` = 0. If the architect intended a distinct operator abstraction,
+that is a parkable naming decision (it would need either a genuine concept-distinction or a
+Constitution amendment, neither of which I judged warranted).
+
+**What was compressed (compress, never dilute):** the 1.0 worked example was **repurposed** —
+same AAPL close now also carries a 2-for-1 split (the frame operator, composition, inverse), the
+two-answers query now shows *both* a time cut *and* a frame (150.20 pre-split → 75.25 post-split
+corrected), and a **disputed collateral mark settled by replay** (MD-14) — 7 bullets → 5, richer.
+§4 "does not govern" was turned from a bulleted list into running prose (+ a new clause: CA
+*terms* are recorded events, not decided here). Accumulated verbosity from 1.0's three revisions
+was tightened in MD-1/2/3/6/8/11/12, the vocabulary map (bullets → prose), §5, and the conclusion.
+No article's substance was dropped; every certified claim survives.
+
+**FORMALIS items — now RESOLVED (were unsettled at first 1.1 draft):**
+1. **Naming resolution** — CONFIRMED by FORMALIS (C-9.2 literally defines the operator as the
+   change-of-frame map; no overloading onto lifecycle stages; "frame" legitimate as the one new
+   object term).
+2. **Commutation conditionality** — CONFIRMED necessary and now justified correctly (E3): the
+   operator leaves as-of/as-at unchanged (not "orthogonal"), and the necessity counterexample is
+   stated.
+3. **Inverse honesty** — corrected (E1): no universal invertibility; under minor-unit rounding
+   most operators have no exact inverse, and the framework needs none (forward composition from
+   preserved originals).
+
+**For the next reviewers (THORP CA-practitioner, KLEPPMANN, TALEB), nothing blocking:**
+- **8 pages at the hard cap.** The three mandates + the honest (longer) inverse story and the E3
+  counterexample sit at exactly 8pp; the 6–7 target was not reachable without cutting certified
+  substance. If CONCORDIA needs margin, the §3 worked example is the compressible block.
+- **THORP** may want to confirm the frame/operator story against real CA mechanics (splits,
+  dividends, mergers) — MD-13 keeps it principle-level and defers CA *terms* to recorded events
+  (§4), so specific CA machinery is deliberately out of scope.
+
+---
+
+## 1.0 — Handoff Note (certified; retained for the record)
+
+**Deliverable (1.0):** `/home/renaud/Ledger/MarketData/MarketDataManifesto_1.0.tex` (+ `.pdf`)
 **Status:** revision 3 — carries FORMALIS D1–D6 (`formalis_cell_review.md`), Review Round 1
 (KLEPPMANN M1/M2 + m1/m2 `kleppmann_r1.md`; TALEB M1–M6 + minors `taleb_r1.md`), and Review
 Round 2 (KLEPPMANN F1 + m1'/m2' `kleppmann_r2.md`; TALEB F1 + F2 `taleb_r2.md`). Both round-2

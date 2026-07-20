@@ -52,3 +52,58 @@ The 7 source conflicts (C-1 posterior-as-state; C-2 gating-as-rejection; C-3 Ora
 **Veto: not exercised.**
 
 — CONCORDIA, constitutional-adherence certifier, 2026-07-20. **SIGNED (last).**
+
+---
+---
+
+# Market Data Manifesto 1.1 — CONCORDIA Certification Note (amendment of the certified 1.0)
+
+**Certifier:** CONCORDIA (constitutional-adherence certifier, signature-last, absolute veto).
+**Date:** 2026-07-20. **Document:** `MarketDataManifesto_1.1.tex` (8pp, 15 articles MD-1…MD-15, pdflatex ×2 clean).
+**Authority:** Constitution v1.4 (`ledger_manifesto_v1_4.tex`), in force. **1.0 untouched:** verified **byte-identical** — `git diff --stat HEAD` empty, `git ls-files -m` empty; 1.0 stands as certified at commit 8837045.
+
+## Committee roster (1.1)
+- **GATHERAL** — drafting lead.
+- **FORMALIS** — rigor cell (E1–E7; RETURN → revision carried). Confirmed the C-9.2 naming resolution and the full citation audit.
+- **THORP** *(desk / corporate-action realism)* — `thorp_11_r1.md`; **CONVERGED** round 2 (5 MATERIAL findings resolved). Caught the C-9.3 narrowing (M4).
+- **KLEPPMANN** *[chartered seat — no dedicated agent in this environment; recorded, not silently substituted]* — `kleppmann_11_r1.md`; **CONVERGED** round 2.
+- **TALEB** — `taleb_11_r1.md`; **CONVERGED** round 2 (independently verified the worked-example arithmetic).
+- **CONCORDIA** — constitutional-adherence certification, signing last.
+
+## Rounds run (1.1)
+FORMALIS rigor cell (E1–E7, return-then-revision) → Review Round 1 (THORP 5M+2m, KLEPPMANN 2M+2m, TALEB 3M+minors) → **Round 2: all three reviewers CONVERGED**, no material item open.
+
+## Page count vs cap
+**8 pages at the 8pp hard cap — MET (at the cap, not over).** The three mandates cost ~2pp, recovered by compressing 1.0 material, never diluting; every certified 1.0 claim survives. §7 (correctness above brevity) governs; 8pp is within the hard cap.
+
+## Where and how each mandate was embedded (article map)
+- **MANDATE 1 — corporate-action frames + operator algebra → MD-13 (new).** Threads: MD-4 gains the corporate-action *frame* as a further coordinate; MD-10 recasts split/dividend adjustment as a *change of frame* (distinct from correction) and restores C-9.3; MD-6 lineage now carries the corporate-action events behind a value's frame; MD-8 flags a re-entered observation stale when a corrected corporate action moves under it, exactly as a corrected price does.
+- **MANDATE 2 — dispute-readiness (seventh governing principle) → MD-14 (new),** *derived* from auditability (C-2.1) + reproducibility (C-2.2): a dispute is settled by replay, bounded to faithfulness (not two-sided economic truth, §4).
+- **MANDATE 3 — model binding + price-space validation → MD-15 (new).** Threads: MD-6 lineage carries the bound model; MD-9 distinguishes a derived object's *internal* no-arbitrage consistency from its *external* price-space validity.
+
+## Certification checks (1.1)
+
+### (1) SUBORDINATION against v1.4 — CLEAN
+Every new/changed citation verified verbatim: **C-9.1** (corporate action "a transaction like any other" — MD-13) ✓; **C-9.2** (market data operator) ✓; **C-9.3** ✓; **C-4.6** (minor-unit rounding — MD-13's full-precision-compose, round once at read) ✓; **C-2.3** (time travel) ✓; **C-2.1/C-2.2** (MD-14) ✓; **C-2.4/C-14.15/C-Scope.11** (MD-15) ✓. All *cite and specialise*, none extends/weakens/narrows.
+- **C-9.3 RESTORATION — verified verbatim.** THORP found the draft had **dropped** C-9.3's "derived quantities are recomputed from operator-adjusted inputs" and generalised a scalar operator onto derived objects — a constitutional narrowing (CLAUDE.md §1). Repaired: the exact C-9.3 line now stands in **MD-13 (l.427)** *and* **MD-10 (l.361–362)** — "derived quantities are recomputed from operator-adjusted inputs (C-9.3) … never scalar-transported." **Scalar-transport confined to leaves:** the operator "acts on *leaf* observations and is not in general a proportional scalar" (special cash dividend shifts additively; OCC adjustment re-coordinates strike/multiplier/deliverable); derived objects are *never transported by an operator of their own* — recomputed from operator-adjusted leaves (MD-6/MD-12). The narrowing is closed.
+- **C-9.2 naming resolution — verified.** C-9.2 *literally* defines the market data operator as "a transformation … to carry pre-event market data into the post-event frame … the market data operator" — i.e., the change-of-frame map; MD-13 uses it as exactly that. FORMALIS confirmed the same on the constitutional text. **No overloading:** the corporate action's C-9.1 transaction effect (moves, unit-state, terms) is kept separate from its C-9.2 market-data-frame effect; the operator is never used for a source or a lifecycle stage; no "frame operator" synonym coined (grep = 0).
+- **ex-date frame boundary / terms-resolved condition / delivery-frame registration — all SPECIALISE, never extend.** Ex-date = the corporate action's as-of / frame boundary (C-2.7 three times + C-9.2 post-event frame). Operator determined only from the *resolution* observation, provisional-and-legible before (strengthens C-9.2 "never improvised"; C-2.4 fail-closed). Delivery frame an asserted, registered provenance fact per data kind (§1/C-4.12), preventing double-adjustment (C-9.3 originals-once).
+
+### (2) VOCABULARY — CLEAN
+"Frame" builds on the Constitution's own informal **"post-event frame" (C-9.2)**, promoted to a defined coordinate system — the one new term 1.1 coins, an *object* of the algebra, not a synonym for any C-Auth.4 fixed component. "The market data operator" keeps its single Constitutional referent throughout (27 uses, none overloaded). Calibration dialect still mapped once in §1 and never leaking. No synonym drift across the 15 articles.
+
+### (3) INTERNAL CONSISTENCY — CLEAN
+Amended MD-4/6/8/10 are mutually consistent with the new MD-13/14/15 and the unamended articles; the projection / re-entered-observation split holds throughout (a corrected corporate action stales a re-entered observation exactly as a corrected price does, MD-8/MD-13). **Worked example (§3) consistent and arithmetically correct:** 150.20 recorded once in the pre-split frame; split → **75.10** (150.20/2); Thursday correction → **150.50**; as-valued-now (post-split frame, corrected) → **75.25** (150.50/2) — the split-reframe and the correction cleanly separated; the disputed mark is replayed bit-for-bit and *localises* the disagreement without deciding model choice (MD-14/MD-15). TALEB independently re-verified the arithmetic.
+
+### (4) CONFLICT LEDGER — CLEAN (zero parks, a considered zero)
+The handoff 1.1 section is honest: THORP's C-9.3 narrowing is recorded as a **caught** narrowing and **repaired by restoration** — explicitly "No parking," because restoring an existing guarantee needs no amendment. The one naming decision that could have parked (a distinct frame-operator abstraction) was **explicitly weighed against parking** and judged unwarranted — the operator keeps its C-9.2 name, "frame" names the new object concept. Mandates 2/3 resolve by specialising existing clauses (C-14.15, C-Scope.11, C-2.1/C-2.2). No genuine constitutional conflict was absorbed; the park mechanism was exercised (the narrowing was caught, not buried).
+
+---
+
+## SIGNATURE (1.1)
+
+**CONCORDIA certifies Market Data Manifesto 1.1 consistent with, and properly subordinate to, the Architectural Constitution (v1.4).** The certified 1.0 is byte-identical and untouched. Every new citation is correct; the document cites and specialises, never extends, weakens, or narrows any clause. The one constitutional narrowing that arose (C-9.3 dropped) was caught by THORP and **restored verbatim** in MD-13 and MD-10, with scalar-transport confined to leaf observations and derived quantities recomputed from operator-adjusted inputs. The C-9.2 naming resolution is faithful to the clause's literal text with no overloading. Vocabulary is one-name-per-thing with "frame" legitimately built on C-9.2's "post-event frame." The 15 articles and the worked example are mutually consistent and arithmetically sound. Zero parks — a considered zero. **Page cap met (8pp ≤ 8pp hard cap).**
+
+**Veto: not exercised.**
+
+— CONCORDIA, constitutional-adherence certifier, 2026-07-20. **SIGNED (last).**
