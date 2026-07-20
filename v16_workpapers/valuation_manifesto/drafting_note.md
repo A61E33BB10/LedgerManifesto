@@ -121,7 +121,163 @@ VM-4/5 *conclusions* are accessible; only the mechanism is dense, by design.
 over the chain; route the late CA to the reordering refold). Parking index stays a
 considered zero.
 
-## 6. Vocabulary discipline applied
+## 6. Two-part restructure + Part B integration, 2026-07-20
+
+The architect reissued the mission as a two-part document; same file
+`Valuation/ValuationManifesto_1.0.tex`. Now **13 pp total** (cap 15); **Part B =
+5 pp** (pages 9–13, JACOBI est. 5); exit 0, no overfull/undefined.
+
+**Restructure.** Abstract gains one sentence announcing two parts. Two centered
+dividers: **PART A — Valuation Doctrine** (before §1) and **PART B — The Pricing
+Engine** (after Part A's Conclusion, on a `\clearpage` so Part B opens its own
+page — the architect's "deliberately distinct" demarcation, and a clean 5-page
+Part B). Part A substance is **untouched but for the one linkage** below. Part B
+carries JACOBI's PE-1..PE-6, GATHERAL-checked, prefaced by the mandated
+demarcation paragraph (Part A governs the record and its chain; Part B states one
+mathematical fact about the pricing function the chain stores).
+
+**The one Part A change — the linkage (VM-4 + VM-6).** VM-4's gamma-and-theta
+balance now states the balance closes at exactly one volatility — the *product
+instantaneous volatility* (PE-4) — and the carry line must *declare which
+volatility reconciles it*, the model's or the product's. VM-6 names it as a
+structural source of residual: booking model theta against a gamma priced at the
+wrong volatility leaves the Feynman–Kac discrepancy (PE-2) in R; silently mixing
+the two worlds is exactly the unexplained PnL the article forbids. No other Part
+A prose changed.
+
+**GATHERAL's three fixes (from `gatheral_partB_check.md`), applied in Part B.**
+(1) Admissibility hypothesis: A5 adds `Σ(·;S) ∈ 𝒜` (arbitrage-free set, Vol I
+§2.6; open, Def 2.20), and PE-3 well-posedness gains a **third** structural
+failure mode (surface leaves 𝒜 ⇒ price undefined ⇒ σ_prod inherits the gap) —
+hypothesis + structural fact, not a re-admissibilisation. (2) The general
+`pe:sprod` stays the **primary/boxed** definition; `σ√(Γ/Γ_adj)` is the
+constant-vol **corollary** in PE-5, now with a one-sentence local-vol caveat (the
+√-ratio collapse does not survive; use the general form with `Θ=−½σ_loc²S²∂_{SS}P`).
+(3) Clarity: A5 now names the corpus dynamic as the decomposition (2.1) *held
+fixed under F=F(S)* (a coordinate system, not a dynamic; the dynamic is
+(2.19)–(2.20)); PE-5 names the equal-vol/locally-constant-volslope hypothesis of
+Vol II **Prop 2.27** when importing (2.23).
+
+**PE-6 citations.** Now cites VM-6 (chain machinery = VM-3 chain + VM-6
+recorded-diagnostic discipline) alongside VM-1/VM-3/VM-8; monitored "as the
+recorded diagnostic VM-6 already makes of every residual."
+
+**Equation-number resolution (JACOBI unsettled item 4 — CLOSED).** Compiled both
+volumes today and resolved every cited `\label` from the `.aux`. All of JACOBI's
+printed numbers match as-is: (2.1),(2.19),(2.20),(2.21),(3.34),(1.13),(2.28);
+§3.9.3, §2.5; Vol II (2.21),(2.23),§2.5,§1.6. New citations resolve to Vol I §2.6
+(`sec:no-arb`), Def 2.20 (`def:admissible`), and Vol II Prop 2.27
+(`prop:sh2:shadow-gamma`). No number edits were needed.
+
+**Hygiene.** One preamble: added `amssymb` (for `\mathbb`, `\mathfrak`, `\square`);
+moved Part B's math macros (`\dd,\Vanna,\Volga,\Gadj,\smod,\sprod,\Dhyb,\Ghyb,
+\satm,\ssm,\lF,\Fref,\volslope`) into the house preamble; defined `\pelabel` there
+styled **identically to `\vlabel`** (gray marginpar, `pe-` targets). Dropped the
+fragment's standalone `\providecommand` scaffolding. Certificate/chain vocabulary
+untouched; no desk-talk introduced (GATHERAL ban-sweep already PASS).
+
+**Unsettled for the review round.** (a) JACOBI item 2: σ_prod² (sign-carrying
+effective variance) vs σ_prod as the first-class *stored* object — PE-3 defines
+σ_prod (nonneg, where it exists) and boxes σ_prod²; FORMALIS to confirm which is
+canonical for PE-6's stored quantity through the sign changes. (b) JACOBI item 1:
+the Gâteaux `D_Σ P[·]` is kept at the scalar (single-implied-vol) level with the
+integral form as the general remark — recommended for a manifesto, not a volume;
+FORMALIS to ratify. (c) Part A's Conclusion sits before Part B by design (it
+concludes the doctrine; Part B is the deliberately-distinct engine) — flag if the
+board wants a joint closing instead.
+
+## 7. Review round 1 — Part B (FORMALIS RETURN + KLEPPMANN 2M + TALEB 1M), 2026-07-20
+
+Gate PASS; FORMALIS RETURN(light) with two rulings; KLEPPMANN + TALEB NOT-CONVERGED
+narrowly; no park. Reviews: `formalis_partB_review.md`, `kleppmann_vm2_r1.md`,
+`taleb_vm2_r1.md`. Applied as three loci + singles. Now **14 pp total** (cap 15),
+**Part B = 6 pp** (pages 9–14; the additions are clauses, within the coordinator's
+anticipated 13–14). Exit 0, no overfull/undefined.
+
+**LOCUS 1 — PE-6 rewrite (FORMALIS ruling (a) + KLEPPMANN M2 + TALEB m3/m4 + KLEPPMANN
+minor 3).** Canonical stored object is now **σ_prod²** (product instantaneous variance,
+sign-carrying; total off the pole — the sign IS the diagnostic), σ_prod its nonneg root
+where real; fixes PE-6's self-contradiction ("sign changes auditable" on a nonneg object).
+PE-3 Definition also recast so σ_prod² is first-class before PE-6 uses it. Classification:
+σ_prod² is a **projection** of the recorded greeks (reproduces UNCONDITIONALLY, no model
+re-run — stronger than a mark), and per the architect's B6 storage mandate it is
+materialised on the link with **lineage that ENUMERATES the greeks Θ,Δ_hyb,Γ_hyb,P** (+
+model + 𝒟), never "model+𝒟" alone — so a forward-repaired greek (VM-7) flags the stored
+series stale (MD-8), closing the silent-divergence gap. At a pole (Γ_hyb=0) the recorded
+fact is the pole itself; where σ_prod²<0, that no real vol restores FK. Adjectives tempered:
+internal diagnostic feeding a dispute-ready mark's certificate, not itself a counterparty
+mark. Purpose stated: a pole/sign-flip marks **degenerate carry** (the carry-line analogue
+of VM-4's O(1) residual at a digital).
+
+**LOCUS 2 — the certificate field (KLEPPMANN M1b + TALEB m2), in VM-4.** The
+which-volatility declaration is now a **declared, recorded term** with change-is-auditable
+**parity to the convention (VM-5) and the bound (VM-6)** — a governance lever deciding
+whether the FK discrepancy sits in the carry line or lands in R. It names **which of the
+three** volatilities in play (model, raw implied-surface, σ_prod) reconciled the line — not
+a binary.
+
+**LOCUS 3 — the vocabulary bridge (TALEB M1), in PE-1(A5).** One sentence: 𝒟 is **not a new
+coordinate** — it is the surface-dynamics content of the VM-5 re-marking convention, one
+declared term read in two roles (attribution split in Part A; hybrid greeks / σ_prod² in
+Part B). Naming collision fixed: PE-5's **shadow gamma** is the second-order **instance** of
+VM-5's shadow greek, not a separate object.
+
+**SINGLES.** B1 (PE-2 "iff"): ∂_SΣ=0 is insufficient (δ_Γ retains D_ΣP[∂_SSΣ]); stated the
+second-order sufficient condition, exact condition deferred to the Remark. B2 (PE-4
+overclaim): a general σ leaves ½(σ²−σ_prod²)S²Γ_hyb — only σ_mod leaves exactly L_hyb; fixed
+in Claim 2 and the linkage paragraph (raw-implied σ no longer said to leave L_hyb), + a
+breakeven back-reference to PE-3's real regime (σ_prod²>0). Grounding clause (STRENGTHEN-B)
+added at first use of D_ΣP: directional derivative along the A5 C² curve, Fréchet-on-surface
+disclaimed to the volumes, integral form as the same object. TALEB minors: m1 softened VM-6's
+"the wrong volatility" → "a volatility other than σ_prod" (removes the advice-read; the model
+vol is a declared choice with a surfaced residual, not an error); m5 one number through σ_prod
+using Part A's base call (σ=30%, Γ=0.0265, downward skew dσ/dS≈−0.01 ⇒ Γ_adj≈0.0245 ⇒
+σ_prod≈31%, "a vol point of carry the implied never showed"); m6 plain handle on Feynman–Kac
+at first use ("the model's own pricing equation…").
+
+**Unsettled for next round.** m5's number is my hand computation (vanna≈0.10, Γ_adj≈0.0245,
+σ_prod≈31%) — FORMALIS to re-verify the arithmetic as it did DEFECT-1. The classification
+"projection materialised on the chain with greek-enumerating lineage" reconciles B6 storage
+with KLEPPMANN's projection argument; confirm this is the intended reading of B6.
+
+## 8. PARK-1 (B4) — the first genuine park of the document family, 2026-07-20
+
+FORMALIS adjudicated B4 (`formalis_partB_review.md`, ROUND 2): **PARK**. The architect's
+B6 mandate that σ_prod² be **stored** per valuation collides with C-4.11 ("computable from
+the coordinates ⇒ a projection, computed when needed and **never stored**") and MD-6 ("a
+projection stores nothing"). The certificate-field reconciliation **fails**: the certificate's
+greeks/price are stored as *model outputs* under C-14.15 (not ledger-computable), whereas
+σ_prod² **is** ledger-computable (pure algebra over recorded greeks, no model run) — it would
+be the architecture's **first stored ledger-computable output**. Relabelling it a "materialised
+projection / recorded field" to keep C-4.11 reading true is the CLAUDE.md §1 narrowing (the
+worse failure). Amending C-4.11 is the owner's alone → park, work continues around it.
+
+**Applied to the document (this is the terminus of the B4 question):**
+1. **Conforming reading now in force in PE-6** — σ_prod² is a projection **computed on demand**,
+   its value/sign/poles/regularity monitored by **recomputation over the chain's recorded
+   greeks** (authoritative, cannot drift); nothing stored. The monitoring mandate survives
+   fully. Kept the classification insight ("a projection … reproduces unconditionally … stronger
+   than a mark") — it is exactly what makes storage a C-4.11 question. **Dropped** all
+   materialises/stored-series/flags-stale-cache vocabulary from the in-force text (verified:
+   zero occurrences in PE-6 body). PE-3 vocab softened ("its sign a *recorded* diagnostic" →
+   "a diagnostic in its own right"). PE-6 trace now cites C-4.11 + C-14.15; drops VM-7/MD-8
+   (the stale-cache half, which lives only in the park).
+2. **Park recorded verbatim in the document** — new final section **"Open Problems (Parked
+   Items)"** (the house open-problems index; PARK-1 is its first entry). Carries: the conflict;
+   the **exact clause replaced** (C-4.11 final sentence, verbatim); FORMALIS's **exact proposed
+   amendment text** (the "materialised projection" three-conditions clause, verbatim) + its MD-6
+   mirror; **KLEPPMANN's engineering-safety rationale** as the amendment's justification (a
+   recomputable, lineage-bearing, flagged-stale field cannot silently diverge — C-1.2/1.3 stays
+   closed, but safety ≠ textual permission); and the **alternative resolution** (keep C-4.11
+   literal: "stored" → "computed on demand and monitored" = the conforming reading, no amendment
+   needed). Decision the owner's alone. No relabel, no absorption.
+
+Everything else byte-stable. Now **15 pp** (at cap 15); Part B (PE-1..PE-6) pages 9–14; the
+park section pages 14–15. Round-2 status: B1/B2/B3/ruling(a)/ruling(b)/m5 RESOLVED; three-vol
+field CONSISTENT; **B4 PARKED** (open, escalated). Per protocol a constitutional park is the
+terminus — the work proceeds around it.
+
+## 9. Vocabulary discipline applied
 
 Coined (checked against both Auth.4 sets): *valuation record*, *valuation chain*
 (always two words; bare "chain" only anaphoric or in the doctrinal "broken chain",

@@ -24,7 +24,7 @@ rated against nothing, and every specification, test, and review is rated agains
 | next_step_v16 (v11.0 archaeology) | Advisory — gap register | `LedgerManifesto/next_step_v16.tex` / `.pdf` |
 | Ledger entropy note (5 pp) | Non-normative research (verdict: yes-but) | `LedgerManifesto/ledgerentropy.tex` / `.pdf` |
 | Market Data Manifesto 1.1 (8 pp) | Certified (CONCORDIA signed; GATHERAL/FORMALIS draft, THORP+KLEPPMANN+TALEB converged) — subordinate to the Constitution | `MarketData/MarketDataManifesto_1.1.tex` / `.pdf` |
-| Valuation Manifesto 1.0 (8 pp) | Certified (CONCORDIA signed; THORP/FORMALIS draft, JACOBI+GATHERAL memos, KLEPPMANN+TALEB converged) — subordinate to the Constitution and the Market Data Manifesto | `Valuation/ValuationManifesto_1.0.tex` / `.pdf` |
+| Valuation Manifesto 1.0, two parts (15 pp) | Certified (CONCORDIA signed; Part A doctrine THORP/FORMALIS; Part B pricing engine JACOBI-led). Carries PARK-1 — the corpus's first genuine park: the architect's mandate to store the product instantaneous volatility vs C-4.11's "never stored"; amendment text ready, the architect decides | `Valuation/ValuationManifesto_1.0.tex` / `.pdf` |
 | Market Data Manifesto 1.0 (7 pp) | Superseded by 1.1 (was certified) | `MarketData/MarketDataManifesto_1.0.tex` / `.pdf` |
 
 ## Layout

@@ -23,6 +23,7 @@
 \usepackage[margin=2.5cm,marginparwidth=2.0cm,marginparsep=2mm]{geometry}
 \usepackage{parskip}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{booktabs}
 \usepackage[hidelinks]{hyperref}
 
@@ -31,12 +32,29 @@
 \ifdefined\textcolor\else\def\textcolor#1#2{#2}\fi
 \newcommand{\vlabel}[1]{\leavevmode\hypertarget{vm-#1}{}%
   \marginpar{\raggedright\scriptsize\ttfamily\textcolor{gray}{#1}}}
+\newcommand{\pelabel}[1]{\leavevmode\hypertarget{pe-#1}{}%
+  \marginpar{\raggedright\scriptsize\ttfamily\textcolor{gray}{#1}}}
 
 \setcounter{secnumdepth}{0}
 \providecommand{\tightlist}{\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}}
 
 % traceability tag at the close of each article
 \newcommand{\trace}[1]{\par\smallskip{\small\itshape (#1)}}
+
+% --- Part B (The Pricing Engine) notation, reused from the corpus by name ---
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Vanna}{\mathrm{Vanna}}
+\newcommand{\Volga}{\mathrm{Volga}}
+\newcommand{\Gadj}{\Gamma_{\mathrm{adj}}}
+\newcommand{\smod}{\sigma_{\mathrm{mod}}}
+\newcommand{\sprod}{\sigma_{\mathrm{prod}}}
+\newcommand{\Dhyb}{\Delta_{\mathrm{hyb}}}
+\newcommand{\Ghyb}{\Gamma_{\mathrm{hyb}}}
+\newcommand{\satm}{\sigma_{\mathrm{ATM}}}
+\newcommand{\ssm}{\sigma_{\mathrm{smile}}}
+\newcommand{\lF}{\ell_F}
+\newcommand{\Fref}{F_{\mathrm{ref}}}
+\newcommand{\volslope}{\mathrm{vol.slope}}
 
 \begin{document}
 
@@ -85,6 +103,14 @@ path. Each principle is an \emph{article} derived from the seven governing
 principles the two parents already fixed --- auditability, reproducibility,
 time travel, correctness, order, simulability, and the derived
 dispute-readiness --- and rests on the clause of a parent that carries it.
+The manifesto is in two parts. Part~A is the doctrine above --- the ten
+articles that govern the record and its chain. Part~B, deliberately
+distinct, steps beneath the doctrine to state and derive one mathematical
+fact about the pricing function the chain stores: the price and the
+sensitivities a book hedges with are drawn, in general, from two different
+worlds, and the object that measures the gap --- the \emph{product
+instantaneous volatility} --- is what the carry line of every explain must
+reconcile against.
 The document is rated against both parents, never the other way round;
 where it conflicts with either, the parent prevails.
 \end{quote}
@@ -92,6 +118,11 @@ where it conflicts with either, the parent prevails.
 \vspace{0.4em}
 \begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
 \vspace{0.6em}
+
+\begin{center}
+{\large\bfseries PART A \quad---\quad Valuation Doctrine}\\[0.3em]
+{\small\itshape The record and its chain}
+\end{center}
 
 \section{1. Valuation in the Ledger's Terms}
 
@@ -224,7 +255,15 @@ Then the delta line --- the move read against the entry delta. Then the
 gamma-and-theta balance, the core of the daily explain: convexity earns on
 the move, decay pays for it, and a delta-hedged position turns a profit
 only once the move clears its breakeven, the point where the day's gamma
-gain just covers the day's theta. Then vega, bucket by bucket --- by name,
+gain just covers the day's theta. That balance closes at exactly one
+volatility --- the \emph{product instantaneous volatility} of Part~B (PE-4).
+The carry line therefore carries a declared, recorded term naming \emph{which}
+of the volatilities in play it was reconciled against --- the model's, the raw
+implied-surface, or the product instantaneous volatility. That term is a
+governance lever --- it decides whether the Feynman--Kac discrepancy (PE-2) sits
+in the carry line or lands in the residual --- so a change to it is an auditable,
+reviewable event, exactly as the attribution convention (VM-5) and the
+certification bound (VM-6) are. Then vega, bucket by bucket --- by name,
 by expiry, by strike, never a single number --- with the cross-greeks
 vanna and volga among the higher-order terms. Then the lifecycle and
 state changes the link crossed. And last, one explicit residual (VM-6).
@@ -300,7 +339,13 @@ correlation profit-and-loss --- routed under the declared convention
 (VM-5) --- must also come to rest. The residual is itself a re-entered
 observation --- a recorded
 diagnostic, stale if its inputs later move, never a silent pass (MD-9,
-MD-15). It is a sensor, not a rounding error: a residual that is small,
+MD-15). One structural source of it is named in Part~B: a carry line that
+books the model theta against the gamma the book carries but reconciles it at a
+volatility other than the product instantaneous volatility (PE-4) leaves the
+Feynman--Kac discrepancy (PE-2) sitting in $R$. Which volatility reconciles the
+line is a declared choice (VM-4); making it silently --- mixing the two worlds
+without declaring --- is exactly the unexplained profit-and-loss this article
+refuses to pass. It is a sensor, not a rounding error: a residual that is small,
 mean-zero, and regime-independent certifies the bookkeeping is a control
 variate --- a correction whose smallness can be trusted ---; a residual
 that is structurally large, sign-biased, or wakes up
@@ -562,5 +607,490 @@ and is re-run in a simulated world for risk by the very same recipe.
 Operate it any other way and the divergence the architecture exists to
 remove comes back; this way, a valuation is a fact, and there is nothing
 left to reconcile.
+
+\clearpage
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+\begin{center}
+{\large\bfseries PART B \quad---\quad The Pricing Engine}\\[0.3em]
+{\small\itshape One fact about the pricing function the chain stores}
+\end{center}
+\vspace{0.4em}
+
+Part~A governs the record and its chain: a mark is a re-entered observation
+(VM-1), proven from the last by a profit-and-loss explain whose residual
+sits below a declared bound (VM-4, VM-6). Part~B is \emph{deliberately
+distinct}. It is not workflow doctrine; it steps beneath the doctrine to
+state, and derive, one mathematical fact about the pricing function the
+chain stores --- the fact beneath a single line of the explain, the line
+that reconciles carry against convexity. That fact: the price and the
+sensitivities a book hedges with are, in general, drawn from two different
+mathematical worlds, and the object that measures the gap is a
+\emph{product instantaneous volatility}. Part~B is descriptive of that
+structure only. It proposes no model, no surface, no re-marking rule, and
+no remedy beyond the single monitoring mandate of PE-6; the rule by which
+an implied surface moves enters solely as a declared mathematical map,
+never as an account of anyone's practice. Its articles are numbered
+PE-\emph{n}, append-only, and cite Part~A by VM-\emph{n} and the corpus by
+section and equation.
+
+%% ---------------------------------------------------------------------------
+\pelabel{PE-1}\textbf{PE-1. The objects: a pricing model, its Feynman--Kac
+equation, and a declared surface-move map.} Fix a filtered probability space
+carrying a risk-neutral measure $\mathbb{Q}$ and a strictly positive
+underlying $S_t$. The following are standing for all of Part~B.
+
+\textbf{(A1) Carry.} A constant short rate $r \ge 0$ and continuous dividend
+yield $q \ge 0$; the drift of $S$ under $\mathbb{Q}$ is $(r-q)$. The corpus's
+zero-rate specialization $r=q=0$, hence $F=S$, is flagged at each use.
+
+\textbf{(A2) Pricing model $\mathfrak{M}$.} Its diffusion coefficient is a
+function $\smod$: either \emph{constant} $\smod \equiv \sigma > 0$
+(Black--Scholes for vanillas), or \emph{local} $\smod = \sigma_{\mathrm{loc}}(S,t)$
+with $0 < \sigma_{\min} \le \sigma_{\mathrm{loc}} \le \sigma_{\max} < \infty$
+and locally Lipschitz in $S$ uniformly in $t$ on compacts, so that
+$\dd S_t = (r-q)S_t\,\dd t + \smod(S_t,t)\,S_t\,\dd W_t^{\mathbb Q}$ has a unique
+strong solution.
+
+\textbf{(A3) Product and price.} A product $\Phi$ with model price
+$P(S,t) = \mathbb{E}^{\mathbb Q}\!\left[e^{-r(T-t)}\Phi \mid S_t = S\right]$,
+assumed $C^{2,1}$ on the open domain
+$\mathcal{O} = (0,\infty)\times[0,T)$. For a payoff with a discontinuity or a
+kink in the state --- a digital, a barrier, an autocallable --- $\mathcal{O}$
+excludes the discontinuity locus, and $C^{2,1}$ fails on it; this is the same
+non-smoothness Part~A books as an $O(1)$ residual (VM-4), and PE-3 shows where
+it re-enters here.
+
+\textbf{(A4) Implied surface.} An arbitrage-free implied-volatility surface
+$\Sigma_t$, calibrated to market at $t$ and valid in price space (MD-15); its
+scalar value at the product's reference strike and expiry is the implied
+volatility $\sigma$.
+
+\textbf{(A5) The surface-move map (the hedging rule, as an object).} A declared
+\emph{spot-dynamic} $\mathcal{D}$: a map that assigns to a spot level $S$ a
+surface $\Sigma(\cdot\,;S)$, of class $C^2$ in $S$ near the valuation spot, so
+that the reprice map
+\begin{equation}\label{pe:reprice}
+  g_{\Phi,\mathcal D}(S) \;:=\; P\bigl(S,\,\Sigma(\cdot\,;S)\bigr)
+\end{equation}
+is twice differentiable there. The moved surface stays admissible:
+$\Sigma(\cdot\,;S)\in\mathcal{A}$, the set of arbitrage-free surfaces
+(Vol~I, \S2.6), for $S$ in the neighbourhood; since $\mathcal{A}$ is open
+(Vol~I, Def.~2.20), this holds automatically when the base surface is interior
+to $\mathcal{A}$ and $\mathcal{D}$ is continuous into surface space.
+$\mathcal{D}$ is a mathematical object only: sticky-strike, sticky-moneyness,
+and sticky-delta are instances, as is the corpus dynamic --- the decomposition
+$\sigma=\satm(\lF,T)+\ssm(m,T)$ (Vol~I, \S2.1.1, Eq.~(2.1)) \emph{held fixed}
+as the forward $F=F(S)$ floats (Eqs.~(2.19)--(2.20), slope $\volslope$) --- each
+a different $\mathcal{D}$. The decomposition (2.1) is a coordinate system, not a
+dynamic; the dynamic is that system carried under the forward map. This map
+$\mathcal{D}$ is not a new coordinate: it is the surface-dynamics content of the
+re-marking convention Part~A already declares (VM-5) --- one declared, recorded
+term (MD-6), read in two roles, the attribution split in Part~A and the hybrid
+Greeks and $\sprod^2$ here. Accordingly the \emph{shadow gamma} of PE-5 is the
+second-order instance of VM-5's \emph{shadow greek} --- the value routed through
+the held-invariant factor --- not a separate object.
+
+\textbf{Claim (Feynman--Kac).} Under (A1)--(A3), $P$ satisfies on $\mathcal{O}$
+\begin{equation}\label{pe:fk}
+  \partial_t P \;+\; \tfrac12\,\smod(S,t)^2 S^2\,\partial_{SS}P
+  \;+\; (r-q)\,S\,\partial_S P \;-\; rP \;=\; 0,
+  \qquad P(S,T)=\Phi .
+\end{equation}
+This is the Feynman--Kac PDE of $\mathfrak{M}$ --- the model's own pricing
+equation, the consistency its price and Greeks satisfy by construction; its
+diffusion coefficient is $\smod$, the volatility function of the model used to
+price. Under (A2) the
+standard Feynman--Kac hypotheses hold (uniform ellipticity and local
+regularity of the coefficients), so \eqref{pe:fk} is exact, not a heuristic.
+\trace{Correctness; VM-1, VM-2, MD-15; Vol~I \S1, Assumption~1.1.}
+
+%% ---------------------------------------------------------------------------
+\pelabel{PE-2}\textbf{PE-2. The discrepancy: hybrid Greeks do not satisfy the
+model's Feynman--Kac equation.} The Greeks $\mathfrak{M}$ owns are the partials
+$\partial_S P,\ \partial_{SS}P,\ \partial_t P$ of the same $P$; by construction
+they combine to zero in \eqref{pe:fk}. The Greeks a book hedges with are, in
+general, different objects: they are read off the reprice map
+\eqref{pe:reprice}, in which the surface is moved by $\mathcal{D}$ and the
+product is repriced.
+
+\textbf{Definition (hybrid Greeks).} The \emph{hybrid delta} and \emph{hybrid
+gamma} are the total derivatives of \eqref{pe:reprice} along the curve
+$S\mapsto(S,\Sigma(\cdot\,;S))$,
+\begin{align}
+  \Dhyb &:= g_{\Phi,\mathcal D}'(S)
+        = \partial_S P + \underbrace{D_\Sigma P[\partial_S\Sigma]}_{=:~\delta_\Delta},
+        \label{pe:dhyb}\\[2pt]
+  \Ghyb &:= g_{\Phi,\mathcal D}''(S)
+        = \partial_{SS}P + \underbrace{2\,D_\Sigma(\partial_S P)[\partial_S\Sigma]
+          + D_{\Sigma\Sigma}P[\partial_S\Sigma,\partial_S\Sigma]
+          + D_\Sigma P[\partial_{SS}\Sigma]}_{=:~\delta_\Gamma},
+        \label{pe:ghyb}
+\end{align}
+where $D_\Sigma P[\cdot]$ is the G\^ateaux derivative of $P$ in the surface
+argument. These directional (G\^ateaux) derivatives are taken along the declared
+$C^2$ curve $S\mapsto\Sigma(\cdot\,;S)$ of (A5); their existence is the standing
+hypothesis that $P$ is twice differentiable in the surface argument there ---
+realized concretely by the smooth Black--Scholes dependence of PE-5 --- not a
+claim of Fr\'echet differentiability on surface space, which the manifesto
+neither needs nor asserts. Coordinatized by strike,
+$\delta_\Delta = \int (\partial P/\partial\sigma(K))\,(\partial\sigma(K)/\partial S)\,\dd K$
+is the same object. The corrections $\delta_\Delta,\delta_\Gamma$ are the surface-response
+terms; they are exactly the smile-adjustment terms of the total (routed)
+Greeks of Vol~I, \S2.4.2 (Eq.~(2.21)), made explicit per instance in PE-5. Both
+$\delta_\Delta$ and $\delta_\Gamma$ are proportional to the surface response
+$\partial_S\Sigma$ that $\mathcal{D}$ declares.
+
+\textbf{Claim.} With the model theta $\Theta := \partial_t P$ and the hybrid
+Greeks $\Dhyb,\Ghyb$, the Feynman--Kac operator of \eqref{pe:fk} does not
+vanish:
+\begin{equation}\label{pe:residual-operator}
+  \mathcal{L}_{\mathrm{hyb}}
+  := \Theta + \tfrac12\,\smod^2 S^2\,\Ghyb + (r-q)S\,\Dhyb - rP
+  \;=\; \tfrac12\,\smod^2 S^2\,\delta_\Gamma + (r-q)S\,\delta_\Delta,
+\end{equation}
+which is nonzero whenever the surface response is nonzero.
+
+\textbf{Derivation.} Substitute \eqref{pe:dhyb}--\eqref{pe:ghyb} into
+$\mathcal{L}_{\mathrm{hyb}}$ and add and subtract the model partials:
+\[
+\begin{aligned}
+  \mathcal{L}_{\mathrm{hyb}}
+  &= \underbrace{\bigl[\partial_t P + \tfrac12\smod^2S^2\partial_{SS}P
+     + (r-q)S\,\partial_S P - rP\bigr]}_{=\,0\ \text{by \eqref{pe:fk}}}\\
+  &\quad{}+\; \tfrac12\smod^2 S^2(\Ghyb-\partial_{SS}P)
+  \;+\; (r-q)S(\Dhyb-\partial_S P).
+\end{aligned}
+\]
+The bracket is the Feynman--Kac equation, identically zero; the remaining two
+terms are $\tfrac12\smod^2S^2\,\delta_\Gamma + (r-q)S\,\delta_\Delta$, giving
+\eqref{pe:residual-operator}. The discrepancy $\mathcal{L}_{\mathrm{hyb}} = 0$
+exactly when the surface-response corrections $\delta_\Delta,\delta_\Gamma$
+combine to zero. Sufficient are a surface-insensitive product
+($D_\Sigma P = 0$, e.g.\ a forward) or a rule that holds the surface still
+\emph{to second order} ($\partial_S\Sigma = \partial_{SS}\Sigma = 0$) --- note
+$\delta_\Gamma$ retains the term $D_\Sigma P[\partial_{SS}\Sigma]$, so
+$\partial_S\Sigma = 0$ alone does not suffice. The exact condition is that
+$\mathcal{D}$ reproduce the model's own endogenous surface dynamics (Remark
+below). $\square$
+
+\textbf{Remark (two worlds, and when they coincide).} $P$ is the price under a
+diffusion whose coefficient is $\smod$; in that world the implied surface is an
+\emph{output}, and its response to spot is whatever the model dictates. The
+hybrid Greeks encode an \emph{externally declared} response $\partial_S\Sigma$.
+Equation \eqref{pe:residual-operator} is precisely the mismatch between the two:
+it vanishes exactly when $\mathcal{D}$ reproduces the model's own endogenous
+surface dynamics, and is otherwise the signed amount by which the hedging
+Greeks fail the model's own equation. The pair $(P,\,\partial P_{\mathrm{model}})$
+solves \eqref{pe:fk}; the pair $(P,\,\partial P_{\mathrm{hyb}})$ does not ---
+same price, sensitivities from a different world.
+\trace{Correctness; VM-4, VM-5; Vol~I \S2.4.2, Eq.~(2.21), \S3.6, Eq.~(3.34).}
+
+%% ---------------------------------------------------------------------------
+\pelabel{PE-3}\textbf{PE-3. Product instantaneous volatility: the coefficient
+that restores the equation, and why it need not be smooth.} The discrepancy
+\eqref{pe:residual-operator} can be absorbed into a single coefficient. Since
+$\smod$ enters \eqref{pe:fk} only through $\tfrac12\smod^2S^2\partial_{SS}P$,
+one asks for the diffusion coefficient that makes a PDE \emph{of the same form}
+hold with the model theta and the hybrid delta and gamma.
+
+\textbf{Definition (product instantaneous variance and volatility).} At a point
+$(S,t)$ with $\Ghyb(S,t)\neq 0$, the \emph{product instantaneous variance}
+$\sprod^2(S,t)$ is the sign-carrying number solving
+\begin{equation}\label{pe:sprod-pde}
+  \partial_t P + \tfrac12\,\sprod^2 S^2\,\Ghyb + (r-q)S\,\Dhyb - rP = 0 ,
+\end{equation}
+that is, in closed form,
+\begin{equation}\label{pe:sprod}
+  \boxed{\;
+  \sprod^2 \;=\; -\,\frac{2\bigl[\,\Theta + (r-q)S\,\Dhyb - rP\,\bigr]}{S^2\,\Ghyb}
+  \;,}\qquad \Theta = \partial_t P .
+\end{equation}
+It is the first-class object here --- real and total wherever $\Ghyb\neq0$, its
+sign a diagnostic in its own right; the \emph{product instantaneous volatility}
+$\sprod=\sqrt{\sprod^2}$ is its nonnegative root where $\sprod^2\ge0$. Under
+$r=q=0$ this is $\sprod^2 = -2\Theta/(S^2\Ghyb)$; with $q=0$ it matches
+the normative form $\sprod^2 = -2(\theta + rS\Dhyb - rP)/(S^2\Ghyb)$.
+
+\textbf{Well-posedness (stated, not waved).} Equation \eqref{pe:sprod} defines
+$\sprod^2$ wherever $\Ghyb\neq0$. Writing $N := -2[\Theta+(r-q)S\Dhyb-rP]$ and
+$M := S^2\Ghyb$, the value $\sprod=\sqrt{N/M}$ is real and nonnegative iff $N$
+and $M$ share sign; where $M=0$ the ratio has a pole and $\sprod$ is undefined;
+where $N/M<0$ no real $\sprod$ exists --- the FK form cannot be restored with a
+real coefficient; and where $\mathcal{D}$ carries $\Sigma(\cdot\,;S)$ out of the
+admissible set $\mathcal{A}$ (PE-1, A5), the model price of a surface-dependent
+product is itself undefined, and $\sprod$ inherits that gap. These are
+structural facts about the hybrid pair, recorded, not smoothed.
+
+\textbf{Its nature, stated with total honesty.}
+\emph{(i) Reverse-engineered, not an SDE coefficient.} $\sprod$ is defined by
+algebraically inverting \eqref{pe:sprod-pde} given $(\Theta,\Dhyb,\Ghyb)$; it is
+not the diffusion coefficient of any stochastic differential equation for $S$.
+In particular $\sprod \neq \smod$: it is neither the constant $\sigma$ nor
+$\sigma_{\mathrm{loc}}$.
+\emph{(ii) Specific to the product and to the rule.} Through $\Dhyb,\Ghyb$ the
+right-hand side of \eqref{pe:sprod} depends on the product $\Phi$ (via its
+surface sensitivities) and on $\mathcal{D}$ (via $\partial_S\Sigma,
+\partial_{SS}\Sigma$). Two products at one $(S,t)$ under one rule have different
+$\sprod$; one product under two rules (say sticky-strike versus sticky-delta)
+has different $\sprod$.
+\emph{(iii) Fitted, hence not required to be smooth --- and here is why.}
+$\sprod^2$ is the ratio $N/M$ of two independently constructed fields; it solves
+no differential equation that would impose regularity, so its only regularity is
+that inherited from the quotient. The denominator $M=S^2\Ghyb$ can vanish and
+change sign --- Vol~I exhibits $\Gadj$ crossing zero as Vanna does
+(Vol~I, \S3.9.3) --- while the numerator $N$ need not, so
+$\sprod^2$ carries poles and sign changes there. Even where finite, $N$ and $M$
+inherit $\partial_S\Sigma$ and $\partial_{SS}\Sigma$ from the declared rule
+$\mathcal{D}$, itself only a declared map --- admissibly kinked (a
+sticky rule piecewise in moneyness) --- so nothing forces $\sprod$ to be even
+continuous. Contrast the Dupire local volatility, which is a smooth functional
+of a smooth arbitrage-free surface (Vol~I, \S2.5): $\sigma_{\mathrm{loc}}$ is
+\emph{modelled}; $\sprod$ is \emph{fitted}, and the two regularities are not the
+same.
+\trace{Correctness; VM-4, VM-6; Vol~I \S2.5, \S3.9.}
+
+%% ---------------------------------------------------------------------------
+\pelabel{PE-4}\textbf{PE-4. Carry: theta is model-determined; the theta--gamma
+balance closes only against the product instantaneous volatility.}
+
+\textbf{Claim 1 (theta is invariant to the surface-vs-spot dynamic).} The model
+theta $\Theta=\partial_t P$ does not depend on the choice of $\mathcal{D}$.
+
+\textbf{Derivation.} $\Theta$ is the partial of the model price in calendar time
+at \emph{fixed} spot. By (A5) $\mathcal{D}$ is a spot-dynamic: it prescribes the
+surface response $\partial_S\Sigma$ and enters the reprice map only through
+$S$-derivatives, where the chain rule multiplies the surface terms
+$D_\Sigma P[\cdot]$ by $\partial_S\Sigma$ --- see
+\eqref{pe:dhyb}--\eqref{pe:ghyb}. The calendar partial at fixed $S$ contains no
+$\partial_S\Sigma$ factor; hence $\Theta$ is one and the same across the whole
+admissible family of surface-move maps, while $\Dhyb,\Ghyb$ vary with
+$\mathcal{D}$ through $\delta_\Delta,\delta_\Gamma$. This is the asymmetry the
+normative source states: the dynamics of the implied surface with respect to
+spot affect the hybrid delta and gamma and leave theta untouched. $\square$
+
+\textbf{Scope (honest caveat).} The invariance holds because $\mathcal{D}$ is
+declared as a spot-dynamic. A rule that additionally prescribed an autonomous
+calendar roll $\partial_t\Sigma$ independent of the model would give a
+``hybrid theta'' carrying $D_\Sigma P[\partial_t\Sigma]$; PE-1(A5) fixes
+$\mathcal{D}$ as a spot-dynamic precisely so that theta is the model's alone.
+
+\textbf{Claim 2 (the theta--gamma balance is readable only at $\sprod$).}
+Rearranging \eqref{pe:sprod-pde},
+\begin{equation}\label{pe:carry-identity}
+  \Theta + (r-q)S\,\Dhyb - rP \;=\; -\tfrac12\,\sprod^2 S^2\,\Ghyb ,
+\end{equation}
+and under the zero-rate convention ($r=q=0$, $F=S$, flagged),
+$\Theta = -\tfrac12\,\sprod^2 S^2\,\Ghyb$. The hedger carries $\Ghyb$; the daily
+breakeven move --- the $|\delta S|$ at which gamma gain offsets a day's decay ---
+follows from $\tfrac12\Ghyb(\delta S_{\mathrm{BE}})^2 = |\Theta|\,\dd t$ and
+\eqref{pe:carry-identity} as
+\begin{equation}\label{pe:breakeven}
+  \delta S_{\mathrm{BE}} = \sprod\,S\,\sqrt{\dd t}\,,
+\end{equation}
+the same form as the corpus breakeven $\sigma S/\sqrt{252}$ (Vol~I, \S1.4,
+Eq.~(1.13)) but with $\sprod$ in place of the implied $\sigma$ --- and it
+presumes the real, long-carry regime $\sprod^2>0$; where PE-3 gives
+$\sprod^2\le0$ (a pole, or a sign flip) there is no real breakeven. So $\sprod$
+is, by construction, the one volatility at which the model theta and the
+hedger's gamma reconcile: a volatility $\sigma$ leaves in
+\eqref{pe:carry-identity} the residual $\tfrac12(\sigma^2-\sprod^2)S^2\Ghyb$,
+nonzero for every $\sigma\neq\sprod$ and equal to the Feynman--Kac discrepancy
+$\mathcal{L}_{\mathrm{hyb}}$ of \eqref{pe:residual-operator} exactly at the
+model's own $\smod$.
+
+\textbf{Linkage to Part~A (the statement threaded there).} The
+profit-and-loss explain certificate's carry line reconciles the model theta
+against the gamma the book actually carries --- the hybrid gamma. That
+reconciliation holds at exactly one volatility, $\sprod$. A certificate that
+reconciles at a volatility other than $\sprod$ carries a nonzero residual into
+$R$ --- the model's $\smod$ leaves exactly $\mathcal{L}_{\mathrm{hyb}}\,\dd t$ of
+\eqref{pe:residual-operator}, a general $\sigma$ leaves
+$\tfrac12(\sigma^2-\sprod^2)S^2\Ghyb\,\dd t$ --- which is exactly the unexplained
+profit-and-loss VM-6 forbids to leave silently unattributed and VM-7 calls a
+broken chain. Hence the carry line carries a declared, recorded term naming
+which volatility reconciles it; VM-4 and VM-6 carry that thread.
+\trace{Correctness, Auditability; VM-4, VM-6, VM-7; Vol~I \S1.4, Eq.~(1.13).}
+
+%% ---------------------------------------------------------------------------
+\pelabel{PE-5}\textbf{PE-5. The corpus illustration: the total gamma under an
+implied-volatility dynamic drives the product instantaneous volatility,
+vanillas included.} Take a single name, the constant-vol model priced at the
+option's implied volatility, and the corpus surface-move map. All under the
+zero-rate convention $F=S$, flagged.
+
+\textbf{The declared dynamic, explicitly.} Write the implied vol at the option's
+fixed strike through the corpus decomposition (Vol~I, \S2.1.1, Eq.~(2.1))
+$\sigma(m,\lF,T) = \satm(\lF,T) + \ssm(m,T)$, with $m=\ln(K/F)$,
+$\lF=\ln(F/\Fref)$, skew $s(m)=\partial_m\ssm$, curvature
+$c(m)=\partial_m^2\ssm$, and ATM slope $\volslope=\partial_{\lF}\satm$. The map
+$\mathcal{D}$ is carried entirely by $(\volslope,\,s,\,c)$: routing through
+$F(S)$ gives (Vol~I, \S2.4.2, Eqs.~(2.19)--(2.20))
+\begin{equation}\label{pe:dsig}
+  \frac{\dd\sigma}{\dd S} = \frac{\volslope - s(m)}{S},
+  \qquad
+  \frac{\dd^2\sigma}{\dd S^2}
+  = \frac{\bigl(\partial_{\lF}^2\satm - \volslope\bigr) + \bigl(c(m)+s(m)\bigr)}{S^2}.
+\end{equation}
+
+\textbf{The hybrid gamma, every cross term explicit.} The price is
+$C(S,\sigma(S))$ with $\sigma(S)$ read off the surface under $\mathcal{D}$. Its
+second total spot derivative is the total (smile-adjusted) gamma of Vol~I, \S2.4.2,
+Eq.~(2.21):
+\begin{equation}\label{pe:gadj}
+  \Ghyb = \Gadj
+  = \Gamma + 2\,\Vanna\,\frac{\dd\sigma}{\dd S}
+    + \Volga\left(\frac{\dd\sigma}{\dd S}\right)^{\!2}
+    + \nu\,\frac{\dd^2\sigma}{\dd S^2},
+\end{equation}
+with $\Gamma=\partial_{SS}C$, $\Vanna=\partial_S\partial_\sigma C$,
+$\Volga=\partial_\sigma^2 C$, $\nu=\partial_\sigma C$ the frozen-vol
+Black--Scholes Greeks. This is exactly the $\delta_\Gamma$ of
+\eqref{pe:ghyb} in the single-implied-vol realization: the model gamma
+$\Gamma$, plus the vanna and volga terms in the surface velocity
+$\dd\sigma/\dd S$, plus vega times the surface acceleration $\dd^2\sigma/\dd
+S^2$. It is confirmed to be the object that enters the P\&L identity in
+Vol~I, \S3.6, Eq.~(3.34).
+
+\textbf{The product instantaneous volatility, exhibited.} The constant-vol model
+theta is $\Theta = \partial_t C = -\tfrac12\sigma^2 S^2\Gamma$ (Feynman--Kac
+\eqref{pe:fk} at $r=q=0$ with $\smod=\sigma$, $\partial_{SS}C=\Gamma$). Insert
+into \eqref{pe:sprod} with $\Ghyb=\Gadj$:
+\begin{equation}\label{pe:sprod-vanilla}
+  \sprod^2 = \frac{-2\Theta}{S^2\Gadj}
+           = \sigma^2\,\frac{\Gamma}{\Gadj},
+  \qquad\text{i.e.}\qquad
+  \sprod = \sigma\,\sqrt{\frac{\Gamma}{\Gadj}} .
+\end{equation}
+The model theta fixes the numerator and is invariant to $\mathcal{D}$ (PE-4);
+the entire dependence on the assumed dynamic sits in the ratio
+$\Gamma/\Gadj$, and by \eqref{pe:gadj} that ratio departs from $1$ for
+\emph{any} product carrying vega, vanna, or volga once the surface moves with
+spot ($\volslope\neq0$ or $s(m)\neq0$). A vanilla carries all three; therefore
+$\sprod\neq\sigma$ for a vanilla under any nontrivial surface dynamic --- the
+normative source's ``vanilla options included'' is exactly \eqref{pe:sprod-vanilla}.
+The clean ratio is specific to the constant-vol model: for a local-vol model
+$\sprod$ is the general form \eqref{pe:sprod} with
+$\Theta=-\tfrac12\sigma_{\mathrm{loc}}^2 S^2\,\partial_{SS}P$ and
+$\partial_{SS}P$ the local-vol price's own second partial --- the
+$\sqrt{\Gamma/\Gadj}$ collapse does not survive.
+
+\textbf{A number.} Take Part~A's base call ($\sigma=30\%$, $\Gamma=0.0265$, vega
+$\approx0.20$ per vol point, $S=100$, $T=0.25$) under a downward skew of one vol
+point per one-percent up-move ($\dd\sigma/\dd S\approx-0.01$). Its vanna is
+$\approx0.10$, so the surface-velocity term
+$2\,\Vanna\,(\dd\sigma/\dd S)\approx-0.002$ lowers the effective gamma to
+$\Gadj\approx0.0245$, and
+$\sprod=\sigma\sqrt{\Gamma/\Gadj}\approx30\%\times\sqrt{0.0265/0.0245}\approx31\%$.
+The breakeven volatility the delta-hedged holder actually runs is about $31\%$,
+not the $30\%$ quoted --- a vol point of carry the implied number never showed.
+
+\textbf{Non-smoothness, exhibited.} Vol~I, \S3.9.3, exhibits $\Gadj$ running from a
+positive smile adjustment at one spot to a negative one a finite move away, as
+Vanna crosses zero. Where $\Gadj\to0$, \eqref{pe:sprod-vanilla}
+gives $\sprod\to\infty$ (a pole); where $\Gadj$ takes the sign opposite to
+$\Gamma$, $\sprod^2<0$ and no real $\sprod$ exists. So even for a vanilla,
+$\sprod$ is neither globally smooth nor globally real --- the abstract statement
+of PE-3(iii) made concrete.
+
+\textbf{The multi-name instance.} When the book's value depends on an implied
+correlation re-marked by a declared convention, the surface-response term
+$\delta_\Gamma$ of \eqref{pe:ghyb} acquires a correlation channel: the
+\emph{shadow gamma} of Vol~II, \S2.5, Eq.~(2.23) --- under the equal-vol,
+locally-constant-$\volslope$ hypothesis of its Prop.~2.27 ---
+\[
+\begin{aligned}
+  \mathrm{ShadowGamma}
+  &= \frac{\volslope^2}{S}\!\left[\partial_\rho^2 V\,R^2
+      + \partial_\rho V\,\partial_\sigma^2\rho\big|_\xi\right]
+   + \volslope R\!\left(\partial^2_{S\rho}V
+      + \frac{\volslope}{S}\partial^2_{\sigma\rho}V\right),\\
+  &\qquad\qquad R=\partial_\sigma\rho\big|_\xi,
+\end{aligned}
+\]
+under the sticky-CVC convention ($\dd\xi=0$), and vanishing identically under
+sticky-$\rho$ ($\dd\rho=0$). It enters $\Ghyb$ on its raw footing
+$\Gamma^{\mathrm{sh}}$ (Vol~II, \S2.5, Eq.~(2.21)), so that here too the choice
+of surface-move convention drives $\sprod$ through \eqref{pe:sprod} --- the same
+structure as the single-name case, with $\mathrm{Cega}$ and the correlation
+dynamics in place of vega and the vol dynamics.
+\trace{Correctness; VM-4, VM-5; Vol~I \S2.4.2, Eqs.~(2.19)--(2.21), \S3.9.3;
+  Vol~II \S2.5, Eqs.~(2.21),(2.23), Prop.~2.27.}
+
+%% ---------------------------------------------------------------------------
+\pelabel{PE-6}\textbf{PE-6. The product instantaneous variance is a first-class
+derived quantity: computed on demand per product and per valuation over the
+chain.} The canonical object is the \emph{product instantaneous variance}
+$\sprod^2$ of \eqref{pe:sprod} --- the sign-carrying effective variance, real and
+total wherever $\Ghyb\neq0$ --- with the product instantaneous volatility
+$\sprod=\sqrt{\sprod^2}$ its nonnegative root where $\sprod^2\ge0$. It is a
+\emph{projection} of the recorded Greeks: the deterministic algebraic function
+\eqref{pe:sprod} of $\Theta,\Dhyb,\Ghyb,P$ and the market state, so it
+reproduces \emph{unconditionally} from the record with no model re-run ---
+stronger than a mark, whose number needs its retained model (C-14.15). Being a
+projection it is computed when needed and never stored (C-4.11, MD-6): for every
+product and every valuation its value, its sign, its poles, and its regularity
+are monitored by \emph{recomputation over the chain's recorded Greeks}, which is
+authoritative, so it cannot drift (VM-8). Where the object is pathological the
+pathology is what the recomputation returns: at a pole ($\Ghyb=0$) $\sprod^2$ is
+undefined and the fact is the pole itself; where $\sprod^2<0$ the fact is that no
+real volatility restores the Feynman--Kac form --- the sign is the diagnostic,
+not an error to be smoothed. Its evolution across links is thereby auditable and
+reproducible under challenge, an internal diagnostic feeding the certificate of
+a dispute-ready mark (VM-8), not itself a counterparty mark. \emph{Why the
+mandate:} a pole or a sign flip in $\sprod^2$ marks \emph{degenerate carry} ---
+the spot at which the carry line's theta-gamma reconciliation breaks down, the
+carry-line analogue of the $O(1)$ residual VM-4 books at a digital. This is the
+single monitoring mandate of Part~B; it prescribes nothing further.
+\emph{Parked:} the mandate that $\sprod^2$ additionally be \emph{stored} per
+valuation on the chain is parked against C-4.11 and MD-6 --- a projection stores
+nothing --- and stands in the open-problems index for the owner's ruling;
+nothing above depends on storage.
+\trace{Auditability, Reproducibility; VM-1, VM-3, VM-6, VM-8, C-4.11, C-14.15, MD-6, MD-15.}
+
+\section{Open Problems (Parked Items)}
+
+The framework parks a genuine conflict rather than fudge it: it is recorded here
+with the exact clause it would replace, the exact amendment text, and the
+justification, and the decision is the owner's alone. This index holds the
+document's first entry.
+
+\textbf{PARK-1 --- storing the product instantaneous variance versus C-4.11.}
+
+\emph{Conflict.} Part~B mandates that $\sprod^2$ (PE-6) be \emph{stored} per
+product and per valuation on the chain. This conflicts with the Constitution's
+C-4.11 and with MD-6: $\sprod^2$ is a \emph{projection} --- an algebraic
+recomputation over recorded Greeks, needing no model run (PE-6) --- and a
+projection stores nothing. It would be the architecture's first stored
+ledger-computable output. The in-force text of PE-6 therefore runs the
+conforming reading --- computed on demand, monitored by recomputation, never
+stored --- and only the storage half of the mandate is parked.
+
+\emph{Exact clause it would replace (C-4.11, final sentence).} ``Anything
+computable from the coordinates is a projection, computed when needed and never
+stored.''
+
+\emph{Exact proposed amendment text.} ``Anything computable from the coordinates
+is a projection, computed when needed; recomputation from the record is always
+authoritative. A projection's value may be recorded as a verifiable field of a
+re-entered observation or a certificate --- a \textbf{materialised projection}
+--- only where (i) recomputation from the record remains authoritative and always
+available, (ii) the recorded value carries complete lineage to the inputs it was
+computed from, and (iii) any correction to those inputs flags the recorded value
+stale. So recorded, it is never a second source that can silently diverge, and
+recomputation is the standing check. Absent all three, a projection is never
+stored.'' Mirrored in MD-6: ``stores nothing'' becomes ``stores nothing, save as
+a materialised projection under C-4.11's three conditions.''
+
+\emph{Justification.} A recomputable, lineage-bearing, flagged-stale field cannot
+silently diverge, so the reconciliation-failure mode the architecture exists to
+remove (C-1.2, C-1.3) stays closed and a materialised $\sprod^2$ series would be
+operationally safe. Safety is not textual permission: C-4.11 is categorical, and
+amending it is the owner's alone.
+
+\emph{Alternative resolution, keeping C-4.11 literal.} The storage mandate's
+``stored'' becomes ``computed on demand and monitored,'' $\sprod^2$ a projection
+never stored --- exactly the conforming reading PE-6 already runs; under it no
+amendment is needed and the park closes.
 
 \end{document}
