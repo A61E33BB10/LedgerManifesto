@@ -14,6 +14,7 @@ rated against nothing, and every specification, test, and review is rated agains
 | Document | Status | Where |
 |---|---|---|
 | Constitution v1.4 (116 clauses) | In force — sole authority (owner declaration 2026-07-16; the document's own date field awaits the owner) | `LedgerManifesto/ledger_manifesto_v1_4.tex` / `.pdf` |
+| Constitution v1.41 | Proposal — clarifies the time-envelope language of C-2.7 and C-12.6 only; certified conservative (no material change); awaiting the owner's ratification | `LedgerManifesto/ledger_manifesto_v1_41.tex` / `.pdf` |
 | Constitution v1.3 (115 clauses) | Superseded by v1.4 | `LedgerManifesto/ledger_manifesto_v1_3.tex` / `.pdf` |
 | Specification v16.1 (113 pp) | Content-certified (FORMALIS signed, CONCORDIA signed last; 5 review iterations, supervised by TuringAward). One open item: the 112-page cap is exceeded by one page of normative content — the owner's decision | `Ledger_Spec_v16.1/ledger/ledger_v16_1.tex` / `.pdf` |
 | Specification v16.0 (108 pp) | Superseded by v16.1 (was certified against Constitution v1.3) | `Ledger_Spec_v16.0/ledger/ledger_v16_0.tex` / `.pdf` |
