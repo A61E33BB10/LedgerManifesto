@@ -1,0 +1,577 @@
+% FrameworkReview.tex --- Cross-Manifesto Analysis and the Temporal Extension
+% Placement: LedgerManifesto/, the repository convention for cross-cutting documents
+% (the Manifesto, TuringReview, temporalv16 all live here).
+% Part I: merged systemic review (TuringAward/MINSKY/FORMALIS), inserted from
+%   v16_workpapers/framework_review/partI_merged.tex.
+% Part II: Temporal Committee unanimous consensus (round 11), converted from
+%   v16_workpapers/framework_review/temporal_committee/partII_consensus.md.
+% Preamble follows temporalv16.tex conventions; no packages beyond the corpus's.
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\setlength{\emergencystretch}{2em}
+
+\title{\textbf{Framework Review --- Cross-Manifesto Analysis\\
+and the Temporal Extension}}
+\author{FrameworkReview mission: peer merge (TuringAward, MINSKY, FORMALIS)
+$+$ Temporal Committee (TEMPORAL-1\ldots5, converged)}
+\date{21 July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent This document assembles the FrameworkReview mission in two parts. \textbf{Part~I} is a
+merged systemic review of the Ledger Constitution together with the Market Data and Valuation
+Manifestos, read as \emph{one composed system} by three independent reviewers (TuringAward on
+architecture, MINSKY on type discipline, FORMALIS on cross-manifesto coherence); findings are
+attributed and divergences kept as positions, never averaged. \textbf{Part~II} is the unanimous
+round-11 consensus of the Temporal Committee: a substrate proposal placing the whole framework ---
+market data, valuation, and lifecycle --- on one durable-execution machine that folds observations
+and re-entered observations through the one door, with the immutable log remaining the sole book of
+record. Both parts turn on one boundary --- where a deterministic function of the record becomes a
+stored artifact: Part~I finds the gravest open collision there; Part~II contains it by construction.
+\end{abstract}
+
+% =====================================================================
+%  Part I --- Merged Systemic Review (peer merge of three parallel reviews)
+%  Reviewers: TuringAward (TA), MINSKY (MK), FORMALIS (FL).
+%  Subjects: Constitution v1.41 + Market Data Manifesto 1.3 + Valuation
+%  Manifesto 1.0 (incl. Part B, PARK-1), reviewed as a COMPOSED SYSTEM.
+%  Inserted verbatim from partI_merged.tex (sectioning unchanged).
+%  Severity CRITICAL/HIGH/MED/LOW; TA's MAJOR->HIGH, MINOR->LOW.
+%  Attribution in brackets; divergences preserved, never averaged.
+% =====================================================================
+
+\section*{Part I --- Merged Systemic Review}
+
+\noindent\emph{Three reviewers read the three manifestos independently as one system (TA:
+architecture/algorithms; MK: type discipline, illegal states; FL: cross-manifesto formal
+coherence). Findings are attributed; divergences are kept as positions, never averaged.
+Severity CRITICAL/HIGH/MED/LOW --- TA's MAJOR$\to$HIGH, MINOR$\to$LOW.}
+
+\subsection*{1. Systemic verdict}
+
+The three documents compose \emph{without a vicious logical cycle}: definitions and discharges
+each flow one way [FL]. But they share one fault line --- the boundary at which a deterministic
+function of the record becomes a \emph{stored} artifact --- and all three reviewers, apart,
+ranked the collision there the gravest finding. A \textbf{version-layering inversion} compounds
+it: the parent clause a child leans on (MD-16, Market Data 1.3) postdates and is uncited by that
+child (Valuation 1.0, subordinate to Market Data 1.1) [FL]. The recurring defect beyond the
+headline is \textbf{drift-by-relabeling at the seams between authors and versions} --- a
+guarantee kept reading true by renaming its residue (``event-outcome,'' ``forbidden,''
+``$\mathcal{D}\equiv$~VM-5,'' ``structurally impossible''). Correctness holds where one author
+states a thing once (VM-8 extends MD-14 without re-proving; MD-13 defers the sandwich to VM-9);
+it frays where documents meet. These are composition gaps and relabelings, not thesis errors.
+
+\subsection*{2. Headline finding (unanimous, gravest)}
+
+\noindent\textbf{H1 [all three --- gravest]. A ledger-computable number is stored on one side of
+the framework and parked as unstorable on the other.} MD-16 records a gate decision's
+\emph{computed functionals and percentiles} --- each a map from a derived state $m^\ast$ to a
+number, a \emph{projection} by C-4.11's own definition --- as stored fields, while the Valuation
+Manifesto \emph{parks} the identical act (storing $\sigma_{\mathrm{prod}}^2$, PARK-1) because ``a
+projection stores nothing.'' MD-16 declares ``no collision with C-4.11 \dots\ an event-outcome,
+not a projection.'' Three angles converged: \textbf{[TA]} a \emph{certified} article (Market
+Data 1.3) silently depends on an unresolved sibling park --- rule C-4.11 literal and it breaks
+retroactively; \textbf{[MK]} ``event-outcome'' \emph{is} the reclassification PARK-1 refused
+without the owner, the CLAUDE.md\,\S1 worse failure (a guarantee kept true by renaming its
+residue, eroding the reconciliation root C-1.2--1.3); \textbf{[FL]} silent non-conformance with
+a blast radius the parking index hides --- and, surgically, recording the pass/fail \emph{bit}
+is fine, only the numeric \emph{fields} materialise a projection.
+\emph{Divergence preserved (fix):} FL's remedy needs \emph{no} amendment --- ground the
+recording on MD-11/C-14.15 (a simulated path must capture its outputs) and drop ``not a
+projection''; else fold the fields under PARK-1. TA/MK treat the whole recording as
+materialisation, FL only the fields. \emph{Complementary [TA]:} C-2.8 (``the seed \dots\ every
+path replays exactly'') itself overclaims against MD-11 (``a path that recorded only the seed
+could not replay''); amend C-2.8 to match MD-11.
+
+\subsection*{3. Advice --- ordered, merged (highest leverage first)}
+
+\begin{enumerate}\setlength{\itemsep}{0pt}
+  \item \textbf{[all three] Rule PARK-1 with \emph{both} documents on the table} --- its ruling
+  governs VM PE-6 \emph{and} MD-16's recorded gate fields; ``nothing depends on storage'' is
+  true only inside the Valuation Manifesto. Precedes any other ratification.
+  \item \textbf{[all three] Legislate ``may a deterministic function of the record be stored?''
+  once} --- one clause over C-4.11, PARK-1, MD-16 (PARK-1's three-condition materialised
+  projection is the candidate), so no document decides it by private nomenclature.
+  \item \textbf{[FL, TA] Freeze the parent text the children consumed, then re-rate} --- C-2.7
+  and C-12.6 (reworded by v1.4/v1.41, both ratification-pending) carry MD-4/MD-5/MD-13/VM-2/VM-9;
+  fix the stale headers (VM 1.0 cites parent files that do not exist).
+  \item \textbf{[all three] Decide prevention-vs-detection at the Constitution} --- add a
+  forward-pointer on MD-9 to MD-16's carve-out; align ``forbidden'' language to the actual
+  mechanism (detection, recorded-and-flagged).
+  \item \textbf{[FL, MK] Tighten the A5 discharge} --- make Gate 1 an interior-membership gate
+  over the move's neighbourhood, or downgrade ``grounds'' to ``guarantees the endpoint''; wire
+  VM-10's finite-shift states to MD-16's gates.
+  \item \textbf{[MK] Complete the typed arrow algebra (C-3.6)} --- name the producer of the
+  observation-recording and re-entered-observation arrows, or ratify observable-is-a-unit.
+  \item \textbf{[FL, TA] Add a firing witness to every new invariant} (Gate 1/2, VM-6, VM-7) and
+  state a \emph{liveness} commitment: every stale flag, broken chain, undecidable gate carries a
+  deadline, owner, and fallback.
+\end{enumerate}
+
+\subsection*{4. Criticisms --- wrong or weakly argued today}
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \textbf{C1 [MK, HIGH]. The recording arrow has no typed producer.} C-3.6 types only
+  $\mathit{contract}:(\mathrm{Event},\mathrm{Ledger})\to\mathrm{Transaction}$; the
+  observation-recording and re-entered-observation transactions have none --- MD-1 attributes
+  recording to the Events Executor, which C-5.4 says ``never writes the ledger.'' The arrow
+  crossing the trust boundary has unspecified producer, input type, and validation.
+  \item \textbf{C2 [all three, HIGH$/$MED]. Prevention vs detection: two polarities, one
+  unannotated.} MD-9 ``by detection, not admission'' vs MD-16 Gate 1 ``prevention, not
+  detection,'' reconciled only inside MD-16 [MK C3, FL C6]. \emph{Preserved:} TA goes further ---
+  Gate 1 prevents on an \emph{economic} property \emph{outside} the Transaction Executor, a
+  third correctness category C-13 never sanctions (HIGH); MK/FL rate it MED and read MD-16 as
+  honest (``a consumer over-trusts'').
+  \item \textbf{C3 [FL, HIGH; corr.\ MK].\ Gate 1 discharges VM PE-1(A5) incorrectly.} Gate 1
+  guarantees one endpoint $m^\ast\in\Theta_{\mathrm{AF}}$; A5 needs $\Sigma(\cdot;S)\in\mathcal{A}$
+  on a \emph{neighbourhood} with \emph{interiority} --- gated at neither end (the origin surface
+  is admissible only by MD-9 detection). \emph{Corr.\ [MK W5]:} a finite bump (VM-10, spot
+  $+20\%$) falls between the infinitesimal discharge and the finite gate. \emph{Mitigant [FL]:}
+  poles are recorded diagnostics, so nothing breaks silently; only the \emph{discharge claim} is
+  false.
+  \item \textbf{C4 [MK, HIGH]. NAV carries two types.} C-8.1/8.2 type NAV as a bare cash number;
+  VM-2 says a valuation without coordinates ``is not one'' and may be stale/broken --- different
+  guarantees in different documents (see W1).
+  \item \textbf{C5 [FL, MED-HIGH]. MD-4's ``every observation bears three times'' fails for VM's
+  own observations.} By C-2.7 an emitted event bears no monitor time; a re-entered observation
+  (VM-1: every model-priced leg) is emitted, not observed. Fix: ``bears \emph{up to} three
+  times.''
+  \item \textbf{C6 [TA, HIGH]. C-2.2 is narrowed in the children without amending the parent.}
+  Unconditional ``to the last minor unit'' is made conditional by MD-6/VM-2 (re-deriving a model
+  mark ``needs the retained model and numerical environment \dots\ outside this scope''); every
+  model-mark's bit-for-bit claim (VM-8, VM-11) rests on it. C-Auth.3 requires amending the
+  Constitution first.
+  \item \textbf{C7 [TA, HIGH]. ``Look-ahead is structurally impossible'' (MD-4) is not
+  structural.} ``By default'' concedes a non-default: VM-2's legal decoupled query (position
+  as-at yesterday, market cut today) inside a VM-11 trajectory reintroduces look-ahead ---
+  a discipline to remember. \emph{Adjacent:} VM-11's ``valuation at every step'' vs
+  gate-\emph{undecidable} holes [FL C5]; MD-4 fixes the as-of/as-at indexing C-12.1 left to the
+  spec [MK C5].
+  \item \textbf{C8 [all three, MED]. The world-map family is asserted, not constrained.} [TA]
+  three names for one concept (\emph{dynamic}/\emph{shift}/$\mathcal{D}$) stress C-Auth.4; [FL]
+  MD-16's ``VM-5~$\equiv\mathcal{D}$'' is containment not identity, dropping the correlation
+  channel; [MK] a surface's $\mathcal{D}$ and its vols' per-datum dynamics must agree
+  \emph{nowhere}. Also stale subordination: A5's only discharge (MD-16) postdates and is uncited
+  by VM 1.0 [FL C9].
+\end{itemize}
+
+\subsection*{5. Potential weaknesses --- what breaks later, and under what condition}
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \textbf{W1 [MK, HIGH]. Stale marks under refold surface a bare NAV.} An execution-time-early
+  observation lands; projections refold the quantities but re-entered marks go stale (VM-7); NAV
+  computes fresh quantities $\times$ stale marks and surfaces a bare number --- C-8.1's NAV type
+  carries no staleness flag. Ties C4.
+  \item \textbf{W2 [FL, HIGH; with TA]. New invariants have no firing witness, and no liveness.}
+  Gate 1/2, VM-6, VM-7 map to no property test (CLAUDE.md\,\S3: ``zero firings is a defect'').
+  \emph{[FL]} Gate 2 passes \emph{vacuously} where thin history never generates its precondition;
+  a loose VM-6 bound marks every move ``explained.'' \emph{[TA]} detect-and-flag has no liveness
+  --- a bulk retraction stale-flags much of the book (MD-8 propagates forward) with no deadline
+  or owner.
+  \item \textbf{W3 [TA, HIGH]. Gate 2 blinds risk where it is most needed.} Thin-history names
+  (IPO, post-restructuring) yield permanent ``undecidable'' --- no risk report for the riskiest
+  names; under regime shift (2008/COVID/dividend cut) unprecedented states are rejected as
+  ``unrealistic,'' suppressing the tail. \emph{Divergence preserved:} TA reads thin history as
+  runtime \emph{refusal}, FL (W2) as the test's \emph{vacuous pass} --- the refuse-behaviour must
+  be \emph{shown to fire}.
+  \item \textbf{W4 [TA, HIGH; with FL]. $\sigma_{\mathrm{prod}}$ poles force structural
+  chain-breaks the alarm cannot distinguish.} At spot near $\Gamma_{\mathrm{adj}}=0$ an ordinary
+  vanilla reconciles at no real volatility, residual forced $O(1)$, VM-7 calls the chain
+  ``broken'' through no data fault. \emph{Divergence preserved:} FL reads PE-6's pole treatment
+  as an honest diagnostic; TA reads the clash with VM-7's ``forbidden'' as alarm fatigue ---
+  reconciled by exempting degenerate-carry poles from the broken-chain class.
+  \item \textbf{W5 [TA, HIGH]. Write amplification meets the single writer and $O(n)$ replay.}
+  VM-1 re-enters every model-priced mark; VM-10/MD-11 re-enter every mark of every scenario and
+  MC path to be replayable. A real book funnels the whole valuation/risk firehose through one
+  writer, and time-travel folds a prefix growing at pricing cadence, not event cadence. No
+  checkpoint is fixed.
+  \item \textbf{W6 [FL, MED]. Two correction species collide at the TA-union seam.} A vendor
+  ``correction'' that also restates the timestamp is both an order-correction (reorders the fold,
+  C-2.7) and a value-correction (MD-10); never distinguished --- undefined behaviour.
+  \item \textbf{W7 [MK, MED]. Idempotence is conditional on an unnamed assumption.} C-11.5 lists
+  it with no caveat; MD-1 admits two distinct prints identical under every field collide and one
+  is silently dropped. Name the identifier-grain trust assumption beside the invariant.
+\end{itemize}
+
+\clearpage
+
+% =====================================================================
+%  PART II --- Temporal Committee consensus (converted from partII_consensus.md)
+%  Set at \small with tightened parskip to hold the 5-page cap; tables \footnotesize.
+% =====================================================================
+\begingroup
+\small
+\linespread{0.94}\selectfont
+\setlength{\parskip}{0.5pt plus 1pt minus 0.5pt}
+\setlength{\LTpre}{2pt}\setlength{\LTpost}{2pt}
+\section*{Part II --- Temporal as Execution Substrate for the Whole Framework}
+
+\noindent\emph{The Temporal Committee's unanimous consensus, assembled at round~11 and signed
+by all five members (TEMPORAL-1\ldots5) and both referees (FORMALIS, TuringAward). This is a
+substrate proposal, not a Constitutional amendment: the immutable log remains the sole book of
+record, and Temporal workflow histories are never the source of truth.}
+
+\subsection*{1. Thesis and mapping}
+
+\textbf{Central result.} Market data and valuation are \emph{not} a second substrate. The seed
+(\texttt{temporalv16.tex}) mapped the ledger's two untrusted machines --- the Event Monitor and the
+Events Executor --- onto Temporal, keeping the Transaction Executor outside as the single writer. The
+extension adds no new writer, no new door, no new book: \textbf{the whole framework is the one machine
+folding observations and re-entered observations through the one door.} Every market-data fact, model
+number, gate verdict, and valuation mark crosses the same door under the same cause-derived identity;
+everything else is a projection recomputed from the log.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}p{0.235\textwidth} p{0.715\textwidth}@{}}
+\toprule
+\textbf{Temporal primitive} & \textbf{Ledger / market-data / valuation object} \\
+\midrule
+\endhead
+\textbf{Workflow} (long-lived, keyed \texttt{unitId}) & one \textbf{unit} walking its product
+graph; pending timers $+$ signal-waits $=$ the current node's armed \textbf{watch} set (R-03).
+Derived-object builds, MD-16 dynamic applications, and valuation-chain links are sequences it
+runs --- no new workflow kind. \\
+\textbf{Activity} & every side effect: capture an arrival, read a \textbf{cut}, run a model
+(version-pinned), propose to the door, apply the \textbf{market data operator}, compute a
+certificate, evaluate an MD-16 gate. NAV/PnL/operator/settlement are read-time \textbf{projection}
+activities. A read that records nothing is the forbidden \textbf{bare read}. \\
+\textbf{Signal / signal-with-start} & timing and reference only (a cause identifier, a log
+position), never economic payload: a \textbf{watch} satisfaction, a corporate-action cascade
+fan-out, or a ``re-read: the fold moved'' notice. Ledger-created units (the settlement-obligation
+unit, a market-claim leg, split successor legs) start their own workflows; graph branches stay
+in-workflow. \\
+\textbf{Query} & a non-authoritative liveness view; a valuation or collateral \textbf{dispute} is
+a \emph{replay} --- a read-only re-derivation from the log, never a second authority. \\
+\textbf{Child workflow} & \emph{not} used for lineage coupling (parental linkage is ledger-absent
+relational state); a corporate-action cascade fans out by signal-with-start. Child workflows
+appear only \emph{inside a simulation namespace} for history-bounding --- not the forbidden use. \\
+\textbf{Continue-as-new} & history-size control; carries \texttt{\{unitId|lineageId, nodeId, cut\}}
+only. The \textbf{valuation chain}, the derived states, and the gate verdicts live on the log and
+rehydrate from it. \\
+\textbf{Durable timer / Schedule} & timer $=$ a date-\textbf{watch} liveness half only, authoring
+none of the three times; Schedule $=$ system cadence only (end-of-day sweeps, overdue-watch
+reconciliation), never a per-unit contractual date. \\
+\textbf{The Transaction Executor $+$ the immutable log} & the trusted single writer, fronted by
+\textbf{one} idempotent door activity --- the only write path. Never a workflow. \\
+\textbf{The two MD-16 gates}, \textbf{the CA sandwich}, \textbf{the backtest} & the gates $=$
+version-pinned predicate activities whose verdict $+$ state cross the door in one transaction; the
+sandwich $=$ a sequence of idempotent legs struck as a projection from the log; a backtest $=$ a
+strategy \textbf{unit} run through a trajectory in an isolated namespace against its own lineage's
+door. \\
+\bottomrule
+\end{longtable}}
+
+\noindent\textbf{Acceptance test.} Wipe the Temporal cluster: the entire workflow population
+re-derives from the log --- unit status re-read, watches re-armed, chains and derived states and
+gate verdicts rebuilt, nothing lost.
+
+\subsection*{2. The three record kinds and the one lineage discipline}
+
+Every object the framework records is exactly one of three kinds, distinguished by
+\textbf{staleness semantics}:
+
+\begin{enumerate}[leftmargin=*, itemsep=1pt, topsep=2pt]
+\item \textbf{Projection} --- computes over the record and stores nothing; recomputed on every
+read; \emph{never stale}. Balances, the three homes, NAV, profit-and-loss, the valuation chain as
+assembled, the market data operator, settlement instructions.
+\item \textbf{Re-entered observation} --- a model output evaluated \emph{outside} the fold (the
+ledger runs no model) whose result re-enters through the one door as a recorded observation;
+read-back is unconditional; \emph{stale when a consumed input moves} (MD-8), superseded forward. A
+fitted surface, a mark, a greek, a calibration.
+\item \textbf{Recorded decision, pinned as-known} --- a verdict recorded with the event it decides;
+\emph{not recompute-on-read, not stale-on-input-move} --- it decided against inputs as they then
+stood. This is \textbf{not a new primitive}: the base ledger already has it as the door's
+admit/refuse; the MD-16 gate verdict is the same shape.
+\end{enumerate}
+
+\noindent\textbf{The lineage discipline.} Every re-entry carries a cause-derived transaction
+identifier over the \textbf{canonical 3-tuple key} \texttt{(input-cut, model-version,
+recipe/dynamic-version)}. The \texttt{input-cut} is recorded at \textbf{exact grain} (a log-position
+or content-hash, never a coarse ``latest'' label). A stochastic recipe's drawn \textbf{seed} is a
+recorded parameter \emph{of the recipe/dynamic-version term} --- so the key stays a 3-tuple; a
+separate seed slot would mint two identifiers for two retries and double-admit, the same failure
+that keeping the numerical environment in the key would cause. \textbf{Seed and numerical-environment
+are out of identity} --- both are recorded Tier-2 re-derivation terms, never txid coordinates. The
+refold that honours a late arrival is \textbf{forward-only} and is the single writer's work; Temporal
+is signalled to re-read and re-fires forward, never rewinding its own history against a new fold.
+
+\subsection*{3. Decomposition per framework area}
+
+\textbf{3.1 Ledger.}\quad The unit-workflow holds timers, signal-waits, selectors, and sequencing,
+and nothing else; its in-memory node is a mirror, rehydrated from the ledger on start, on
+continue-as-new, and on any doubt. Side effects are activities: capture-arrival $\to$
+evaluate-contract (version-pinned, queue-routed, never a local activity) $\to$ propose-to-door. The
+\textbf{Transaction Executor} is an external single-writer service fronted by one idempotent
+\texttt{admit} activity whose write is an \textbf{atomic unique-key insert on the cause-derived
+identifier} --- not check-then-append. Exactly-once admission is therefore a \textbf{total function of
+the durable log}: dedup is decided against the committed identifier-set on the log, never an in-memory
+in-flight set or arrival order. A corporate-action cascade fans out by signal-with-start; each firing
+proposes its own identifier, so all $n$ legs commit. Settlement is a pure projection that writes
+nothing; settlement failure re-enters as a recorded event walking the settlement-obligation unit's
+graph --- never a Temporal compensation or saga.
+
+\textbf{3.2 Market data.}\quad Capture records the observation through the \textbf{one door}
+(envelope-first, before payload validation); absorption of a redelivery is the door's
+cause-derived-identifier job at the registered grain. A \textbf{projection-kind} derived object (a
+discount factor, an operator-adjusted value) is a read-time activity that stores nothing. A
+\textbf{re-entered-observation-kind} derived object (a fitted surface, a filter) runs the model in a
+version-pinned activity whose seed is recorded to the log before compute and reused on resume, then
+re-enters through the door.
+
+\textbf{The two MD-16 gates and the single-transaction write.} Applying a declared \emph{dynamic} to
+an admissible base state yields a derived state, admitted only through two gates decided at
+application time: \textbf{Gate~1}, no-arbitrage by construction ($m^\ast \in \Theta_{\mathrm{AF}}$);
+\textbf{Gate~2}, realism against the underlying's own as-known history (per-functional percentiles,
+joint where marginals would hide an inversion). The workflow pins \textbf{one cut} and runs
+\texttt{gate1}, \texttt{gate2}, and \texttt{construct} all over that cut (MD-12), then \textbf{the
+derived state and its passing gate verdict cross the door as one transaction} --- never a pass
+recorded first with construction gated on it, which would open an inconsistent-read window. Fail or
+undecidable is a recorded \textbf{refusal}; the state is never constructed, and a consumer names a
+state only by its admission record, so an ungated state is unnameable.
+
+\textbf{Prevention-at-construction $=$ detection-at-audit.} Gate~1 is a decidable predicate, but one
+requiring model knowledge (the arbitrage-free set) the door must not hold --- the door is generic
+machinery with no product knowledge. So the gate runs in a version-pinned activity, like a contract; the
+door commits verdict-and-state atomically; a mis-gate degrades to detection-at-audit by recomputation,
+exactly as an economically-wrong contract does. Under the single-trusted-door model, that is the honest
+status of ``prevention'' here.
+
+\textbf{$A'=$ FLAG.} A correction to a consumed input that lands under the pinned cut before admission
+does \textbf{not} refuse: it \textbf{flags $m^\ast$ stale-forward} (MD-8/MD-10), $m^\ast$ remaining the
+as-known-at-cut value it was gated as --- the single writer decides staleness on the refold. The state
+is kind-2 (staleable), the decision kind-3 (pinned, never stale); refusing would conflate them, and
+C-11.3 is a structural consistency guard, not a freshness check. \textbf{Refuse is reserved for a gate
+fail/undecidable verdict (the gate decides) or an unresolvable structural reference (the door decides)
+--- never a fresher tip.} A 90-second calibration under corrections every 45 seconds never converges
+under REFUSE; FLAG guarantees progress.
+
+\textbf{The value-level $\beta$ bound.} A model number is one member of a set the attempts could have
+produced; read-back reproduces the recorded bytes, not proof the mark is within tolerance of an honest
+re-derivation. The producer attests a \textbf{reproducibility class} carrying a bound $\beta$ in the
+lineage. The \textbf{door checks presence and structure only}: it never compares $\beta$ to a tolerance,
+since the tolerance is the \emph{consuming} instrument's and is not single-valued at admission (one
+surface at $\beta = 3$ bp serves a unit tolerant to 5 bp and one to 1 bp). A missing attestation is
+admit-and-flag, never refused. \textbf{At consumption, $\beta \le$ VM-6 is checked as a VM-7 broken
+chain}: the consuming unit's valuation projection raises a broken chain when $\beta$ exceeds \emph{that}
+unit's tolerance, or is absent. Totality is by type (\textbf{COVERAGE-$\beta$}): the sole accessor to a
+kind-2 leaf is the ``current fit'' selector, which carries the class and raises the chain, so a raw path
+is a type error. A false $\beta$ degrades to detection-at-audit.
+
+\textbf{The compute/emit split} removes the door-arrival race for a non-bit-reproducible model:
+\texttt{runModel} is one activity whose output Temporal memoizes; \texttt{proposeToDoor} is a separate
+activity whose only input is that recorded output --- a typed boundary, so a worker that
+recomputes-and-proposes in one step (which would reopen the race) is not representable. Retries
+re-present identical bytes; canonical-by-first is a declared rule, and bit-reproducibility is never an
+admission precondition (out-of-scope numerics).
+
+\textbf{Corporate actions.} A corporate action is a first-class recorded transaction; the market data
+operator is a read-time projection, the original never overwritten. A late or corrected corporate
+action is a reordering handled by the refold, never a Temporal un-adjust.
+
+\textbf{3.3 Valuation.}\quad A \textbf{chain link} reads a cut, prices a leg (version-pinned,
+re-entering via the door), computes the \textbf{profit-and-loss explain certificate} with entry-and-exit
+greeks, checks the residual against its declared bound, and appends the link through the door. The chain
+and its certificates live on the log; the workflow holds only the chain-head cursor. NAV and
+profit-and-loss are pure projections --- one recipe also serves risk, so risk and the books cannot
+disagree by construction.
+
+\textbf{Re-mark cadence splits by the spec's own axis.} End-of-day desk marks are system cadence $\to$ a
+\textbf{Schedule sweep} that chooses which units to re-mark, the pricing activity reading each unit's
+node/frame/cut \emph{from the record}, so a mid-corporate-action unit is never priced in a stale frame.
+Contractual, corporate-action-driven, or input-moved re-marks are a \textbf{per-unit watch} reading the
+node.
+
+\textbf{The corporate-action valuation sandwich} is a valuation struck immediately before the transition
+and another immediately after, the market data operator transporting the pre-frame mark into the
+post-frame as a zero-profit identity, with a full explain across the pair. It is a \textbf{sequence of
+idempotent legs} whose completion is a deterministic function of the recorded \texttt{\{nodeId, cut\}}: a
+mark is kind-1 when it is the operator's frame re-coordination, kind-2 when model-priced; the certificate
+is the one kind-3 admission. Because no leg is held in workflow memory, a continue-as-new at any step
+re-derives the whole sandwich or resumes the one missing certificate --- \textbf{a half-sandwich is never
+nameable}. The residual within its three declared tolerances (minor-unit rounding, the convention's
+rounding, any re-derived surface's calibration tolerance) is the proof the action went well.
+
+\textbf{Risk, scenarios, and backtests} run the one per-unit recipe on shifted market data in an isolated
+namespace against its own lineage's door. The \textbf{shift} is the recorded seed; a strategy is itself a
+\textbf{unit}, so a backtest reuses one-workflow-per-unit unchanged; simulated re-entries enter the
+simulated path's own record, and where coordinates coincide with production the chain equals it by
+determinism, reached by recomputation, never a second stored copy.
+
+\subsection*{4. Invariants, the canonical key, and the production/simulation seam}
+
+\begin{itemize}[leftmargin=*, itemsep=1pt, topsep=2pt]
+\item \textbf{I1 --- one single writer per lineage.} The write credential is a \textbf{fenced lease over
+a quorum-committed log}: an append is acknowledged only after it is durable in the quorum
+(durable-before-ack, so no lost admission), and the log rejects any append not carrying the current fence
+token, so a split-brain stale door's writes are rejected by the log --- never two admitting doors.
+Failover moves the fence, never duplicates it.
+\item \textbf{I2 --- the identity key.} The canonical 3-tuple \texttt{(input-cut, model-version,
+recipe/dynamic-version)}; seed and numerical-environment out of identity; input-cut exact-grained. The
+injectivity dual: distinct fine-grained causes yield distinct admissions.
+\item \textbf{I3 --- no model in-fold.} The refold is $\mathrm{apply}\circ\mathrm{contract}$, a pure fold;
+kind-2 outputs are immutable leaves; re-derivation is forward and out-of-fold. Enforced by type.
+\item \textbf{I4 --- axis non-leak.} The activity reads the recipe/model/dynamic version \emph{from the
+log}, never from its binary; the orchestration Build-ID pins orchestration only and is not in the fold.
+Three economics axes (ProductTerms, model/recipe, dynamic/gate-terms) live on the log.
+\end{itemize}
+
+\noindent\textbf{The production/simulation seam} is two orthogonal separations. \textbf{Base vs derived
+stream} is a \emph{stream} boundary within one production lineage --- tagged sub-streams sharing the
+production door; a production-serving derived object (today's calibrated surface serving a real mark) is
+production data. \textbf{Production vs simulation} is a \emph{namespace} boundary: a scenario, backtest, or
+authorised fork runs in an isolated namespace against its own lineage's door, and only a final result
+re-enters production as an observation. Door credentials follow the second boundary: the production door
+holds the sole production write credential, a simulation namespace's door a separate one. The
+discriminating test: \emph{does a real production unit's valuation chain read it back?}
+
+\subsection*{5. Divergence catalogue and red-team survival}
+
+\noindent\textbf{Divergences (D1--D16), each with its containment.}
+
+\begin{itemize}[leftmargin=*, itemsep=0pt, topsep=1pt]
+\item \textbf{D1 Bare-read} --- a fetch that records nothing is forbidden; every ingestion activity's only
+success is proposing an observation-recording transaction, and read activities read the record, never a
+live feed.
+\item \textbf{D2 Model nondeterminism} --- model runs are version-pinned activities (never workflow, never
+local), output recorded; heavy runs heartbeat under a bounded schedule-to-close so a retry fires only on
+genuine failure.
+\item \textbf{D3 Past-dated synthesised firings} --- the refold's past-dated synthesis is the single
+writer's work; the substrate re-fires forward only; the late corporate-action sandwich rides this exact
+path.
+\item \textbf{D4 Staleness vs workflow state} --- staleness is a recorded fact; the ``current fit''
+projection selects the latest non-superseded value and carries the flag; orchestration only triggers
+forward re-derivation.
+\item \textbf{D5 History size} --- marks, states, and verdicts live on the log; continue-as-new carries the
+identifier triple only; derived-state volume is isolated to simulation namespaces.
+\item \textbf{D6 Undecidable / refuse vs retry-to-infinity} --- undecidable, refuse, and a broken chain are
+returned values, not retryable errors; each stands as a visible blocked or overdue item.
+\item \textbf{D7 Prevention in an untrusted constructor} --- a decidable predicate any party recomputes;
+prevention-at-construction plus consumption-by-reference, detection-at-audit; no door privilege added.
+\item \textbf{D8 Workflow-code nondeterminism} --- wall clock, randomness, unordered-map iteration, and
+direct I/O are confined to activities; the three times come from the log.
+\item \textbf{D9 Versioning --- three axes} --- orchestration Build-ID; contract economics;
+model/recipe/dynamic/gate terms on the log, never touching workflow code.
+\item \textbf{D10 Retry vs exactly-once admission} --- the cause-derived identifier over the canonical
+3-tuple, never a Temporal run/attempt id; dedup is load-bearing by construction, and only the pre-log
+early-drop is optimisation.
+\item \textbf{D11/D12 Queue/timer time vs the fold} --- the committed order is the total order
+$(\text{execution},\text{door},\text{hash})$ at the door alone; timers carry no time authority; a late
+observation refolds; a late-firing timer yields the identical transaction.
+\item \textbf{D13 Attribution/dispersion convention as worker config} --- the convention (the
+held-invariant factor, the partition, the dispersion rule, the normalisation) is a declared, recorded term
+read by the projection, never a worker default.
+\item \textbf{D14 Admission $\neq$ deterministic value} --- closed by the compute/emit split,
+canonical-by-first, and the $\beta$ bound at consumption.
+\item \textbf{D15 MD-16 write atomicity} --- state $+$ verdict as one transaction over one pinned cut;
+$A'=$ FLAG.
+\item \textbf{D16 Value spread bound} --- the producer-attested reproducibility class, $\beta \le$ VM-6 at
+consumption (COVERAGE-$\beta$), false $\beta$ to audit.
+\end{itemize}
+
+\noindent\textbf{The seven red-team scenarios (S1--S7), and the property each demonstrated survives.}
+
+\begin{itemize}[leftmargin=*, itemsep=0pt, topsep=1pt]
+\item \textbf{S4 Exactly-once $=$ a total function of the durable log} (the root; S1/S3/S6/S7 reduce to it).
+The atomic unique-key insert admits exactly one row per identifier under $N$ redeliveries $\times$ $W$
+racing workers $\times$ a door crash-restart; none is starved; differing payloads under one identifier
+collapse to first-wins, $\beta$ bounding the discard.
+\item \textbf{S1 Refold-atomic.} Append-only $\Rightarrow$ rewind not representable; no model recomputed
+in-fold; re-proposed transactions and synthesised firings collapse to one row; the resume key is the stable
+$(\text{exec},\text{door},\text{hash})$ triple, never an ordinal. This is what $A'=$ FLAG rests on.
+\item \textbf{S7 Gate-state-atomic.} State $+$ verdict are one transaction over one pinned cut; a failover
+re-runs the gate and construct as pure functions of the cut to the same identifier; no ungated or
+half-verdict state is nameable.
+\item \textbf{S3 Sandwich-carries-no-workflow-state.} The sandwich holds no economic state in Temporal
+history; a continue-as-new re-derives it or resumes the one missing certificate; a pre-admitted leg is
+byte-identical by read-back, a re-driven leg is idempotent and $\beta$-bounded.
+\item \textbf{S6 Log-is-sole-truth.} Rebuild reads only the log; the cache holds no write credential; a
+replayed identifier is absorbed; a fabricated novel identifier is door-refused, and a
+value-corrupted-but-consistent one is audit-caught. \emph{Honest edge, no overclaim:} economic causality is
+\textbf{detection-at-audit, not door-prevention} --- the guarantee is ``no poison silently becomes trusted
+truth; no rebuilt state is not derivable from the log,'' not ``no structurally-valid poison ever touches
+the log.''
+\item \textbf{S2 Deploy-is-orchestration-only.} A deploy touches only the Build-ID, which is not in the
+fold; every value is a fold/read-back under recorded economic versions read from the log; an economic change
+is a new recipe-version and a new identifier, never a silent rewrite.
+\item \textbf{S5 Three-times-are-recorded-values.} The fold orders on the door's logical
+$(\text{exec},\text{door},\text{hash})$ read from the log; a bare clock-read stamping a recorded fact is
+unrepresentable by type; skew enters only timer firing, so a skewed fire yields the identical transaction
+and degrades to an overdue-watch event.
+\end{itemize}
+
+\subsection*{6. The firing-witness harvest}
+
+A guarantee defended only in prose is not an invariant. Each property below is owed to the property-test
+regime over generated products, events, and histories, and must be shown to \textbf{fire} --- a
+precondition never generated is a defect, not a green test.
+
+{\footnotesize
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}p{0.265\textwidth} p{0.40\textwidth} p{0.275\textwidth}@{}}
+\toprule
+\textbf{Property} & \textbf{Generator that witnesses it fire} & \textbf{Obligation} \\
+\midrule
+\endhead
+\texttt{prop\_refoldIdempotent} & random late-arrival interleavings $+$ a second refold pass & refold
+twice $=$ refold once \\
+\texttt{prop\_refoldEqualsTimely} & late arrivals vs the same events folded in execution order & refolded
+state $=$ timely state \\
+\texttt{prop\_exactlyOnceAdmission} (S4, double-admit half of I2) & $N$ redeliveries $\times$ $W$ workers
+$\times$ a door crash-restart, same identifier & exactly one row per identifier; none starved \\
+\texttt{prop\_noSilentUnderAdmit} (S4, injectivity half of I2) & two fine-grained-distinct causes with
+near-identical input-cuts & distinct causes $\to$ two distinct admitted identifiers \\
+\texttt{prop\_gateStateAtomic} (S7) & failover at each of gate1 / gate2 / construct / propose & whole
+\{state, verdict\} pair or nothing \\
+\texttt{prop\_sandwichCANInvariant} (S3) & continue-as-new after a leg's emission is durable, and
+mid-compute of a kind-2 leg & pre-admitted leg byte-identical by read-back; a re-driven leg idempotent, no
+half/no double, $\beta$-bounded \\
+\texttt{prop\_wipeRebuildEqualsLog} (S6) & wipe Temporal and rebuild from the log & rebuilt state $=$
+pre-wipe state, cache-independent \\
+\texttt{prop\_fabricatedTxidRefusedOrAudited} (S6) & two fabrications: a novel/inconsistent identifier, and
+a structurally-valid, value-corrupted one (real logged cause, wrong value) & the first door-refused; the
+second audit-caught (D7) --- the audit branch fires \\
+\texttt{prop\_deployMidBacktestInvariant} (S2) & a Build-ID change at each backtest step & admitted
+\texttt{(txid, value)} set $+$ order unchanged \\
+\texttt{prop\_clockSkewInvariant} (S5) & adversarial per-worker/DC offsets over a history with a commuting
+same-execution-time pair & admitted set, fold result, execution$+$monitor times invariant; door-order
+invariant up to a same-execution-time swap; a skewed timer fire yields the identical identifier \\
+\texttt{prop\_everyKind2ConsumerChecksBeta} (COVERAGE-$\beta$) & valuation paths with $\beta$ above/below
+tolerance & every $\beta>$ tolerance path raises a VM-7 broken chain \\
+\bottomrule
+\end{longtable}}
+
+\noindent\textbf{Parking test exercised, empty.} The derived stream is not a second store (one
+immutable-log mechanism on a tagged sub-stream); a gate verdict is a pinned event-outcome, not a
+recompute-on-read projection; the late-corporate-action sandwich is the reordering path, not a
+compensation. The design must \textbf{not} turn on the Valuation Manifesto's PARK-1, which the MD-16
+mechanism neither reopens nor turns on. Residual open items --- the truthfulness of a producer's attested
+$\beta$ (a perimeter reconciliation caught at audit), and the load model sizing the continue-as-new
+cadence and the door and derivation pools --- are parked, not swept.
+
+\subsection*{7. Minority report}
+
+\textbf{None.} Unanimous consensus at round~11: TEMPORAL-1 through TEMPORAL-5 all SIGN, and both referees
+(FORMALIS, TuringAward) sign the round-11 text. The design is Pareto-optimal across correctness,
+minimalism, and simplicity, and --- with \texttt{prop\_noSilentUnderAdmit} added and the harvest
+completed --- across testability. No entry demands anything of the Constitution; every object stays a
+projection, a re-entered observation, or a recorded decision on the log, and the log stays the sole book
+of record.
+\endgroup
+
+\end{document}
