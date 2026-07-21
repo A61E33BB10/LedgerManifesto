@@ -1,0 +1,829 @@
+% =====================================================================
+%  THE LEDGER FRAMEWORK — Market Data Manifesto, Version 1.3
+%  Governing principles for market data. Subordinate to the
+%  Architectural Constitution (ledger_manifesto_v1_4.tex).
+%  1.1 amended the certified 1.0 (fixed) with three embedded mandates:
+%  (1) corporate actions as first-class events — frames and the market
+%  data operator algebra (MD-13); (2) a new governing principle,
+%  dispute-readiness (MD-14); (3) model association and price-space
+%  validation (MD-15), with MD-1/MD-6/MD-9 extended. MD-1..MD-12 keep
+%  their numbers.
+%  1.2 extends three articles for backtesting (the data side of the
+%  cross-manifesto amendment; the backtest object is the Valuation
+%  Manifesto's): MD-4 (served history, read as-known), MD-11 (stressed
+%  history = simulated path branched from a historical cut), MD-13
+%  (horizon-agnostic operator algebra). No new MD-n. 1.1 stays untouched.
+%  1.3 adds ONE article, MD-16 (market data dynamics), placed after
+%  MD-11 to close the shift-and-simulation family (identifier
+%  append-only, never renumbered): every datum has a dynamic (one member
+%  of the world-map family with the shift, MD-11, and the VM's surface-move
+%  rule); a derived state is admitted only through two application-time
+%  gates — no-arbitrage by construction (grounds VM PE-1(A5)) and realism
+%  vs the underlying's own as-known history; thresholds are declared terms
+%  (no numeric constants); the gate decision is a recorded event-outcome.
+%  MD-11 gains one sentence (risk consumes only gated states). 1.2 stays
+%  untouched. Binding input: mdm_dynamics/memo_jacobi_distributions.md.
+%  Drafting: GATHERAL (lead) with THORP (dividends co-pass). Rigor-check
+%  of the gate formalism: FORMALIS. Review: KLEPPMANN, TALEB.
+%  Certification: CONCORDIA (two duties: no numeric thresholds; page
+%  delta <=3 attributable to this section only).
+%  Prior art (source material, not a constraint): the Market Data
+%  Calibration Manifesto (calibration_manifesto.tex).
+%  Build: pdflatex (twice). Standard TeX Live; lmodern and microtype
+%  used when available and skipped otherwise.
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\IfFileExists{lmodern.sty}{%
+  \usepackage[T1]{fontenc}\usepackage{lmodern}%
+  \IfFileExists{microtype.sty}{\usepackage{microtype}}{}%
+}{}
+\usepackage[margin=2.5cm,marginparwidth=2.0cm,marginparsep=2mm]{geometry}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+
+% --- article addressing: margin identifiers, mirroring the Constitution ---
+\IfFileExists{xcolor.sty}{\usepackage{xcolor}}{}
+\ifdefined\textcolor\else\def\textcolor#1#2{#2}\fi
+\newcommand{\mlabel}[1]{\leavevmode\hypertarget{md-#1}{}%
+  \marginpar{\raggedright\scriptsize\ttfamily\textcolor{gray}{#1}}}
+
+\setcounter{secnumdepth}{0}
+\providecommand{\tightlist}{\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}}
+
+% traceability tag at the close of each article
+\newcommand{\trace}[1]{\par\smallskip{\small\itshape (#1)}}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries THE LEDGER FRAMEWORK}\\[0.9em]
+  {\large\bfseries Market Data Manifesto}\\[0.6em]
+  {\normalsize Governing Principles for Market Data ---
+   Subordinate to the Architectural Constitution}\\[1.4em]
+  Version 1.3 \quad---\quad amends the certified 1.0, extends 1.1--1.2 \quad---\quad July 2026
+\end{center}
+
+\vspace{0.6em}
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+
+\begin{center}\itshape
+The record holds observations; every price beyond them is derived from them.
+\end{center}
+
+\vspace{0.4em}
+
+\begin{center}\textbf{Abstract}\end{center}
+\begin{quote}
+The Ledger records observations, not prices. A market data fact enters
+the record exactly once, as a moveless observation admitted through the
+one door; every curve, surface, correlation, and calibration is a
+deterministic function of recorded inputs, of two kinds the document
+keeps apart. A \emph{projection} computes over the record and rebuilds
+from it alone; a model's output \emph{re-enters as a recorded
+observation} (C-14.9, C-14.15). Reading back any recorded value is
+unconditional; re-deriving a model's output is what needs the model. A
+value is meaningful only in a \emph{frame} and at a time coordinate ---
+corporate actions are first-class events that change frames; every datum
+is bound to a model by recorded lineage and validated in price space;
+and every datum is dispute-ready, settled by replay. This manifesto
+states the principles that make append-only, event-driven, projected
+market data the only sensible way to hold it. Each principle is an
+\emph{article} derived from six of the Constitution's eight commitments
+--- auditability, reproducibility, time travel, correctness, order,
+simulability --- and a seventh it \emph{derives} from the first two,
+dispute-readiness; each rests on the Constitution clause that carries it.
+The document is rated against the Constitution, never the other way round;
+where the two conflict, the Constitution prevails.
+\end{quote}
+
+\vspace{0.4em}
+\begin{center}\rule{0.35\linewidth}{0.4pt}\end{center}
+\vspace{0.6em}
+
+\section{1. Market Data in the Ledger's Terms}
+
+A market data fact is an \textbf{observation}: a recorded statement,
+attributed to a source, that a named observable --- a price, a rate, a
+fixing, an index level --- took a value with respect to a world-moment.
+The observation is a fact about what a source said, not the truth about
+what a thing is worth; any ``true'' price behind it is a modelling posit
+that lives in a model, never a claim the record makes.
+
+The source of an observation sits outside the trust boundary; the Events
+Executor captures and records the arrival (C-5.4). It enters the immutable
+log only as a moveless \emph{observation-recording transaction} ---
+moveless because it records data and moves no balances --- admitted
+through the single Transaction Executor and folded into a \emph{home}, its
+resting place in the record from which contracts read (C-4.8). (To
+\emph{fold} the log is to replay it in order, accumulating state; the
+current state is the initial state plus the fold of all observations.)
+There is no second door for market data: the one record and the single
+writer extend to every observation. A kind of
+market data is declared before any observation of it crosses --- its
+fields, the frame it is delivered in, the market data operators that
+adjust it across corporate actions (C-9.2), and the grain of the
+cause-derived identifier --- an identifier computed
+from what caused an arrival, so a redelivery of the same cause collides
+with it --- that decides when two arrivals are the same fact, all
+registered on the record first, so an arrival of an undeclared kind is
+quarantined, never guessed (C-4.12).
+
+\textbf{Vocabulary, mapped once.} This manifesto uses the Constitution's
+fixed names and coins no synonym. Its prior art, the Market Data
+Calibration Manifesto, speaks a different dialect, mapped here once and
+not carried further: an \emph{Oracle} is an external source (no
+``oracle'' primitive, MD-3); an \emph{attestation} is an observation
+(C-4.8); \emph{event time} is execution time, \emph{knowledge time}
+splits into monitor and door time (C-2.7); a \emph{posterior} is a derived
+object (MD-6); a \emph{model configuration} is the recorded, versioned
+terms of a derived object (C-4.4, C-7.2). The Constitution's own
+term \emph{the market data operator} names one thing only --- the
+corporate-action transform of C-9.2 --- and is never used for a source;
+version 1.1 uses that operator as the map between \emph{frames} (MD-13).
+\emph{Frame} builds on the Constitution's own ``post-event frame''
+(C-9.2), which this manifesto promotes to a defined coordinate system ---
+the one term it fixes that the Constitution names only informally. No
+synonym for the
+operator is introduced.
+
+\section{2. The Articles}
+
+Each article derives from one or more of the six commitments and rests
+on a clause of the Constitution. The identifiers MD-\emph{n} are
+append-only: never reused, never renumbered, so later documents may cite
+them.
+
+\mlabel{MD-1}\textbf{MD-1. The observation is the atom of market data.}
+A market data fact is an observation, and an observation is recorded
+exactly once. It enters the immutable log as a moveless
+observation-recording transaction, admitted through the single writer,
+and folded into a home. ``Exactly once'' is a mechanism, not a wish: each
+arrival carries its cause-derived identifier, and an arrival identical
+under it is \emph{absorbed} as a duplicate, not recorded again (C-2.7,
+C-12.3, C-14.3). Absorption is not a silent drop: no new value is
+recorded, but the redelivery's arrival provenance is retained, so a
+healthy absorb is distinguishable from a feed gone quiet. Three arrivals that look alike must be told
+apart, and the identifier's grain --- a registered property of the data
+kind (\S1) --- is what tells them: the same print \emph{redelivered} is
+absorbed; a vendor \emph{correction} is a distinct, later observation
+that names the value it corrects (MD-10); a genuinely \emph{new} print at
+the same instant is a second observation, recorded in its own right. A
+grain too \emph{fine} double-counts a redelivery; a grain too \emph{coarse}
+absorbs a genuine second print and loses it --- and that the registered
+grain is correct is a trust assumption, named beside TA-ARRIVAL. The
+double-count is loud, the extra observation on the record to be found;
+the over-coarse loss is \emph{silent}, and where two distinct prints are
+identical under every field a feed sends, no grain can separate them.
+This one residual silent loss the manifesto does not pretend to prevent;
+it is caught where TA-ARRIVAL's gaps are --- at the perimeter, reconciling
+arrival counts against recorded observations. Subject to that, nothing
+about market data is written twice: the value a source stated is its sole
+canonical copy, computed from wherever it is mentioned, never stored
+beside it.
+\trace{Auditability, Correctness; C-1.4, C-4.8, C-2.7, C-12.3, C-14.3.}
+
+\mlabel{MD-2}\textbf{MD-2. Capture precedes judgement.} The record
+admits an observation before anything decides whether to believe it. A
+stale, fat-fingered, or off-consensus quote is well-formed: it enters
+through the normal door as an observation-recording transaction (C-4.8),
+and judgement is deferred because economic correctness is never gated at
+admission --- it is detected after the fact by recomputation (C-13.2,
+C-13.3). A quote that is not even processable --- a corrupted payload,
+an unresolvable reference --- is still not lost: it is captured with the
+provenance of its arrival and stands as a visible open item (C-4.12).
+Either way the Ledger captures, then classifies; it never refuses to
+record in order to reject. Whether an observation is used, down-weighted,
+or ignored is a separate and later question, answered by a derived
+object over the record, never by the door. A ``rejected'' observation is
+one a calibration assigned no weight --- present, inspectable,
+reclassifiable later --- not one the record never held.
+Capture-then-classify is a \emph{principle} whose guarantee runs
+\emph{from arrival}: whether a pipe can hold the open's firehose is a
+capacity question outside this document (TA-ARRIVAL), but the principle
+forbids using capacity as a licence to drop silently --- what the boundary
+cannot admit is a named, visible residual; what never reaches it is the
+perimeter's concern (C-4.12).
+\trace{Auditability, Order, Correctness; C-4.8, C-13.2, C-13.3, C-4.12.}
+
+\mlabel{MD-3}\textbf{MD-3. The source is untrusted; its delivery is a
+trust assumption.} The origin of an observation --- an exchange, a
+broker, a fixing provider, an on-chain feed --- is machinery beyond the
+system's trust boundary, an external source (C-5.1, C-5.8), and the
+framework grants no source the standing of truth. That an observation
+reaches the boundary at all is a trust assumption, reconciled at the
+perimeter, never a fact the fold may assume (C-4.12). The framework has no
+privileged ``oracle'' component: a source is where an observation came
+from, recorded as provenance, and nothing more.
+\trace{Auditability, Correctness; C-5.1, C-5.4, C-5.8, C-4.12.}
+
+\mlabel{MD-4}\textbf{MD-4. Every observation bears three times, and as-of
+and as-at are two of them.} By the Constitution an event carries an
+execution time --- the world-moment its source asserts it happened, the
+time a court would enforce, contestable only in the world and corrected
+only by a later event; a monitor time --- when the boundary observed it;
+and a door time --- when the single writer admitted it (C-2.7). The
+\emph{as-of} coordinate --- the world-moment a value concerns --- is its
+execution time; the \emph{as-at} coordinate --- when the record came to
+hold it --- is its door time; monitor time is provenance, splitting
+lateness into the world's delay and ours. Because both are recorded, the
+system computes both honest answers at any moment: what was known as of a
+past date, and what is known now about it (C-12.1). A value carries one
+coordinate more: the corporate-action frame it is expressed in (MD-13).
+
+\textbf{A served history is these two coordinates ranged over a recorded
+interval, read as-known.} A backtest is the valuation doctrine read at
+historical coordinates. Its default read pins as-at to the historical as-of, so
+each coordinate sees only the observations then in force (MD-5) and look-ahead
+cannot arise --- it is structurally impossible, not a discipline to remember.
+The past is served with its lineage intact: at each coordinate the observation,
+its cut, its frame, and its recorded bound model stand on the record as they
+then stood (MD-6, MD-13, MD-15) --- the single home of ``the model as it was.''
+Serving is gap-free by read-back: every recorded value is read back at its
+historical coordinate unconditionally (C-14.15), so a replay of the marks then
+struck has no gap. Re-deriving a model output at a historical coordinate ---
+rather than reading back its stored re-entered observation --- is available
+exactly where the model is retained (MD-6): completeness is a property of
+read-back and holds always, re-derivation is bounded and the bound is MD-6's.
+\trace{Time travel, Order; C-2.7, C-12.1, C-14.15.}
+
+\mlabel{MD-5}\textbf{MD-5. Order is meaning, and the authoritative fold
+is execution-ordered.} Observations are events, and their sequence is
+load-bearing: a derived object depends on which observations preceded
+it --- a surface fitted before a shock is not the surface fitted after
+it. Meaning lives in execution order. An observation that arrives late,
+whose execution time precedes observations already folded, takes its
+place among them; every \textbf{projection} downstream refolds to include
+it (C-2.7), while a \textbf{re-entered observation} whose input window it
+lands in cannot re-fold itself --- the ledger runs no model (C-14.9) ---
+and is instead flagged stale for re-derivation (MD-8). Neither is silent:
+the insertion and every changed or staled value are flagged, and the
+difference is published as a named explain item --- a line in the
+profit-and-loss explain (C-12.6). The as-known view --- what the book
+showed with only the observations it then held --- survives unrewritten
+beside the corrected one.
+\trace{Order, Time travel; C-2.7, C-12.6, C-14.9.}
+
+\mlabel{MD-6}\textbf{MD-6. Every derived object is a deterministic
+function of recorded inputs.} A curve, a surface, a correlation, a
+calibration is a function of what the record holds --- the observations
+and any derived objects it consumes, each pinned to its version and
+\emph{cut} (the as-at boundary fixing which observations were in force;
+MD-12), the recipe that defines it, and, where the recipe draws on
+randomness, a recorded seed. Two kinds of
+derived object must be told apart, and the Constitution names both.
+
+Where the recipe computes \emph{over the record} --- a discount factor
+read off recorded quotes, an adjusted value from the market data operator
+--- the object is a \textbf{projection}: it stores nothing and rebuilds
+from the record alone, by any party, today or at a past date (C-2.2,
+C-3.2, C-14.11). Where the recipe \emph{runs a model} --- a filter, an
+optimiser, a fitted surface --- the ledger does not run it (C-14.9); the
+model is evaluated outside the fold and its output re-enters through the
+one door as a new \textbf{observation} (C-14.15). That number is stored
+like any observation, and two senses of recovering it must not be
+confused: \emph{reading it back} is always possible from the record
+alone; \emph{re-deriving} it --- showing it follows from its inputs ---
+needs the retained model and the numerical environment it ran in, a
+governance matter outside this scope. A re-entered observation is read
+back unconditionally, re-derived only with the model.
+
+Either kind carries, as recorded provenance, a \textbf{complete lineage}:
+the resolved input cut --- every observation and derived object it
+consumed, each pinned to version and cut; the corporate-action events
+whose frame the operator applied (MD-13); for a model output the model
+version; and for any datum used in valuation the model it is bound to
+(MD-15). Lineage reaches through the whole chain to the leaf observations,
+so what an object depends on --- including the corporate actions behind
+its frame --- is always legible. A derivation that \emph{fails} is not an
+absence, and its treatment follows the split: a \textbf{projection}
+failure --- a bootstrap with too few quotes --- is legible by
+recomputation, never stored, and refreshes to success if a late arrival
+fills the gap (MD-5); a \textbf{model-run} failure re-enters as a recorded
+observation with its diagnostics, itself stale if its inputs later move; a
+failed \emph{capture} (MD-2) is stored as an input-side arrival, not a
+derivation. An absent object never passes for one never attempted. Record
+enough --- observations, derived inputs, recipe, seed, lineage --- that
+the object is a deterministic function of the record.
+\trace{Reproducibility, Simulability, Correctness; C-2.2, C-3.2, C-14.9,
+  C-14.11, C-14.15.}
+
+\mlabel{MD-7}\textbf{MD-7. The prior is a term; the posterior is a
+derived object.} A Bayesian calibration is not banned; it is placed. The
+prior --- including any assumed dynamics for how a parameter moves
+between observations --- is a declared, recorded term. The posterior is
+a derived object of that prior-term, the recorded observations, and the
+seed (MD-6): a projection where it computes over the record, a re-entered
+observation where a filter evaluates a model. Either way it is \emph{not}
+stored state --- no ``current posterior'' updates in place; today's
+posterior is tomorrow's prior names a recomputation, not a mutable
+variable. The framework mandates no dynamics --- a random walk, a
+martingale, a mean reversion are recipe choices, never framework axioms
+--- and whatever is declared is recorded, so the posterior is reproducible
+on MD-6's terms.
+\trace{Correctness, Reproducibility; C-2.8, C-4.11, C-14.15.}
+
+\mlabel{MD-8}\textbf{MD-8. A broken state cannot hide.} A recurring
+pathology of calibrated systems is the stored parameter that has drifted
+from what the information implies: the system knows something it has not
+yet written into its numbers. The Ledger defeats it by a mechanism that
+differs by kind. A \textbf{projection} stores nothing --- recomputed from
+the record on every read (C-4.11) --- so it cannot lag the record: the
+drifted-parameter state is unrepresentable, and under a joint recipe an
+on-demand read is the correct joint conditional expectation, so even two
+correlated legs cannot hold a divergent pair. A \textbf{re-entered
+observation} does store a number --- a fitted surface, or a joint
+vol-and-correlation fit for a spread, sits on the record because the
+ledger runs no model (C-14.9). It cannot drift in place: a new fit is a
+new observation, forward, naming the inputs it consumed (MD-6), never an
+edit of the old. And when an input it consumed is later corrected or
+superseded --- a wrong price, or a corrected corporate action behind its
+frame, both pinned lineage inputs (MD-10, MD-13) --- the ledger does not
+silently recompute it; its lineage shows the input moved under it, and the
+stale fit stands as a flagged open item for re-derivation, so the joint
+spread surface cannot silently disagree with a corrected leg or a restated
+split. That visibility is reached by default: a consumer reads a
+re-entered observation through a projection --- ``the current fit for X'',
+selecting the latest non-superseded observation and carrying its staleness
+flag --- never the raw stored value. What the framework forbids everywhere is the
+\emph{silent} divergence: for a projection it cannot arise; for a
+re-entered observation it cannot hide.
+\trace{Correctness; C-1.5, C-4.11, C-11.5, C-14.9.}
+
+\mlabel{MD-9}\textbf{MD-9. Constraints live in the derived object;
+no-arbitrage is declared, not assumed.} A recorded observation carries
+no promise of mutual consistency --- a stale quote and a fresh one may
+cross, and two sources may disagree; the record holds both. No-arbitrage,
+smoothness, and monotonicity are constraints a derived object imposes on
+its own output, not properties the record must have. A derived object
+that cannot meet the constraints it declares records that it cannot ---
+a visible diagnostic --- rather than serving an inadmissible object as
+though it were sound. No-arbitrage is not negotiable for the object that
+claims it, but it is enforced by detection, not admission: an
+arbitrageable surface served as arbitrage-free is an economic error caught
+after the fact by recomputation, not prevented at a door (C-13.2, C-13.3),
+with claim and test both on the record. Which no-arbitrage conditions are
+correct, and whether a fitted object hedges, are model choice, outside
+this scope (C-Scope.11). No-arbitrage is the object's \emph{internal}
+consistency; its \emph{external} validity --- whether it reprices what it
+was drawn from --- is decided in price space (MD-15); both are recorded
+diagnostics, neither prevented at a door.
+\trace{Auditability, Correctness; C-13.2, C-13.3, C-Scope.11.}
+
+\mlabel{MD-10}\textbf{MD-10. Corrections repair forward; the original is
+never overwritten.} A market data fact found wrong is not edited. The
+discovery is a new recorded observation that names the wrong one, and the
+discrepancy stands as a visible open item. What happens downstream splits
+by kind: every \textbf{projection} over the corrected fact recomputes
+automatically on the next read; a \textbf{re-entered observation} that
+consumed the wrong fact cannot re-run itself (C-14.9), so its recorded
+lineage marks it stale and it stands as a flagged open item until a fresh
+fit supersedes it forward (MD-8). A bulk retraction --- a vendor voiding
+a whole day --- is many corrections at once; the explain may summarise
+them as one named item rather than flood the book, so the signal is not
+lost in the flags. Where money already moved on the strength of the wrong
+fact, it moves back only as an authorised compensating transaction
+(C-12.4). The observed value stays on the record exactly as observed.
+Adjustments a later event forces on earlier data --- a split rescaling a
+price, a dividend rescaling a cash-per-share figure --- are a \emph{change
+of frame}, not a correction: computed at each read by the market data
+operator (C-9.2, C-9.3), declared once per data-and-event pairing and
+never improvised, obeying the algebra of MD-13. The original is preserved,
+the adjusted value derived at read, and derived quantities are recomputed
+from operator-adjusted inputs (C-9.3), never scalar-transported.
+\trace{Auditability, Time travel, Correctness; C-9.3, C-12.4, C-12.6, C-14.9.}
+
+\mlabel{MD-11}\textbf{MD-11. Simulated market data is real market data
+under a different seed.} The state of the market data universe is the
+initial state plus the fold of all recorded observations (C-2.8). A
+stress scenario, a backtest, a Monte-Carlo path is not a separate system
+but the same machine folding a generated stream of observations from a
+recorded seed; production is simply the one path whose observations
+happened to be real. Because the seed is the single non-record input and
+it too is recorded, every simulated path replays exactly, on the same
+terms as one over real observations --- but only because every model
+output on the path is itself captured as a re-entered observation (MD-6);
+a path that recorded only the seed could not replay.
+
+\textbf{A stressed history is a simulated path branched from a historical cut;
+the shift is its seed.} A historical trajectory perturbed by a declared
+\emph{shift} (the Valuation Manifesto's term --- a recorded perturbation of the
+observation stream) is a simulated path under this article, real on the same
+terms. ``What happened'' is the identity shift; ``what could have happened'' is
+any other --- one machine, equal effort, the two symmetric. Its coordinates are
+the historical cut and the declared recorded shift; both recorded, it replays
+bit-for-bit and carries the lineage of the inputs it branched from and the shift
+that moved them. Recording only the shift, like a path recording only its seed,
+could not replay. A backtest or risk report consumes a stressed history only after
+its states pass the admissibility gates of MD-16 --- which is what makes a derived
+world safe to build risk on.
+\trace{Simulability, Reproducibility; C-2.8, C-10.1.}
+
+\mlabel{MD-16}\textbf{MD-16. Every market datum has a dynamic, and a derived
+state it produces is admissible or it does not exist.} Its identifier is
+append-only, so it reads MD-16 though placed beside the shift (MD-11), before MD-12.
+
+Every market datum has a \textbf{dynamic}: a declared rule for how it moves when
+the world moves --- an implied volatility when spot moves, an expected dividend
+that falls when spot falls. A dynamic is first-class, not an implicit convention
+buried in a repricing: it is declared, versioned, and attributable, recorded like
+any derived object's recipe (MD-6). The dynamic, the backtesting \emph{shift}
+(MD-11), and Part~B's surface-move rule $\mathcal{D}$ (VM~PE-1, PE-5) are one
+family of declared \textbf{world-maps} over recorded data --- \emph{dynamic} is this manifesto's
+name for the member that acts on a single datum, as $\mathcal{D}$ is the member
+acting on a whole surface and the shift the member acting on a path. The bridge
+from $\mathcal{D}$ to the attribution convention is the Valuation Manifesto's
+(VM-5 $\equiv \mathcal{D}$), stated once there and not restated here; this article
+closes the family on the market-data side.
+
+Applying a dynamic to an \textbf{admissible base state} $m$ --- a calibrated,
+arbitrage-free configuration for one underlying: its surface, its rate and
+dividend curves, its correlation block --- yields a \textbf{derived state}
+$m^\ast$. A derived state is not captured; it is \emph{constructed}, and it is
+admitted only through two \textbf{gates}, both decided \emph{at application time}.
+This keeps MD-2 and MD-9 intact: a real observation, however implausible, is always
+captured (MD-2) and its no-arbitrage checked by detection (MD-9); a constructed
+state is generated only if it passes the gates. Prevention is available here, and
+not for a black-box fit, precisely because a declared \emph{dynamic} built the state
+--- its admissibility is a decidable predicate on a projection over the record
+(MD-6). The base is pinned at a single application cut: the two gates and the
+constructed state are one evaluation over that cut (MD-12), so the base cannot move
+between gating and construction.
+
+\textbf{Gate 1 --- no-arbitrage, by construction.} The derived state exists only
+if it lies in the arbitrage-free set, $m^\ast \in \Theta_{\mathrm{AF}}$ --- the
+admissibility ladder of the corpus (Vol~I, \S2.6; Ch.~4, Axiom~A3). An
+arbitrageable derived state is not produced, so no consumer ever meets one:
+\emph{prevention, not detection}. This gate \emph{grounds} VM~PE-1(A5)'s standing
+hypothesis $\Sigma(\cdot\,;S)\in\mathcal{A}$: what the child assumes, this parent
+guarantees at application. It does not overturn MD-9: where admissibility is a
+decidable predicate on a projection, as here, the framework prevents; MD-9's
+detection-not-admission stands only where no-arbitrage cannot be tested without
+running a model.
+
+\textbf{Gate 2 --- realism, statistical.} Non-arbitrageable is necessary, not
+sufficient. The derived state's key \textbf{functionals} must lie within
+\emph{realistic} --- and, where the dynamic's danger direction demands,
+\emph{conservative} --- percentiles of their own historical distributions,
+computed \emph{per functional, per underlying, against that underlying's own
+past}. A functional is a deterministic map from a state to a number or a vector,
+defined before use; its historical distribution is the sequence of its values
+over the underlying's own past states, each read \emph{as-known} at its own cut
+(MD-4), never look-ahead-restated. The monitored functionals are the forward
+variance swap between two tenors, the forward dividend yield over a window, the
+one-month--one-year implied-volatility spread, and the total expected dividend to
+a horizon (discounted or undiscounted per a declared convention). Two examples fix the discipline. After a spot move, the
+one-month--one-year spread of the derived surface must sit within a realistic
+percentile of that underlying's history. After a \emph{downward} spot move, the
+total expected dividend must sit within a \emph{conservative} percentile of that
+underlying's own dividend history --- the direction of the move is the dynamic,
+the percentile is the bound. The dynamic governs the \emph{forecast} portion of
+the dividend stream: dividends already declared are fixed and spot-insensitive,
+and special dividends and outright cuts are not monotone in spot at all --- which
+is why the bound is the underlying's own history at a conservative percentile,
+not the point forecast a clean monotone rule would imply. A conservative
+\textbf{acceptance region} --- the percentile band a functional must sit in to pass
+--- is strictly smaller than the realistic one, tighter or one-sided, so the value
+must lie well inside historical support, not merely within it.
+
+\textbf{Joint realism is essential, not a refinement.} Some functionals are tested
+\emph{jointly}: the forward variance swaps across a declared tenor set, and the
+at-the-money volatilities at declared tenors, are vector-valued functionals whose
+joint historical distribution is a point cloud, and realism is the plausibility of
+the derived vector against that cloud. Marginals do not suffice --- each coordinate
+can sit inside its own band while the vector lies in an empty region of the cloud.
+An inverted forward-variance term structure, a near forward variance above a far
+one, can carry each leg at an individually common level yet an inversion that
+essentially never co-occurred: both margins central, the joint configuration
+unprecedented. The marginal gates pass it; the joint gate does not. Joint realism
+is also the hungriest for data: the history needed to fill a point cloud rises
+steeply with the vector's dimension, far beyond any single margin, so the joint
+gate is the most likely to report \emph{undecidable} on the very vectors it exists
+to police --- and a declared joint-plausibility convention that supplies a verdict
+on sparse joint history is itself a disclosed, versioned modelling assumption about
+the joint tail.
+
+\textbf{No numeric threshold is a manifesto constant.} This article fixes
+\emph{which} functionals are monitored, \emph{that} the discipline is
+realistic-or-conservative percentiles, and \emph{that} the history is the
+underlying's own as-known past. Every number that turns those into a test --- the
+history window and cadence, the regime-boundary treatment, the percentile
+convention, the acceptance regions and their one- or two-sidedness, the functional
+vectors and their tenor sets, the discounting basis of the total expected
+dividend, and the joint-plausibility convention --- is a
+\textbf{declared term}: recorded, versioned, attestable, per functional per
+underlying, changeable without amending this manifesto. A region set too loosely
+would make realism vacuous --- VM-6's too-loose-bound risk --- but not silently: it
+is recorded, versioned, and counterparty-challengeable, so a lenient bound is
+auditable, never hidden. Two parties settle by sharing the declared terms and
+replaying, the discipline the attribution and dispersion conventions obey (VM-5, MD-15).
+The gates are decidable under four conditions holding at application: a declared
+as-known history exists over the window and is \emph{sufficient} to populate the
+declared percentile --- a nonempty history is not enough, since a name with too
+few dividend events to fill its dividend functionals' distribution supports no
+realistic percentile, and Gate~2 then reports realism \emph{undecidable}, a thin
+history being a hypothesis failure honestly flagged, never silently waved through;
+an undecidable verdict is not a pass, so the state is not admitted --- prevention,
+not detection --- and the refusal is recorded (without a sufficient history Gate~2
+has no distribution);
+every functional is computable from $m^\ast$ (else its value does not exist); the
+conventions are declared and recorded (else no two parties agree); and each
+historical state was read at its own cut (else look-ahead contaminates the
+distribution).
+
+\textbf{The gate decision is recorded; auditability reaches the verification, not
+only the data.} The application of a dynamic is an \textbf{event} in the derived
+stream --- MD-11's simulated path, whose every output is captured. Its gate decision
+--- pass, fail, or undecidable, the functionals computed, their percentiles, the
+history basis --- is the \emph{recorded outcome} of that event, pinned at
+application with its declared-term lineage, as the single writer's admit-or-refuse
+is recorded with the transaction it decides. It is not a base-stream projection
+recomputed on read (MD-8): the decision turns on declared terms and an as-known
+history that are themselves versioned, so the number that stood is an as-known fact
+(MD-4), re-derived only against the terms and history as they then stood. Pinned
+as-known it cannot drift, so recording it captures an event-outcome (MD-11's
+discipline that a path capture its outputs), not a live projection --- no collision
+with C-4.11, and the Valuation Manifesto's parked storage question (PARK-1) is
+neither reopened nor turned on. Derived states and their decisions live in the
+derived stream and never enter the base stream, so base-history serving (MD-4) is
+unaffected by any volume of derived-state creation.
+
+\textbf{Coherence.} A derived datum remains a \textbf{(datum, model) pair}:
+price-space validation (MD-15) applies in a derived world exactly as in the base
+one. A state that fails either gate is a \emph{broken state}, forbidden by
+construction. Consumption is enforced by reference: a backtest or risk report names
+a derived state \emph{by its admission record} --- its passing gate-decision --- so
+a state carrying none cannot be named and cannot be consumed. The guarantee is
+honestly bounded: prevention governs the \emph{constructed} derived layer, while the
+calibrated base a derived world roots in is admissible by MD-9 \emph{detection}, not
+prevention --- so a backtest inherits detection at its root and prevention at every
+derived step, never uniform prevention. A derived state carries \textbf{full
+lineage} --- the base coordinates it branched from, the dynamic applied to reach it,
+and any market data operator its span crossed (MD-13) --- dispute-ready on MD-14's
+terms.
+\trace{Correctness, Simulability, Auditability, Reproducibility; C-2.4, C-2.8,
+  C-13.3, C-4.11, C-Scope.11.}
+
+\mlabel{MD-12}\textbf{MD-12. Derivation composes.} A derived object may
+consume another derived object --- a volatility calibration reads a
+discount curve, a spread model reads two surfaces. When it does, the
+dependency --- which object, at which version and cut --- is part of the
+recorded recipe (MD-6), so the composite is again a deterministic function
+of the record and the MD-6 split composes: a chain of \textbf{projections}
+reconstructs bit-for-bit from the record; a chain through a
+\textbf{re-entered observation} enters that node as a \emph{leaf} --- read
+back always, re-derived only with its retained model (MD-6). Because each
+input is fixed at its own cut, never a mutable store, the ``mid-update
+input'' cannot arise (MD-8): a curve feeding a calibration is consistent
+with it by construction, not scheduling.
+\trace{Reproducibility, Correctness; C-2.2, C-14.11.}
+
+\mlabel{MD-13}\textbf{MD-13. A corporate action is a change of frame; the
+operators that make it compose.} A corporate action is first-class --- a
+recorded transaction like any other (C-9.1), never an adjustment applied
+to market data outside the ledger. It re-coordinates every value recorded
+before it (C-9.2), so a value is not a bare number but lives in a
+\textbf{frame}: the coordinate system fixed by the corporate-action terms
+in force \emph{and} the declared adjustment convention (which actions the
+operator applies, price- or total-return, the rounding rule). The frame a
+value arrives in is itself an \emph{asserted, recorded
+fact} of the observation --- provenance registered per data kind (\S1),
+never inferred from execution time, since a raw feed delivers unadjusted
+but a vendor's back-adjusted series does not. The operator transports from
+the \emph{declared} delivery frame, so a value already adjusted at source
+is never adjusted again.
+
+A corporate action carries its own three times. Its \textbf{ex-date} is
+its as-of --- the moment the price re-coordinates, the frame boundary ---
+distinct from when its terms became known. Before ex, or if the action is
+cancelled, the operator is the identity on the price series, so a
+cancelled-before-ex action never forces an un-adjust; an announcement, or
+a revised dividend, is not a frame change but new information that refolds
+projections (MD-5). And the operator is determined only once the terms are
+\emph{resolved}, not merely announced: where the map turns on a later
+fixing, proration, or holder election --- a scrip reference price, a
+merger's blended consideration --- it exists from the \emph{resolution}
+observation, and before that the frame is provisional and legible as such
+(MD-6), never a silent wrong number.
+
+The map is the Constitution's \textbf{market data operator} (C-9.2), a
+projection computed at read, the original never overwritten (C-9.3,
+MD-10). It acts on \emph{leaf} observations and is not in general a
+proportional scalar --- a special cash dividend shifts a forward
+additively, a listed option's OCC adjustment re-coordinates strike,
+multiplier, and deliverable. Derived objects --- surfaces, curves,
+correlations --- are never transported by an operator of their own;
+\textbf{derived quantities are recomputed from operator-adjusted inputs}
+(C-9.3, MD-6, MD-12). Operators compose at \emph{full precision}, the
+minor-unit rounding (C-4.6) applied \emph{once} at read, so the composite
+is grouping-independent and two parties reconstruct the identical value;
+rounding between operators would not.
+
+These operators form a plain algebra over frames. They \textbf{compose}:
+two splits a week apart chain forward into one map, associative because it
+is function composition. Over an action-free span the operator is the
+\textbf{identity}, and some actions are the identity for a data kind --- a
+proportional dividend figure stands across a split (C-9.2). An
+\textbf{inverse} exists only where the transform preserves information;
+under rounding most operators lose it and have none, and the framework
+needs none --- the original is preserved (C-9.3), so any frame is reached
+forward from the execution-time frame, never by inverting. The operator
+changes a value's frame and leaves its as-of and as-at (MD-4) unchanged,
+so it \emph{commutes} with as-of selection under a fixed as-at cut ---
+adjust Tuesday into today's frame then pick Tuesday, or pick then adjust,
+gives the same value. The cut must be fixed:
+an action whose door time falls between two cuts is known only at the
+later, so the composite operator differs between them. A corrected or late
+corporate action is a \emph{superseding} event (MD-5, MD-10): every
+projection over the old frame recomputes, and --- the action being a
+pinned lineage input (MD-6) --- every re-entered observation whose lineage
+reaches it is flagged stale, exactly as a corrected price does. Hence
+\textbf{a quote is meaningful only given a time coordinate and a frame}:
+any two parties who agree on (as-of, as-at, frame) reconstruct the
+identical value.
+
+\textbf{The operator algebra is horizon-agnostic.} A backtest is a fold over the
+same observations and corporate-action events, so an ex-date crossed inside it
+traverses frames through the market data operator with nothing relaxed: the
+frame boundary, the delivery-frame discipline (a value adjusted at source is
+never re-adjusted), and the terms-resolved condition (the operator exists only
+from the resolution observation; before it the frame is provisional) all hold
+within the horizon. The valuation sandwich that decomposes the ex-date mark
+jump --- value-before in the old frame, operator, value-after in the new ---
+fires inside the backtest as in production; that sandwich is the Valuation
+Manifesto's, stated once there.
+\trace{Order, Time travel, Reproducibility, Correctness; C-9.1, C-9.2,
+  C-9.3, C-2.3, C-4.6.}
+
+\mlabel{MD-14}\textbf{MD-14. Every datum is dispute-ready.} Auditability
+and reproducibility, pressed to their adversarial conclusion, give a
+seventh governing principle: a dispute about a recorded value is settled
+by \emph{replay}, not argument --- dispute-readiness is what those two
+principles already are once an adversary insists, asking nothing new of
+the record. To contest a mark is to contest a number, and the record
+answers by exhibiting the whole chain that produced it --- the datum, its
+provenance and attestation, the \textbf{cut} it was struck at, the
+\textbf{frame} it was read in (MD-13), and the model it is bound to
+(MD-15) --- and reproducing the valuation bit-for-bit (MD-6), the as-at
+pinned to the mark's own cut, so the number that stood then is reproduced,
+not a post-correction one. Its bound is exact: replay settles whether the
+value is the faithful, deterministic consequence of the inputs the record
+held at its stated (as-of, as-at, frame) --- the only question a system of
+record can answer. It does \emph{not} settle a two-sided economic dispute:
+a counterparty's mark, from its own surface, model, and frame, replays
+bit-for-bit too, and which is right is model choice, out of scope (\S4).
+But exhibiting the frame and the bound model \emph{localises} the
+disagreement --- one side applied the split to the strike, the other to
+the multiplier --- which is the value replay does deliver. Its reach is MD-6's:
+a value reproduces from recorded prices unconditionally, a model's number
+once the model is supplied (C-14.15), never wider.
+\trace{Dispute-readiness (Auditability + Reproducibility); C-2.1, C-2.2,
+  C-2.3, C-Scope.11.}
+
+\mlabel{MD-15}\textbf{MD-15. A datum used in valuation is bound to a
+model; validity is decided in price space.} A market data value on its
+own is a number; it becomes a fact of the valuation universe only when
+bound to the model through which it prices something. The binding is not a
+claim that the model is true --- this manifesto asserts no model, and a
+dynamics such as the martingale, or a latent ``true price'', is
+admissible only as a declared, recorded term, never an axiom. The binding
+is \textbf{recorded lineage}: which model, which version, stands beside
+the datum (MD-6), exactly as an input cut does.
+
+Why price space: no one argues a printed number is wrong in itself.
+Disputes are about the valuation of \emph{units} (MD-14), and a unit's
+value is defined only in price space, where truth is contractually fixed.
+So a datum is validated where it is used: it is \textbf{valid on its
+calibration set} when, through its bound model, it reprices the
+instruments it was drawn from within a declared tolerance --- off-set use
+is model extrapolation, whose validity is model choice, not this
+round-trip. The round-trip is the acceptance test, and it shows
+calibration and validation to be one act seen from opposite directions ---
+calibration reads parameters from prices, validation reads prices back. Both are derived
+objects over recorded inputs and the declared model term (MD-6), so
+model-binding never undoes the split, and the repricing residual is
+itself a re-entered observation --- a recorded diagnostic (MD-9), stale
+if its inputs later move (MD-8), never a silent pass. Which model, and
+which tolerance, are model choice, out of scope (C-Scope.11); that
+validity is decided in price space is not.
+\trace{Correctness; C-2.4, C-13.2, C-14.15, C-Scope.11.}
+
+\section{3. The Life of an Observation}
+
+One observation can walk the whole picture. Follow AAPL's official close
+on a Tuesday, needed by an equity volatility surface.
+
+\begin{itemize}
+\tightlist
+\item \textbf{Recorded once, in a frame.} The exchange publishes AAPL's
+  Tuesday close of 150.20; the Transaction Executor admits a moveless
+  observation-recording transaction. The value is on the record once
+  (a redelivery is absorbed), stamped with execution time (Tue 16:00,
+  as-of), monitor, and door time (Tue 18:30, as-at), in the pre-split
+  frame it was quoted in (MD-1, MD-4, MD-13).
+\item \textbf{A split is a change of frame.} The next week a two-for-one
+  split is recorded as a first-class event. The market data operator
+  carries 150.20 into the post-split frame as 75.10, computed at read; the
+  original is never overwritten, and any later action's operator chains
+  onto the split's, forward, in execution order (MD-13, MD-10).
+\item \textbf{Corrected forward, two answers.} On Thursday the exchange
+  restates the close to 150.50 --- a correction (a new observation naming
+  the old, MD-10), distinct from the split. The two effects separate: the
+  split alone reframes 150.20 to 75.10; the correction alone lifts 150.20
+  to 150.50. So \emph{Tuesday as published Tuesday} (cut as-at Tue 18:30,
+  pre-split frame) is 150.20, while \emph{Tuesday as valued now} (cut
+  as-at today, post-split frame) is the corrected close reframed, 75.25 ---
+  a quote needs both a time coordinate and a frame.
+\item \textbf{Disputed.} A counterparty contests a collateral mark that
+  used Tuesday's surface. It is not argued: replay exhibits 150.20, its
+  provenance, cut, frame, and bound model, and reprices the mark
+  bit-for-bit, the as-at pinned to the mark's cut (MD-14). Replay cannot
+  decide whose surface is right, but it \emph{localises} the disagreement
+  to a differing frame, input, or model.
+\end{itemize}
+
+\section{4. What This Manifesto Does Not Govern}
+
+This manifesto governs how market data is recorded, ordered, corrected,
+and projected. It does not govern \textbf{price formation and discovery}
+(where a price comes from is not a question the record answers);
+\textbf{which model, prior, or no-arbitrage condition is correct} (model
+choice, whose test is hedging performance); \textbf{model governance,
+validation, and retention} (a value reproduces from recorded prices
+unconditionally, a model's number only if the model is kept); \textbf{the
+terms of a corporate action} (the operators transport data through it,
+MD-13; the terms arrive as recorded events, not decided here); and
+\textbf{settlement} (the record projects committed activity toward it but
+does not perform it). These lie outside the Ledger boundary and are
+reconciled against it only at its perimeter (C-Scope.11).
+
+\textbf{The backtest object is the Valuation Manifesto's.} This manifesto grants
+a served history read as-known (MD-4), stressed histories as first-class
+simulated paths (MD-11), and corporate-action frames that hold through the
+horizon (MD-13). The backtest itself --- a valuation chain evaluated across a
+served or stressed history, and the comparison of the chains it produces --- is a
+valuation object, governed by the Valuation Manifesto.
+
+\section{5. Subordination}
+
+This manifesto is subordinate to the Constitution and rated against it,
+never the other way round. Its vocabulary is the Constitution's, one name
+per component, no synonym for any fixed term. Where a principle here would
+conflict with the Constitution, the Constitution prevails and the
+conflict is parked with the exact amendment text and the exact clause it
+replaces --- never resolved by quiet narrowing. A genuine departure amends
+this document explicitly first; an article identifier is never reused or
+renumbered.
+
+\section{Conclusion}
+
+Reconciliation of market data has the same root cause as every other: the
+same fact stored more than once, and the Ledger removes it. An observation
+is recorded once; every curve, surface, and calibration is a deterministic
+function of what the record holds --- read back always, re-derived only
+where a model runs; every value carries its times and its frame, is bound
+to a model, and is settled by replay; corrections repair forward,
+originals survive. Operate it any other way and you reintroduce the
+divergence the architecture exists to remove; this way, there is nothing
+left to reconcile.
+
+\noindent\textbf{Amendment record --- Version 1.1} embeds three mandates
+in the certified 1.0: corporate-action frames and the operator algebra
+(MD-13); dispute-readiness, a derived seventh principle (MD-14); and model
+binding with price-space validation (MD-15). MD-4, MD-6, MD-9, MD-10
+extended; MD-1--MD-12 keep their numbers.
+
+\medskip
+\noindent\textbf{Amendment record --- Version 1.2} extends three articles for
+backtesting --- the data side of the cross-manifesto amendment, the backtest
+object itself governed by the Valuation Manifesto --- and adds no article: MD-4
+gains the served history (the two coordinates ranged over a recorded interval,
+read as-known, look-ahead structurally impossible; completeness by read-back,
+exactness by the read-back/re-derive split); MD-11 gains the stressed history (a
+simulated path branched from a historical cut, the shift its seed,
+what-happened and what-could-have symmetric); MD-13 gains the horizon-agnostic
+operator algebra (frame boundary, delivery frame, and terms-resolved hold
+through the backtest horizon), with one pointer to the Valuation Manifesto's
+sandwich. Section 4 gains one sentence placing the backtest object in the
+Valuation Manifesto. No new MD-\emph{n}; MD-1--MD-15 keep their numbers; 1.1
+stands untouched.
+
+\medskip
+\noindent\textbf{Amendment record --- Version 1.3} adds one article, MD-16, placed
+after MD-11 to close the shift-and-simulation family (identifier append-only, so it
+reads MD-16 though it sits before MD-12). Every market datum has a \emph{dynamic},
+one member of the family of world-maps that also holds the shift (MD-11) and the
+Valuation Manifesto's surface-move rule $\mathcal{D}$; a \emph{derived state} a
+dynamic constructs is admitted only through two application-time gates ---
+no-arbitrage by construction ($m^\ast\in\Theta_{\mathrm{AF}}$, grounding
+VM~PE-1(A5)) and realism against the underlying's own as-known history (realistic,
+or conservative where the direction demands), joint distributions tested where
+marginals would hide an unprecedented configuration. Every threshold is a declared,
+versioned term, no number a manifesto constant; the gate decision is a recorded
+event-outcome, so auditability reaches the verification, not only the data. The
+distinction from a captured observation keeps MD-2 and MD-9 intact. MD-11 gains one
+sentence --- risk consumes only gated states. No existing article is otherwise
+changed; MD-1--MD-15 keep their numbers and text; 1.2 stands untouched.
+
+\end{document}
