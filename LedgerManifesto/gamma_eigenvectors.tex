@@ -1,0 +1,162 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=0.78in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{array}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{4pt}{1pt}
+\titleformat*{\section}{\large\bfseries}
+\setlength{\parskip}{1pt}
+\setlength{\parindent}{0pt}
+\allowdisplaybreaks
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+
+\title{\vspace{-3.5em}The Eigenstructure of the Black--Scholes Second-Order Greek Matrix\\[2pt]
+\large A note on $(S,\sigma)$ curvature, its signature, and the at-the-money eigenframe}
+\author{}
+\date{2026-07-24}
+
+\begin{document}
+\maketitle
+\vspace{-3.2em}
+
+\begin{abstract}
+\noindent The Hessian of the Black--Scholes price in spot and implied volatility has
+signature governed by $\operatorname{sign} d_2$ alone; at the money it factors into a
+scalar times a matrix of determinant $-\tfrac12$, so its eigenframe is fixed and vanna
+acts only as a rotation by half the total variance. Eigenvectors are coordinate-dependent;
+the inertia is not.
+\end{abstract}
+
+\vspace{-0.4em}
+\section{Setup}
+Work in the Black--Scholes frame with $r=q=0$, so $F=S$; fix strike $K$, maturity $T$, implied
+volatility $\sigma$, and write $m=\ln(K/S)$. Then
+\[
+d_{1,2}=-\frac{m}{\sigma\sqrt T}\pm\frac{\sigma\sqrt T}{2},\qquad
+d_1-d_2=\sigma\sqrt T,\qquad d_1 d_2=\tfrac14\sigma^2T-\tfrac{m^2}{\sigma^2T},
+\]
+and $\varphi=\varphi(d_1)$ is the standard normal density at $d_1$. The second-order sensitivities
+in $(S,\sigma)$ assemble into the symmetric Hessian
+\[
+H=\begin{pmatrix}\Gamma&\text{Vanna}\\[1pt]\text{Vanna}&\text{Volga}\end{pmatrix},\qquad
+\Gamma=\frac{\varphi}{S\sigma\sqrt T},\quad
+\text{Vanna}=-\frac{\varphi\,d_2}{\sigma},\quad
+\text{Volga}=\frac{S\sqrt T\,\varphi\,d_1 d_2}{\sigma}.
+\]
+$H$ is the curvature of the price as a function of the two state variables a desk marks against;
+its eigenstructure is the local principal-axis decomposition of that curvature.
+
+\section{Signature}
+\begin{proposition}\label{prop:sig}
+$\det H=\dfrac{\varphi^2\sqrt T}{\sigma}\,d_2$, hence $\operatorname{sign}\det H=\operatorname{sign} d_2$.
+\end{proposition}
+\begin{proof}
+Directly,
+\[
+\det H=\Gamma\,\text{Volga}-\text{Vanna}^2
+=\frac{\varphi^2 d_1 d_2}{\sigma^2}-\frac{\varphi^2 d_2^2}{\sigma^2}
+=\frac{\varphi^2}{\sigma^2}\,d_2\,(d_1-d_2)
+=\frac{\varphi^2}{\sigma^2}\,d_2\,\sigma\sqrt T
+=\frac{\varphi^2\sqrt T}{\sigma}\,d_2. \qedhere
+\]
+\end{proof}
+Since $\Gamma>0$ always, the signature is read off $d_2$: $H$ is positive definite when $d_2>0$,
+rank one when $d_2=0$, and a saddle when $d_2<0$.
+\begin{corollary}
+$d_2>0\iff m<\tfrac12\sigma^2T\iff S>K\,e^{\sigma^2T/2}$. Curvature in $(S,\sigma)$ is a genuine
+minimum only sufficiently far in the money; at spot--ATM ($m=0$) one has $d_2=-\tfrac12\sigma\sqrt T<0$,
+so the ATM point lies strictly in the saddle region --- $\Gamma>0$ and $\text{Volga}>0$ coexist with a
+negative eigenvalue produced by vanna.
+\end{corollary}
+
+\section{The at-the-money factorization}
+Set $m=0$ (so $K=S$): then $d_1=-d_2=\tfrac12\sigma\sqrt T$ and $d_1d_2=-\tfrac14\sigma^2T$. Writing
+$\beta:=S\sigma T$,
+\[
+H=\varphi\sqrt T\,M,\qquad
+M=\begin{pmatrix}\dfrac1\beta&\dfrac12\\[6pt]\dfrac12&-\dfrac\beta4\end{pmatrix},\qquad
+\det M=-\frac1\beta\cdot\frac\beta4-\frac14=-\frac12 .
+\]
+\begin{proposition}\label{prop:eig}
+$\det M=-\tfrac12$ for every $\beta>0$. With $t:=\operatorname{tr}M=\dfrac1\beta-\dfrac\beta4$, the
+eigenvalues and axes of $M$ are
+\[
+\lambda_\pm=\frac{t\pm\sqrt{t^2+2}}{2},\qquad
+\lambda_+\lambda_-=-\tfrac12,\qquad
+v_\pm\propto\Bigl(1,\;2\bigl(\lambda_\pm-\tfrac1\beta\bigr)\Bigr),\qquad
+\tan2\theta=\frac{4\beta}{4+\beta^2},
+\]
+where $\theta$ is the rotation of the eigenframe from the $(S,\sigma)$ axes.
+\end{proposition}
+\begin{proof}
+$\lambda_\pm$ solve $\lambda^2-t\lambda+\det M=0$ with $\det M=-\tfrac12$, so the discriminant is
+$t^2-4\det M=t^2+2$ and $\lambda_+\lambda_-=\det M=-\tfrac12$. For the axis, $(M-\lambda I)v=0$ gives
+$v\propto(M_{12},\,\lambda-M_{11})=(\tfrac12,\lambda-\tfrac1\beta)$, i.e. $(1,2(\lambda-\tfrac1\beta))$;
+and $\tan2\theta=2M_{12}/(M_{11}-M_{22})=4\beta/(4+\beta^2)$ for the symmetric $2\times2$ case.
+\end{proof}
+The determinant invariant $\det M=-\tfrac12$ means the two axes carry eigenvalues of strictly opposite
+sign for every $\beta$: the ATM curvature is a saddle whose principal-axis product is fixed independent
+of spot, volatility, and maturity.
+
+\section{Coordinate dependence and the natural (log) normalization}
+$H$ mixes units ($\Gamma$ per $S^2$, Volga per $\sigma^2$, Vanna per $S\sigma$), so its eigenvectors are
+\emph{not} invariant: a rescaling by $D=\operatorname{diag}(a,b)$ sends $H\mapsto D^{-1}HD^{-1}$, changing
+both axes and eigenvalues. By Sylvester's law of inertia only the signature (Proposition~\ref{prop:sig})
+survives. The natural choice measures curvature against \emph{relative} moves $dS/S$, $d\sigma/\sigma$ ---
+the congruence $\tilde H=DHD$, $D=\operatorname{diag}(S,\sigma)$, so $\tilde H_{11}=S^2\Gamma$,
+$\tilde H_{12}=S\sigma\,\text{Vanna}$, $\tilde H_{22}=\sigma^2\,\text{Volga}$.
+\begin{proposition}\label{prop:tilde}
+At the money, with $w:=\sigma^2T$ the total variance,
+\[
+\tilde H=S\sigma\varphi\sqrt T\;M_w,\qquad
+M_w=\begin{pmatrix}\dfrac1w&\dfrac12\\[6pt]\dfrac12&-\dfrac w4\end{pmatrix},\qquad
+\det M_w=-\tfrac12,\qquad
+\tan2\theta=\frac{4w}{4+w^2}.
+\]
+The prefactor is exactly $S\sigma\varphi\sqrt T$ --- \emph{not} $\varphi\sqrt T$; the factor $S\sigma$
+is the Jacobian of the log rescaling and must be carried.
+\end{proposition}
+\begin{proof}
+At $m=0$: $\tilde H_{12}=S\sigma\cdot(-\varphi d_2/\sigma)=-S\varphi d_2=\tfrac12 S\sigma\varphi\sqrt T$,
+fixing the prefactor $P=S\sigma\varphi\sqrt T$. Then $\tilde H_{11}=S^2\Gamma=S\varphi/(\sigma\sqrt T)=P/w$
+and $\tilde H_{22}=\sigma^2\,\text{Volga}=-S\varphi\sigma^3T^{3/2}/4=-Pw/4$, so $\tilde H=P\,M_w$; the
+angle formula follows from Proposition~\ref{prop:eig} with $\beta\to w$.
+\end{proof}
+So the log-normalized ATM curvature has the identical $M$-form with $\beta$ replaced by the total
+variance $w=\sigma^2T$. For a small total variance $w\to0$, using $\det M_w=\lambda_+\lambda_-=-\tfrac12$:
+\[
+\lambda_+=\frac1w+\frac w4+O(w^3)\ \approx\ \frac1w\ \ (\text{gamma axis}),\qquad
+\lambda_-=-\frac1{2\lambda_+}\ \approx\ -\frac w2\ \ (\text{volga axis}),\qquad
+\theta\approx\frac w2 .
+\]
+The volga \emph{entry} is $-w/4$, but vanna's off-diagonal contributes an equal $-w/4$ to the eigenvalue,
+so the volga-axis eigenvalue is $\lambda_-\approx-w/2$, twice the entry --- the exact invariant
+$\lambda_+\lambda_-=-\tfrac12$ forces it. Interpretation: at the money the gamma and volga directions
+nearly decouple ($\lambda_+\lambda_-$ fixed, axes nearly the coordinate axes), and vanna's entire effect
+is to rotate the eigenframe by $\theta\approx w/2$, half the total variance.
+
+\section{Numerical check}
+Take $S=K=100$, $\sigma=0.2$, $T=1$, so $\beta=S\sigma T=20$ and $\varphi\sqrt T=0.396953$; closed form
+and \texttt{numpy.linalg.eigh} agree.
+\begin{center}\small
+\begin{tabular}{lll}
+\toprule
+Quantity & Closed form & Numeric \\
+\midrule
+$H_{11}=\Gamma$ & $\varphi\sqrt T/\beta=0.019848$ & $0.019848$\\
+$H_{12}=\text{Vanna}$ & $\varphi\sqrt T\cdot\tfrac12=0.198476$ & $0.198476$\\
+$H_{22}=\text{Volga}$ & $-\varphi\sqrt T\cdot\tfrac\beta4=-1.984763$ & $-1.984763$\\
+$\det H$ & $(\varphi^2\sqrt T/\sigma)\,d_2=-0.078786$ & $-0.078786$\\
+$\lambda_-,\ \lambda_+$ & $\varphi\sqrt T\cdot\{\tfrac{t\pm\sqrt{t^2+2}}2\}$ & $-2.004225,\ \ 0.039310$\\
+\bottomrule
+\end{tabular}
+\end{center}
+Here $\det H<0$ confirms the ATM saddle (Proposition~\ref{prop:sig}, $d_2=-0.1<0$), and
+$\lambda_-\lambda_+=(\varphi\sqrt T)^2\det M=-\tfrac12(\varphi\sqrt T)^2$ recovers the invariant.
+\end{document}
